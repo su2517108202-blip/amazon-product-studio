@@ -1,4 +1,5 @@
 import {
+  analyzeOpenAICompatibleProduct,
   listOpenAICompatibleModels,
   testOpenAICompatible,
 } from "./openai";
@@ -9,5 +10,6 @@ export const openAICompatibleAdapter = {
   ...createBaseAdapter("openai-compatible"),
   testConnection: testOpenAICompatible,
   listModels: listOpenAICompatibleModels,
+  analyzeProduct: analyzeOpenAICompatibleProduct,
   normalizeError: normalizeProviderError,
 };

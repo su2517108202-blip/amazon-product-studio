@@ -1,4 +1,27 @@
 import { redactSecrets } from "@/lib/security";
+import { fetch as undiciFetch, ProxyAgent } from "undici";
+
+let proxyDispatcher = null;
+let proxyDispatcherUrl = "";
+
+function getProviderProxyDispatcher() {
+  const proxyUrl =
+    process.env.PROVIDER_PROXY_URL ||
+    process.env.HTTPS_PROXY ||
+    process.env.HTTP_PROXY ||
+    process.env.ALL_PROXY ||
+    "";
+
+  if (!proxyUrl) return undefined;
+
+  if (proxyDispatcher && proxyDispatcherUrl === proxyUrl) {
+    return proxyDispatcher;
+  }
+
+  proxyDispatcherUrl = proxyUrl;
+  proxyDispatcher = new ProxyAgent(proxyUrl);
+  return proxyDispatcher;
+}
 
 export class ProviderError extends Error {
   constructor(code, message, { httpStatus = 0, cause } = {}) {
@@ -33,6 +56,15 @@ export function normalizeProviderError(error) {
     };
   }
 
+  if (error?.code) {
+    return {
+      ok: false,
+      code: error.code,
+      message: error.message || "供应商返回内容无效",
+      httpStatus: error.httpStatus || 0,
+    };
+  }
+
   return {
     ok: false,
     code: "NETWORK_ERROR",
@@ -54,10 +86,14 @@ export async function providerFetch(url, options = {}) {
   const timeoutMs = options.timeoutMs || 30000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const dispatcher = getProviderProxyDispatcher();
 
   try {
-    return await fetch(url, {
+    const fetchImpl = dispatcher ? undiciFetch : fetch;
+
+    return await fetchImpl(url, {
       ...options,
+      ...(dispatcher ? { dispatcher } : {}),
       signal: controller.signal,
     });
   } catch (error) {

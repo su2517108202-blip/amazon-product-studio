@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
 import { saveProjectReference } from "@/lib/storage";
+import { sanitizeReferenceImage } from "@/lib/projects";
 
 const MAX_REFERENCE_IMAGES = 14;
 
@@ -42,7 +43,8 @@ export async function POST(req, context) {
       }
 
       const stored = await saveProjectReference(projectId, file);
-      const isPrimary = project.referenceImages.length === 0 && created.length === 0;
+      const nextIndex = project.referenceImages.length + created.length;
+      const isPrimary = nextIndex === 0;
       const image = await prisma.referenceImage.create({
         data: {
           projectId,
@@ -53,6 +55,7 @@ export async function POST(req, context) {
           mimeType: file.type,
           sortOrder,
           isPrimary,
+          includeInAnalysis: nextIndex < 8,
           imageRole,
         },
       });
@@ -68,7 +71,12 @@ export async function POST(req, context) {
       sortOrder += 1;
     }
 
-    return NextResponse.json(created, { status: 201 });
+    await prisma.productIdentity.updateMany({
+      where: { projectId },
+      data: { isStale: true },
+    });
+
+    return NextResponse.json(created.map(sanitizeReferenceImage), { status: 201 });
   } catch (error) {
     return NextResponse.json(
       { error: error.message || "图片保存失败" },

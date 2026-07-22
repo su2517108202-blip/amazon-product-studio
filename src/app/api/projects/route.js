@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
+import { sanitizeProject } from "@/lib/projects";
 
 export async function GET() {
   try {
@@ -15,7 +16,7 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json(projects);
+    return NextResponse.json(projects.map(sanitizeProject));
   } catch (error) {
     return NextResponse.json(
       { error: error.message || "无法读取项目" },
@@ -50,7 +51,7 @@ export async function POST(req) {
       },
     });
 
-    return NextResponse.json(project, { status: 201 });
+    return NextResponse.json(sanitizeProject(project), { status: 201 });
   } catch (error) {
     return NextResponse.json(
       { error: error.message || "无法创建项目" },

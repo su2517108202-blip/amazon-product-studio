@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
 import { deleteProjectStorage } from "@/lib/storage";
+import { sanitizeProject } from "@/lib/projects";
 
 async function getProjectForUser(projectId, userId) {
   return prisma.project.findFirst({
@@ -24,7 +25,7 @@ export async function GET(_req, context) {
       return NextResponse.json({ error: "项目不存在" }, { status: 404 });
     }
 
-    return NextResponse.json(project);
+    return NextResponse.json(sanitizeProject(project));
   } catch (error) {
     return NextResponse.json(
       { error: error.message || "无法读取项目" },
@@ -64,7 +65,7 @@ export async function PATCH(req, context) {
       },
     });
 
-    return NextResponse.json(project);
+    return NextResponse.json(sanitizeProject(project));
   } catch (error) {
     return NextResponse.json(
       { error: error.message || "无法更新项目" },

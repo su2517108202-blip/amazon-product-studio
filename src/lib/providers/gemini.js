@@ -6,6 +6,11 @@ import {
   providerFetch,
   safeJoinUrl,
 } from "./errors";
+import {
+  parseModelJson,
+  sanitizeProductIdentity,
+} from "@/lib/product-identity";
+import { PRODUCT_ANALYSIS_PROMPT } from "@/lib/product-analysis";
 
 function geminiModelPath(modelId) {
   return modelId.startsWith("models/") ? modelId : `models/${modelId}`;
@@ -80,6 +85,75 @@ export const geminiAdapter = {
       };
     } catch (error) {
       return normalizeProviderError(error);
+    }
+  },
+  async analyzeProduct(config, input) {
+    try {
+      if (!config.apiKey) {
+        throw new ProviderError("MISSING_API_KEY", "请先填写 API Key");
+      }
+      if (!config.capabilities?.includes("vision")) {
+        throw new ProviderError("CAPABILITY_MISMATCH", "当前模型未声明 vision 能力");
+      }
+
+      const parts = [
+        {
+          text: `${PRODUCT_ANALYSIS_PROMPT}\n\n项目名称：${input.project.name || ""}\n商品名称线索：${input.project.productName || ""}`,
+        },
+        {
+          text: `参考图顺序与角色：${input.images
+            .map(
+              (image, index) =>
+                `${index + 1}. ${image.role}${image.isPrimary ? "（主参考图）" : ""}`,
+            )
+            .join("；")}`,
+        },
+        ...input.images.map((image) => ({
+          inlineData: {
+            mimeType: image.mimeType,
+            data: image.data.toString("base64"),
+          },
+        })),
+      ];
+
+      const suffix = `${geminiModelPath(config.modelId)}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
+      const response = await providerFetch(safeJoinUrl(config.baseUrl, suffix), {
+        method: "POST",
+        timeoutMs: config.timeoutMs,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [{ role: "user", parts }],
+          generationConfig: {
+            temperature: 0.1,
+            responseMimeType: "application/json",
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new ProviderError(classifyHttpError(response.status), "视觉识别请求失败", {
+          httpStatus: response.status,
+        });
+      }
+
+      const data = await response.json();
+      const text = data?.candidates?.[0]?.content?.parts
+        ?.map((part) => part.text || "")
+        .join("")
+        .trim();
+
+      if (!text) {
+        throw new ProviderError("INVALID_RESPONSE", "供应商未返回可解析内容");
+      }
+
+      return sanitizeProductIdentity(parseModelJson(text));
+    } catch (error) {
+      const normalized = normalizeProviderError(error);
+      throw new ProviderError(normalized.code, normalized.message, {
+        httpStatus: normalized.httpStatus,
+      });
     }
   },
   normalizeError: normalizeProviderError,

@@ -85,6 +85,8 @@ model Project {
   updatedAt       DateTime         @updatedAt
   User            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   referenceImages ReferenceImage[]
+  productIdentity ProductIdentity?
+  analysisRuns    ProductAnalysisRun[]
 
   @@index([userId])
 }
@@ -99,11 +101,56 @@ model ReferenceImage {
   mimeType    String
   sortOrder   Int      @default(0)
   isPrimary   Boolean  @default(false)
+  includeInAnalysis Boolean @default(true)
   imageRole   String   @default("other")
   createdAt   DateTime @default(now())
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+model ProductIdentity {
+  id                          String   @id @default(cuid())
+  projectId                   String   @unique
+  productName                 String?
+  category                    String?
+  color                       String?
+  material                    String?
+  structure                   String?  @db.Text
+  visibleFunctionsJson        String   @db.Text
+  sellingPointsJson           String   @db.Text
+  targetUsersJson             String   @db.Text
+  usageScenariosJson          String   @db.Text
+  mustKeepJson                String   @db.Text
+  avoidChangesJson            String   @db.Text
+  primaryReferenceDescription String?  @db.Text
+  sourceProvider              String?
+  sourceModel                 String?
+  sourceProfileId             String?
+  inputFingerprint            String?
+  isStale                     Boolean  @default(false)
+  createdAt                   DateTime @default(now())
+  updatedAt                   DateTime @updatedAt
+  project                     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ProductAnalysisRun {
+  id                String    @id @default(cuid())
+  projectId         String
+  providerProfileId String?
+  provider          String?
+  model             String?
+  inputFingerprint  String?
+  status            String    @default("processing")
+  errorCode         String?
+  errorMessage      String?   @db.Text
+  durationMs        Int?
+  createdAt         DateTime  @default(now())
+  completedAt       DateTime?
+  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([providerProfileId])
 }
 
 model ProviderProfile {

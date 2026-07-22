@@ -2,6 +2,7 @@ import { promises as fs } from "fs";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
+import { sanitizeReferenceImage } from "@/lib/projects";
 
 async function getImageForUser(imageId, userId) {
   return prisma.referenceImage.findFirst({
@@ -37,6 +38,8 @@ export async function PATCH(req, context) {
       data: {
         imageRole: body.imageRole,
         isPrimary: body.isPrimary,
+        includeInAnalysis:
+          body.isPrimary === true ? true : body.includeInAnalysis,
       },
     });
 
@@ -47,7 +50,12 @@ export async function PATCH(req, context) {
       });
     }
 
-    return NextResponse.json(updated);
+    await prisma.productIdentity.updateMany({
+      where: { projectId: image.projectId },
+      data: { isStale: true },
+    });
+
+    return NextResponse.json(sanitizeReferenceImage(updated));
   } catch (error) {
     return NextResponse.json(
       { error: error.message || "无法更新图片" },
@@ -68,6 +76,11 @@ export async function DELETE(_req, context) {
 
     await prisma.referenceImage.delete({
       where: { id: imageId },
+    });
+
+    await prisma.productIdentity.updateMany({
+      where: { projectId: image.projectId },
+      data: { isStale: true },
     });
 
     if (image.localPath) {

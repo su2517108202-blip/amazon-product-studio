@@ -8,6 +8,7 @@ import {
   getPublicStorageUrl,
   getStorageKey,
 } from "@/lib/storage";
+import { sanitizeProject } from "@/lib/projects";
 
 export async function POST(_req, context) {
   try {
@@ -63,6 +64,7 @@ export async function POST(_req, context) {
           mimeType: image.mimeType,
           sortOrder: image.sortOrder,
           isPrimary: image.isPrimary,
+          includeInAnalysis: image.includeInAnalysis,
           imageRole: image.imageRole,
         },
       });
@@ -88,7 +90,7 @@ export async function POST(_req, context) {
       },
     });
 
-    return NextResponse.json(duplicated, { status: 201 });
+    return NextResponse.json(sanitizeProject(duplicated), { status: 201 });
   } catch (error) {
     return NextResponse.json(
       { error: error.message || "无法复制项目" },
