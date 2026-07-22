@@ -1,15 +1,10 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { requireCurrentUser } from "@/lib/app-mode";
 import config from "@/lib/config";
 
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    await requireCurrentUser();
 
     const formData = await req.formData();
     const file = formData.get("file");

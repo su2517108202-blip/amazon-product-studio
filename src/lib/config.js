@@ -4,6 +4,10 @@
 
 const config = {
   appName: "Amazon Product Studio",
+  app: {
+    mode: process.env.NEXT_PUBLIC_APP_MODE || process.env.APP_MODE || "production",
+    defaultLocalUserId: process.env.DEFAULT_LOCAL_USER_ID || "local-user",
+  },
   auth: {
     google: {
       clientId: process.env.GOOGLE_CLIENT_ID,

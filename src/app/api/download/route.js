@@ -1,13 +1,9 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { requireCurrentUser } from "@/lib/app-mode";
 
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    await requireCurrentUser();
 
     const { searchParams } = new URL(req.url);
     const url = searchParams.get("url");

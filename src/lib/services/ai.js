@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { UserService } from "./user";
 import config from "@/lib/config";
+import { isLocalMode } from "@/lib/app-mode";
 
 /**
  * Service to manage Amazon Product Studio creations using nano-banana-2-edit API
@@ -25,7 +26,9 @@ export const AIService = {
     }
 
     const cost = this.getCreditCost();
-    await UserService.deductCredits(userId, cost);
+    if (!isLocalMode()) {
+      await UserService.deductCredits(userId, cost);
+    }
 
     const apiKey = config.ai.apiKey;
     if (!apiKey) throw new Error("MUAPIAPP_API_KEY is not configured");
@@ -51,13 +54,17 @@ export const AIService = {
     if (!submitRes.ok) {
       const errorText = await submitRes.text();
       // Refund credits on failure before throwing
-      await UserService.addCredits(userId, cost);
+      if (!isLocalMode()) {
+        await UserService.addCredits(userId, cost);
+      }
       throw new Error(`API Submission Failed: ${submitRes.status} ${errorText}`);
     }
 
     const { request_id } = await submitRes.json();
     if (!request_id) {
-      await UserService.addCredits(userId, cost);
+      if (!isLocalMode()) {
+        await UserService.addCredits(userId, cost);
+      }
       throw new Error("No request_id received from API");
     }
 
@@ -124,7 +131,9 @@ export const AIService = {
         }
       });
       // Refund credit on failure
-      await UserService.addCredits(creation.userId, this.getCreditCost());
+      if (!isLocalMode()) {
+        await UserService.addCredits(creation.userId, this.getCreditCost());
+      }
       return { status: "failed", error: updated.error };
     }
 

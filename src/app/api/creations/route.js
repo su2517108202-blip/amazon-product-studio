@@ -1,17 +1,12 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { AIService } from "@/lib/services/ai";
+import { isLocalMode, requireCurrentUser } from "@/lib/app-mode";
 
 // GET user creations history or check status of a specific request
 export async function GET(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    const user = await requireCurrentUser();
 
     const { searchParams } = new URL(req.url);
     const requestId = searchParams.get("requestId");
@@ -19,14 +14,14 @@ export async function GET(req) {
     // If requestId is passed, perform status check/polling fallback
     if (requestId) {
       console.log(`[CREATIONS_API_GET] Checking status for requestId: ${requestId}`);
-      const statusData = await AIService.checkStatus(requestId, session.user.id);
+      const statusData = await AIService.checkStatus(requestId, user.id);
       console.log(`[CREATIONS_API_GET] Status result for ${requestId}:`, statusData);
       return NextResponse.json(statusData);
     }
 
     // Otherwise, fetch all user amazon product creations
     const creations = await prisma.amazonProductCreation.findMany({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
       orderBy: { createdAt: "desc" }
     });
 
@@ -74,21 +69,20 @@ export async function GET(req) {
 // POST new amazon product creation task
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
+    const user = await requireCurrentUser();
 
-    if (!session?.user) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+    if (!isLocalMode()) {
+      const billingUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { credits: true },
+      });
 
-    // Check credits
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { credits: true }
-    });
-
-    const cost = AIService.getCreditCost();
-    if (!user || user.credits < cost) {
-      return new NextResponse(`Insufficient credits. Required: ${cost}`, { status: 400 });
+      const cost = AIService.getCreditCost();
+      if (!billingUser || billingUser.credits < cost) {
+        return new NextResponse(`Insufficient credits. Required: ${cost}`, {
+          status: 400,
+        });
+      }
     }
 
     const { inputUrls, prompt, aspectRatio } = await req.json();
@@ -103,7 +97,7 @@ export async function POST(req) {
       return new NextResponse("Missing prompt", { status: 400 });
     }
 
-    const creation = await AIService.generate(session.user.id, {
+    const creation = await AIService.generate(user.id, {
       inputUrls,
       prompt,
       aspectRatio: aspectRatio || "1:1",

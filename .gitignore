@@ -19,10 +19,15 @@
 
 # production
 /build
+/storage
+/.local
+/tmp
+/uploads
 
 # misc
 .DS_Store
 *.pem
+*.log
 
 # debug
 npm-debug.log*

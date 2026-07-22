@@ -44,6 +44,7 @@ model User {
   accounts              Account[]
   sessions              Session[]
   AmazonProductCreation AmazonProductCreation[]
+  projects              Project[]
 }
 
 model VerificationToken {
@@ -66,4 +67,39 @@ model AmazonProductCreation {
   error       String?  @db.Text
   createdAt   DateTime @default(now())
   User        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Project {
+  id              String           @id @default(cuid())
+  userId          String
+  name            String
+  productName     String?
+  platform        String           @default("通用电商")
+  aspectRatio     String           @default("1:1")
+  notes           String?          @db.Text
+  status          String           @default("draft")
+  coverImageUrl   String?          @db.Text
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  User            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  referenceImages ReferenceImage[]
+
+  @@index([userId])
+}
+
+model ReferenceImage {
+  id          String   @id @default(cuid())
+  projectId   String
+  url         String   @db.Text
+  localPath   String?  @db.Text
+  storageKey  String?
+  fileName    String
+  mimeType    String
+  sortOrder   Int      @default(0)
+  isPrimary   Boolean  @default(false)
+  imageRole   String   @default("other")
+  createdAt   DateTime @default(now())
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
 }

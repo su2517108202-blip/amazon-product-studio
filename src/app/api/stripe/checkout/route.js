@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
+import { isLocalMode, requireCurrentUser } from "@/lib/app-mode";
 import { BillingService } from "@/lib/services/billing";
 
 export async function POST(req) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user) {
-      return new NextResponse("Unauthorized", { status: 401 });
+    if (isLocalMode()) {
+      return NextResponse.json(
+        { error: "本地模式已停用充值入口" },
+        { status: 400 },
+      );
     }
+
+    const user = await requireCurrentUser();
 
     const { planId } = await req.json();
     if (!planId) {
@@ -17,7 +19,7 @@ export async function POST(req) {
     }
 
     const checkoutUrl = await BillingService.createCheckoutSession(
-      session.user.id, 
+      user.id,
       planId
     );
 

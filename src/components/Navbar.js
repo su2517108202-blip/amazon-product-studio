@@ -17,6 +17,7 @@ export default function Navbar() {
 
   const appName = config?.appName || "AI SaaS";
   const logoLetter = appName.trim().charAt(0).toUpperCase();
+  const isLocalApp = config?.app?.mode === "local";
 
   // Eagerly prefetch workspace/gallery routes for fast tabs
   useEffect(() => {
@@ -30,12 +31,12 @@ export default function Navbar() {
     ? [
         { name: "Workspace", path: `/app/${currentAppId}` },
         { name: "Gallery", path: `/app/${currentAppId}/gallery` },
-        { name: "Pricing", path: `/app/${currentAppId}/pricing` },
+        ...(!isLocalApp ? [{ name: "Pricing", path: `/app/${currentAppId}/pricing` }] : []),
       ]
     : [
         { name: "Workspace", path: "/" },
         { name: "Gallery", path: "/gallery" },
-        { name: "Pricing", path: "/pricing" },
+        ...(!isLocalApp ? [{ name: "Pricing", path: "/pricing" }] : []),
       ];
 
   return (
@@ -87,7 +88,11 @@ export default function Navbar() {
             <span>Deploy</span>
           </a>
 
-          {status === "authenticated" ? (
+          {isLocalApp ? (
+            <span className="rounded-full border border-divider px-4 py-1.5 text-xs font-bold text-secondary-text">
+              Local Mode
+            </span>
+          ) : status === "authenticated" ? (
             <div className="flex items-center">
               {/* Credit Balance indicator */}
               <div className="flex items-center h-9 border border-divider rounded-l bg-bg-page/30 overflow-hidden pr-2">
@@ -150,7 +155,11 @@ export default function Navbar() {
 
         {/* Mobile Navbar Hamburger Menu Controls */}
         <div className="flex md:hidden items-center gap-2">
-          {status === "authenticated" && (
+          {isLocalApp ? (
+            <div className="flex items-center h-8 border border-divider rounded bg-bg-page/30 px-2.5 text-xs font-bold text-primary-text">
+              Local
+            </div>
+          ) : status === "authenticated" && (
             <div className="flex items-center h-8 border border-divider rounded bg-bg-page/30 px-2.5 text-xs font-bold text-primary-text gap-0.5">
               <FiDollarSign className="text-emerald-500 text-[10px]" />
               {session.user.credits !== undefined ? session.user.credits : 0}
@@ -198,7 +207,11 @@ export default function Navbar() {
               <span>Clone & Deploy Template</span>
             </a>
 
-            {status === "authenticated" ? (
+            {isLocalApp ? (
+              <span className="flex w-full items-center justify-center rounded border border-divider py-3 text-xs font-bold text-secondary-text">
+                Local Mode
+              </span>
+            ) : status === "authenticated" ? (
               <button
                 onClick={() => {
                   setIsOpen(false);
