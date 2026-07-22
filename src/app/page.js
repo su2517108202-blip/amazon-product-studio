@@ -1,7 +1,7 @@
 "use client";
 
 import { useSession, signIn } from "next-auth/react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   FaUpload,
   FaMagic,
@@ -83,35 +83,7 @@ export default function HomePage() {
   const fileInputRef = useRef(null);
   const pollRef = useRef(null);
 
-  useEffect(() => {
-    if (session?.user) {
-      fetchHistory();
-    }
-  }, [session]);
-
-  // Periodic polling for active history items that are still processing
-  useEffect(() => {
-    const activePoll = setInterval(() => {
-      const processingItems = history.filter(
-        (item) => item.status === "processing",
-      );
-      if (processingItems.length > 0) {
-        fetchHistory();
-      }
-    }, 4000);
-
-    return () => {
-      clearInterval(activePoll);
-    };
-  }, [history]);
-
-  useEffect(() => {
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current);
-    };
-  }, []);
-
-  const fetchHistory = async () => {
+  const fetchHistory = useCallback(async () => {
     try {
       const res = await fetch("/api/creations");
       if (res.ok) {
@@ -135,7 +107,38 @@ export default function HomePage() {
     } catch (err) {
       console.error("Error fetching history:", err);
     }
-  };
+  }, [currentCreation, updateSession]);
+
+  useEffect(() => {
+    if (session?.user) {
+      const timer = setTimeout(() => {
+        fetchHistory();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [session, fetchHistory]);
+
+  // Periodic polling for active history items that are still processing
+  useEffect(() => {
+    const activePoll = setInterval(() => {
+      const processingItems = history.filter(
+        (item) => item.status === "processing",
+      );
+      if (processingItems.length > 0) {
+        fetchHistory();
+      }
+    }, 4000);
+
+    return () => {
+      clearInterval(activePoll);
+    };
+  }, [history, fetchHistory]);
+
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
 
   const uploadFiles = async (files) => {
     if (inputUrls.length + files.length > 14) {

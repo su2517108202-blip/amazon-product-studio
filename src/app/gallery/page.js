@@ -1,25 +1,17 @@
 "use client";
 
 import { useSession, signIn } from "next-auth/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { FaDownload, FaSpinner, FaTrash, FaImage } from "react-icons/fa";
 
 export default function GalleryPage() {
   const { data: session, status } = useSession();
   const [creations, setCreations] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(null);
   const [selectedCreation, setSelectedCreation] = useState(null);
 
-  useEffect(() => {
-    if (session?.user) {
-      fetchCreations();
-    } else if (status !== "loading") {
-      setLoading(false);
-    }
-  }, [session, status]);
-
-  const fetchCreations = async () => {
+  const fetchCreations = useCallback(async () => {
     try {
       setLoading(true);
       const res = await fetch("/api/creations");
@@ -33,7 +25,16 @@ export default function GalleryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (session?.user) {
+      const timer = setTimeout(() => {
+        fetchCreations();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [session, fetchCreations]);
 
   const handleDownload = async (url, id) => {
     if (downloading) return;
@@ -117,7 +118,7 @@ export default function GalleryPage() {
             </div>
             <p className="text-xs font-semibold text-zinc-300">No creations found</p>
             <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
-              You haven't generated any completed product ad listings yet. Head over to the Product Studio to start creating.
+              You haven&apos;t generated any completed product ad listings yet. Head over to the Product Studio to start creating.
             </p>
           </div>
         ) : (
