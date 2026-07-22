@@ -28,16 +28,18 @@ export default function Navbar() {
   const currentAppId = appMatch ? appMatch[1] : null;
 
   const navLinks = currentAppId
-    ? [
-        { name: "Workspace", path: `/app/${currentAppId}` },
-        { name: "Gallery", path: `/app/${currentAppId}/gallery` },
-        ...(!isLocalApp ? [{ name: "Pricing", path: `/app/${currentAppId}/pricing` }] : []),
-      ]
-    : [
-        { name: "Workspace", path: "/" },
-        { name: "Gallery", path: "/gallery" },
-        ...(!isLocalApp ? [{ name: "Pricing", path: "/pricing" }] : []),
-      ];
+        ? [
+            { name: "Workspace", path: `/app/${currentAppId}` },
+            { name: "Gallery", path: `/app/${currentAppId}/gallery` },
+            { name: "API 设置", path: "/settings/providers" },
+            ...(!isLocalApp ? [{ name: "Pricing", path: `/app/${currentAppId}/pricing` }] : []),
+          ]
+        : [
+            { name: "Workspace", path: "/" },
+            { name: "Gallery", path: "/gallery" },
+            { name: "API 设置", path: "/settings/providers" },
+            ...(!isLocalApp ? [{ name: "Pricing", path: "/pricing" }] : []),
+          ];
 
   return (
     <header className="sticky top-0 z-50 w-full glass-panel border-b border-divider/50 shadow-md">

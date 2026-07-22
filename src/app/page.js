@@ -24,6 +24,7 @@ const EMPTY_FORM = {
 
 export default function ProjectsHomePage() {
   const [projects, setProjects] = useState([]);
+  const [assignments, setAssignments] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -33,10 +34,18 @@ export default function ProjectsHomePage() {
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/projects");
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "无法读取项目");
-      setProjects(data);
+      const [projectsRes, assignmentsRes] = await Promise.all([
+        fetch("/api/projects"),
+        fetch("/api/model-role-assignments"),
+      ]);
+      const projectsData = await projectsRes.json();
+      const assignmentsData = await assignmentsRes.json();
+      if (!projectsRes.ok) throw new Error(projectsData.error || "无法读取项目");
+      if (!assignmentsRes.ok) {
+        throw new Error(assignmentsData.error || "无法读取模型配置状态");
+      }
+      setProjects(projectsData);
+      setAssignments(assignmentsData);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -50,6 +59,10 @@ export default function ProjectsHomePage() {
     }, 0);
     return () => clearTimeout(timer);
   }, [fetchProjects]);
+
+  const assignmentMap = Object.fromEntries(
+    assignments.map((assignment) => [assignment.role, assignment]),
+  );
 
   async function createProject(event) {
     event.preventDefault();
@@ -191,6 +204,37 @@ export default function ProjectsHomePage() {
         </section>
 
         <section className="min-w-0">
+          <div className="mb-5 border border-zinc-800 bg-zinc-900/35 p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <h2 className="text-sm font-black text-white">模型配置状态</h2>
+              <Link
+                href="/settings/providers"
+                className="border border-zinc-800 px-3 py-2 text-xs font-bold text-zinc-300 hover:text-white"
+              >
+                API 设置
+              </Link>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <RoleStatus
+                label="商品识图"
+                assignment={assignmentMap.product_vision}
+              />
+              <RoleStatus
+                label="策划模型"
+                assignment={assignmentMap.image_planning}
+              />
+              <RoleStatus
+                label="图片生成"
+                assignment={assignmentMap.image_generation}
+              />
+            </div>
+            {assignments.length === 0 && (
+              <p className="mt-3 text-xs text-amber-300">
+                尚未配置 API。你仍然可以创建项目、上传参考图和管理素材。
+              </p>
+            )}
+          </div>
+
           <div className="mb-4 flex items-center justify-between">
             <h2 className="text-sm font-black uppercase tracking-widest text-zinc-400">
               最近项目
@@ -297,5 +341,23 @@ function Field({ label, children }) {
       </span>
       {children}
     </label>
+  );
+}
+
+function RoleStatus({ label, assignment }) {
+  return (
+    <div className="border border-zinc-800 bg-zinc-950 px-3 py-3">
+      <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+        {label}
+      </p>
+      <p className={`mt-1 text-sm font-black ${assignment ? "text-emerald-300" : "text-zinc-500"}`}>
+        {assignment ? "已配置" : "未配置"}
+      </p>
+      {assignment?.providerProfile && (
+        <p className="mt-1 truncate text-xs text-zinc-500">
+          {assignment.providerProfile.name}
+        </p>
+      )}
+    </div>
   );
 }

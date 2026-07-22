@@ -45,6 +45,8 @@ model User {
   sessions              Session[]
   AmazonProductCreation AmazonProductCreation[]
   projects              Project[]
+  providerProfiles      ProviderProfile[]
+  modelRoleAssignments  ModelRoleAssignment[]
 }
 
 model VerificationToken {
@@ -102,4 +104,45 @@ model ReferenceImage {
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
+}
+
+model ProviderProfile {
+  id                       String                @id @default(cuid())
+  userId                   String
+  name                     String
+  provider                 String
+  baseUrl                  String?
+  encryptedApiKey          String?               @db.Text
+  apiKeyIv                 String?
+  apiKeyAuthTag            String?
+  apiKeyLast4              String?
+  modelId                  String
+  protocol                 String                @default("openai-compatible")
+  capabilitiesJson         String                @db.Text
+  timeoutMs                Int                   @default(30000)
+  maxRetries               Int                   @default(0)
+  enabled                  Boolean               @default(true)
+  lastTestOk               Boolean?
+  lastTestMessage          String?               @db.Text
+  lastTestedAt             DateTime?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  User                     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  modelRoleAssignments     ModelRoleAssignment[]
+
+  @@index([userId])
+}
+
+model ModelRoleAssignment {
+  id                String          @id @default(cuid())
+  userId            String
+  role              String
+  providerProfileId String
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  User              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  providerProfile   ProviderProfile @relation(fields: [providerProfileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, role])
+  @@index([providerProfileId])
 }
