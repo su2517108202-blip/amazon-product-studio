@@ -1,7 +1,7 @@
 ﻿{
   "stage": "6.1",
   "branch": "codex/stage-6-1-hardening",
-  "commit": "335e857c9507826985ea0c7f51541d4f45c4618c",
+  "commit": "04bc277be6442578fd5d4c31e73349faecdb2c82",
   "tag": "stage-6-1-hardening",
   "repository": "su2517108202-blip/amazon-product-studio",
   "upstreamRepository": "SamurAIGPT/amazon-product-studio",
