@@ -1,0 +1,67 @@
+{
+  "stage": "6.2",
+  "branch": "codex/stage-6-2-auth-ci-fix",
+  "baseSealCommit": "3b1b119ff89dca74a68433fe85b9981745e5baa8",
+  "implementationCommit": "c69a302bb6bd581e49c6f4e838fb81711e53943d",
+  "sealTag": "stage-6-2-auth-ci-fix",
+  "repository": "su2517108202-blip/amazon-product-studio",
+  "upstreamRepository": "SamurAIGPT/amazon-product-studio",
+  "scope": "async generation check ownership enforcement, runtime auth tests, and CI branch trigger fix",
+  "authBoundary": {
+    "catchFindUniqueByIdRemoved": true,
+    "unauthenticatedCheckStatus": 401,
+    "unauthenticatedMutatesRun": false,
+    "unauthenticatedCallsUpstream": false,
+    "crossUserCheckStatus": "404_or_403",
+    "crossUserMutatesRun": false,
+    "crossUserCallsUpstream": false,
+    "crossUserLeaksProviderModelOrExternalTaskId": false,
+    "ownerProcessingCheckWorks": true,
+    "completedFailedSkipUpstream": true,
+    "terminalProviderErrorUpdatesOwnedRunOnly": true
+  },
+  "ci": {
+    "pushBranches": [
+      "codex/**",
+      "main"
+    ],
+    "pullRequestEnabled": true,
+    "usesRealApiKey": false,
+    "connectsUserLocalDatabase": false,
+    "runsStage61Checks": true,
+    "runsStage62RuntimeChecks": true,
+    "githubActions": "checked_after_push"
+  },
+  "qualityChecks": {
+    "prismaGenerate": "passed",
+    "emptyDatabaseMigration": "passed",
+    "stage61Checks": "passed",
+    "stage62RuntimeChecks": "passed",
+    "lint": {
+      "status": "passed",
+      "warnings": 6,
+      "warningType": "existing <img> warnings"
+    },
+    "build": "passed"
+  },
+  "secretsAndArtifacts": {
+    "containsApiKey": false,
+    "containsDatabasePassword": false,
+    "containsAuthorizationHeader": false,
+    "containsImageBase64": false,
+    "containsLocalAbsolutePath": false,
+    "commitsGeneratedAssets": false,
+    "commitsEnvFile": false
+  },
+  "outOfScope": [
+    "stage 7 candidate history",
+    "preferred image selection",
+    "downloads and zip export",
+    "batch five-image generation",
+    "image deletion and version management",
+    "Canva",
+    "ComfyUI",
+    "video",
+    "AI model generation"
+  ]
+}

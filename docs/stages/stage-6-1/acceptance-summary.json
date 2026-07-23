@@ -1,8 +1,9 @@
-﻿{
+{
   "stage": "6.1",
   "branch": "codex/stage-6-1-hardening",
-  "commit": "04bc277be6442578fd5d4c31e73349faecdb2c82",
-  "tag": "stage-6-1-hardening",
+  "implementationCommit": "04bc277be6442578fd5d4c31e73349faecdb2c82",
+  "sealTag": "stage-6-1-hardening",
+  "sealTagTarget": "3b1b119ff89dca74a68433fe85b9981745e5baa8",
   "repository": "su2517108202-blip/amazon-product-studio",
   "upstreamRepository": "SamurAIGPT/amazon-product-studio",
   "scope": "image generation safety, async idempotency, storage authorization, and reference-image protocol hardening",

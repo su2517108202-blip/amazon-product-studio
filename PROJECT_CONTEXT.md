@@ -11,15 +11,16 @@
 
 ## Completed Stages
 
-| Stage | Branch | Commit | Tag |
-| --- | --- | --- | --- |
-| 1 upstream baseline | `codex/stage-1-original-run` | `bc6355f` | `stage-1-original-run` |
-| 2 local projects | `codex/stage-2-local-projects` | `040b11c` | `stage-2-local-projects` |
-| 3 BYOK provider center | `codex/stage-3-provider-center` | `7a942cd` | `stage-3-provider-center` |
-| 4 product analysis | `codex/stage-4-product-analysis` | `7b18db6` | `stage-4-product-analysis` |
-| 5 image planning | `codex/stage-5-image-planning` | `61549a5` | `stage-5-image-planning` |
-| 6 image generation | `codex/stage-6-image-generation` | `ef818d0fd063c94d3c1cf251ef4481dd05daaf9c` | `stage-6-image-generation` |
-| 6.1 generation hardening | `codex/stage-6-1-hardening` | `04bc277be6442578fd5d4c31e73349faecdb2c82` | `stage-6-1-hardening` |
+| Stage | Branch | Implementation Commit | Seal Tag | Seal Tag Target |
+| --- | --- | --- | --- | --- |
+| 1 upstream baseline | `codex/stage-1-original-run` | `bc6355f` | `stage-1-original-run` | `bc6355f` |
+| 2 local projects | `codex/stage-2-local-projects` | `040b11c` | `stage-2-local-projects` | `040b11c` |
+| 3 BYOK provider center | `codex/stage-3-provider-center` | `7a942cd` | `stage-3-provider-center` | `7a942cd` |
+| 4 product analysis | `codex/stage-4-product-analysis` | `7b18db6` | `stage-4-product-analysis` | `7b18db6` |
+| 5 image planning | `codex/stage-5-image-planning` | `61549a5` | `stage-5-image-planning` | `61549a5` |
+| 6 image generation | `codex/stage-6-image-generation` | `ef818d0fd063c94d3c1cf251ef4481dd05daaf9c` | `stage-6-image-generation` | `ef818d0fd063c94d3c1cf251ef4481dd05daaf9c` |
+| 6.1 generation hardening | `codex/stage-6-1-hardening` | `04bc277be6442578fd5d4c31e73349faecdb2c82` | `stage-6-1-hardening` | `3b1b119ff89dca74a68433fe85b9981745e5baa8` |
+| 6.2 async auth CI fix | `codex/stage-6-2-auth-ci-fix` | `c69a302bb6bd581e49c6f4e838fb81711e53943d` | `stage-6-2-auth-ci-fix` | Reported in final reply |
 
 ## Current Prisma Models
 
@@ -121,6 +122,20 @@ Stage 6.1 hardens the Stage 6 generation workflow:
 - GitHub Actions CI was added for install, Prisma generate, migration deploy, Stage 6.1 checks, lint, and build.
 
 Stage 6.1 did not add candidate history, preferred image selection, download, ZIP, batch generation, or other Stage 7 features.
+
+## Stage 6.2 Completion
+
+Stage 6.2 is a final Stage 6 hardening fix:
+
+- Async generation checks no longer read or mutate runs in `catch` by id alone.
+- Unauthenticated async checks return 401 without querying runs or calling upstream providers.
+- Cross-user async checks return a safe not-found style response without leaking provider, model, or external task details.
+- Owned processing async checks continue to work.
+- Completed and failed runs still short-circuit without provider calls.
+- Runtime auth tests now exercise the real API route through temporary Next servers and a local fake provider.
+- CI now triggers on `codex/**`, `main`, and pull requests, and runs Stage 6.1 plus Stage 6.2 checks.
+
+Stage 6.2 did not add candidate history, preferred image selection, download, ZIP, batch generation, or other Stage 7 features.
 
 ## Known Issues
 

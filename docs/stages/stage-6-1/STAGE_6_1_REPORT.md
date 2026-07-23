@@ -1,10 +1,11 @@
 ﻿# Stage 6.1 Report: Image Generation Hardening
 
-## Branch, Commit, Tag
+## Branch, Implementation Commit, Seal Tag
 
 - Branch: `codex/stage-6-1-hardening`
-- Commit: `04bc277be6442578fd5d4c31e73349faecdb2c82`
-- Tag: `stage-6-1-hardening`
+- Implementation commit: `04bc277be6442578fd5d4c31e73349faecdb2c82`
+- Seal tag: `stage-6-1-hardening`
+- Seal tag target: `3b1b119ff89dca74a68433fe85b9981745e5baa8`
 - Repository: `su2517108202-blip/amazon-product-studio`
 - Upstream repository: `SamurAIGPT/amazon-product-studio`
 
