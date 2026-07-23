@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FaArrowLeft,
   FaCheck,
+  FaDownload,
   FaEye,
   FaImage,
   FaLightbulb,
@@ -69,6 +70,8 @@ export default function ProjectStudioClient({ projectId }) {
   const [identityForm, setIdentityForm] = useState(EMPTY_IDENTITY_FORM);
   const [planInfo, setPlanInfo] = useState(null);
   const [generationInfo, setGenerationInfo] = useState(null);
+  const [candidateInfo, setCandidateInfo] = useState(null);
+  const [generationSummary, setGenerationSummary] = useState(null);
   const [planningRuns, setPlanningRuns] = useState([]);
   const [planForm, setPlanForm] = useState(EMPTY_PLAN_FORM);
   const [activePlanIndex, setActivePlanIndex] = useState(1);
@@ -89,7 +92,7 @@ export default function ProjectStudioClient({ projectId }) {
 
   const fetchProject = useCallback(async () => {
     setError("");
-    const [projectRes, identityRes, assignmentsRes, runsRes, plansRes, planningRunsRes] =
+    const [projectRes, identityRes, assignmentsRes, runsRes, plansRes, planningRunsRes, summaryRes] =
       await Promise.all([
         fetch(`/api/projects/${projectId}`),
         fetch(`/api/projects/${projectId}/product-identity`),
@@ -97,6 +100,7 @@ export default function ProjectStudioClient({ projectId }) {
         fetch(`/api/projects/${projectId}/analysis-runs`),
         fetch(`/api/projects/${projectId}/image-plans`),
         fetch(`/api/projects/${projectId}/image-planning-runs`),
+        fetch(`/api/projects/${projectId}/generation-summary`),
       ]);
 
     const projectData = await projectRes.json();
@@ -105,6 +109,7 @@ export default function ProjectStudioClient({ projectId }) {
     const runsData = await runsRes.json();
     const plansData = await plansRes.json();
     const planningRunsData = await planningRunsRes.json();
+    const summaryData = await summaryRes.json();
 
     if (!projectRes.ok) throw new Error(projectData.error || "无法读取项目");
     if (!identityRes.ok) throw new Error(identityData.error || "无法读取产品身份证");
@@ -112,6 +117,7 @@ export default function ProjectStudioClient({ projectId }) {
     if (!runsRes.ok) throw new Error(runsData.error || "无法读取识别记录");
     if (!plansRes.ok) throw new Error(plansData.error || "无法读取主图策划");
     if (!planningRunsRes.ok) throw new Error(planningRunsData.error || "无法读取策划记录");
+    if (!summaryRes.ok) throw new Error(summaryData.error || "无法读取生成摘要");
 
     setProject(projectData);
     setDraft({
@@ -127,6 +133,7 @@ export default function ProjectStudioClient({ projectId }) {
     setRuns(runsData);
     setPlanInfo(plansData);
     setPlanningRuns(planningRunsData);
+    setGenerationSummary(summaryData);
     const selectedPlan =
       plansData.plans?.find((plan) => plan.planIndex === activePlanIndex) ||
       plansData.plans?.[0] ||
@@ -143,16 +150,23 @@ export default function ProjectStudioClient({ projectId }) {
       plansData.plans?.[0] ||
       null;
     if (nextPlan) {
-      const generationRes = await fetch(
-        `/api/projects/${projectId}/image-plans/${nextPlan.id}/generations`,
-      );
+      const [generationRes, candidatesRes] = await Promise.all([
+        fetch(`/api/projects/${projectId}/image-plans/${nextPlan.id}/generations`),
+        fetch(`/api/projects/${projectId}/image-plans/${nextPlan.id}/generated-images`),
+      ]);
       const generationData = await generationRes.json();
+      const candidatesData = await candidatesRes.json();
       if (!generationRes.ok) {
         throw new Error(generationData.error || "鏃犳硶璇诲彇鍥剧墖鐢熸垚璁板綍");
       }
+      if (!candidatesRes.ok) {
+        throw new Error(candidatesData.error || "无法读取候选图历史");
+      }
       setGenerationInfo(generationData);
+      setCandidateInfo(candidatesData);
     } else {
       setGenerationInfo(null);
+      setCandidateInfo(null);
     }
   }, [activePlanIndex, projectId]);
 
@@ -179,6 +193,35 @@ export default function ProjectStudioClient({ projectId }) {
   const failedRuns = runs.filter((run) => run.status === "failed");
   const lastRun = runs[0];
   const lastPlanningRun = planningRuns[0];
+
+  useEffect(() => {
+    const processingRun = generationSummary?.plans?.find(
+      (plan) => plan.id === selectedPlan?.id,
+    )?.processingRun;
+    if (!processingRun?.id) return undefined;
+
+    let cancelled = false;
+    const poll = async () => {
+      if (cancelled || document.hidden) return;
+      try {
+        const res = await fetch(`/api/image-generations/${processingRun.id}/check`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "检查失败");
+        if (data.status === "completed" || data.status === "failed") {
+          await fetchProject();
+        }
+      } catch (err) {
+        if (!cancelled) setError(err.message);
+      }
+    };
+
+    const timer = window.setInterval(poll, 5000);
+    poll();
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [fetchProject, generationSummary, selectedPlan?.id]);
 
   function updatePlanForm(patch) {
     setPlanForm((current) => ({ ...current, ...patch }));
@@ -502,6 +545,54 @@ export default function ProjectStudioClient({ projectId }) {
     }
   }
 
+  async function setPreferredCandidate(candidate) {
+    if (!selectedPlan) return;
+    setError("");
+    setMessage("");
+    const nextId = candidate.isPreferred ? null : candidate.id;
+    try {
+      const res = await fetch(
+        `/api/projects/${projectId}/image-plans/${selectedPlan.id}/preferred-image`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ generatedImageId: nextId }),
+        },
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "设置失败"}`);
+      await fetchProject();
+      setMessage(nextId ? `图${selectedPlan.planIndex} 首选图已保存` : `图${selectedPlan.planIndex} 首选图已取消`);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  async function deleteCandidate(candidate) {
+    const ok = window.confirm(`确认删除候选图 ${candidate.candidateNumber}？生成记录会保留。`);
+    if (!ok) return;
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch(`/api/generated-images/${candidate.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "删除失败"}`);
+      await fetchProject();
+      setMessage(`候选图 ${candidate.candidateNumber} 已删除`);
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
+  function downloadCandidate(candidate) {
+    window.location.href = `/api/generated-images/${candidate.id}/download`;
+  }
+
+  function downloadPreferredZip() {
+    if (!generationSummary?.zipReady) return;
+    window.location.href = `/api/projects/${projectId}/exports/preferred-images`;
+  }
+
   if (!project || !draft || !identityInfo || !planInfo) {
     return (
       <main className="flex flex-1 items-center justify-center bg-zinc-950 text-zinc-400">
@@ -631,6 +722,8 @@ export default function ProjectStudioClient({ projectId }) {
             project={project}
             generationAssignment={generationAssignment}
             generationInfo={generationInfo}
+            candidateInfo={candidateInfo}
+            generationSummary={generationSummary}
             generationReferenceCount={generationReferenceCount}
             generationResolution={generationResolution}
             generatingImage={generatingImage}
@@ -641,6 +734,10 @@ export default function ProjectStudioClient({ projectId }) {
             onResolutionChange={setGenerationResolution}
             onGenerateImage={generateCurrentImage}
             onCheckGeneration={checkCurrentGeneration}
+            onSetPreferredCandidate={setPreferredCandidate}
+            onDeleteCandidate={deleteCandidate}
+            onDownloadCandidate={downloadCandidate}
+            onDownloadPreferredZip={downloadPreferredZip}
           />
 
           <IdentitySection
@@ -910,6 +1007,8 @@ function PlanningSection({
   project,
   generationAssignment,
   generationInfo,
+  candidateInfo,
+  generationSummary,
   generationReferenceCount,
   generationResolution,
   generatingImage,
@@ -920,6 +1019,10 @@ function PlanningSection({
   onResolutionChange,
   onGenerateImage,
   onCheckGeneration,
+  onSetPreferredCandidate,
+  onDeleteCandidate,
+  onDownloadCandidate,
+  onDownloadPreferredZip,
 }) {
   return (
     <section className="border border-zinc-800 bg-zinc-900/35 p-4">
@@ -940,9 +1043,17 @@ function PlanningSection({
         </button>
       </div>
 
+      <GenerationSummaryBar
+        summary={generationSummary}
+        onDownloadPreferredZip={onDownloadPreferredZip}
+      />
+
       <div className="mb-4 grid gap-2 md:grid-cols-5">
         {PLAN_TABS.map((tab) => {
           const plan = plans.find((item) => item.planIndex === tab.index);
+          const planSummary = generationSummary?.plans?.find(
+            (item) => item.planIndex === tab.index,
+          );
           const active = activePlanIndex === tab.index;
           return (
             <button
@@ -956,6 +1067,15 @@ function PlanningSection({
             >
               <p className="font-black">{tab.label}</p>
               <p className="mt-1">{plan ? plan.status : "未生成"}</p>
+              {planSummary && (
+                <p className="mt-1">
+                  候选 {planSummary.candidateCount} · {planSummary.hasPreferred ? "已首选" : "未首选"}
+                </p>
+              )}
+              {planSummary?.processingRun && <p className="mt-1 text-sky-300">处理中</p>}
+              {planSummary?.failedRunCount > 0 && (
+                <p className="mt-1 text-red-300">失败 {planSummary.failedRunCount}</p>
+              )}
               {plan?.isManuallyEdited && <p className="mt-1 text-amber-300">手动修改</p>}
               {plan?.isStale && <p className="mt-1 text-red-300">可能过期</p>}
             </button>
@@ -1047,17 +1167,49 @@ function PlanningSection({
 	              selectedPlan={selectedPlan}
 	              generationAssignment={generationAssignment}
 	              generationInfo={generationInfo}
+	              candidateInfo={candidateInfo}
 	              generationReferenceCount={generationReferenceCount}
 	              generationResolution={generationResolution}
 	              generatingImage={generatingImage}
 	              onResolutionChange={onResolutionChange}
 	              onGenerateImage={onGenerateImage}
 	              onCheckGeneration={onCheckGeneration}
+	              onSetPreferredCandidate={onSetPreferredCandidate}
+	              onDeleteCandidate={onDeleteCandidate}
+	              onDownloadCandidate={onDownloadCandidate}
 	            />
 	          </div>
 	        </form>
       )}
     </section>
+  );
+}
+
+function GenerationSummaryBar({ summary, onDownloadPreferredZip }) {
+  const missing = summary?.missingPreferredPlans || [];
+  const missingText = missing
+    .map((plan) => `图${plan.planIndex} ${planTaskLabel(plan.taskType)}`)
+    .join("、");
+
+  return (
+    <div className="mb-4 grid gap-3 border border-zinc-800 bg-zinc-950 p-3 text-xs md:grid-cols-[1fr_1fr_auto]">
+      <Info label="主图生成" value={`${summary?.generatedPlanCount || 0}/5`} />
+      <Info label="首选图" value={`${summary?.preferredCount || 0}/5`} />
+      <div className="flex min-w-0 flex-col gap-2">
+        <button
+          type="button"
+          onClick={onDownloadPreferredZip}
+          disabled={!summary?.zipReady}
+          className="flex items-center justify-center gap-2 border border-emerald-800 px-3 py-2 font-black text-emerald-200 hover:border-emerald-500 disabled:border-zinc-800 disabled:text-zinc-600"
+        >
+          <FaDownload />
+          下载整套首选图
+        </button>
+        {!summary?.zipReady && missingText && (
+          <p className="truncate text-zinc-500">还缺：{missingText}</p>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -1067,12 +1219,16 @@ function GenerationPanel({
   selectedPlan,
   generationAssignment,
   generationInfo,
+  candidateInfo,
   generationReferenceCount,
   generationResolution,
   generatingImage,
   onResolutionChange,
   onGenerateImage,
   onCheckGeneration,
+  onSetPreferredCandidate,
+  onDeleteCandidate,
+  onDownloadCandidate,
 }) {
   const provider = generationAssignment?.providerProfile;
   const latestRun = generationInfo?.latestRun;
@@ -1093,9 +1249,7 @@ function GenerationPanel({
           <h3 className="text-xs font-black uppercase tracking-widest text-zinc-300">
             单张图片生成
           </h3>
-          <p className="mt-1 text-xs text-zinc-500">
-            候选图、首选图和下载将在阶段 7 开放
-          </p>
+          <p className="mt-1 text-xs text-zinc-500">当前策划候选 {candidateInfo?.stats?.candidateCount || 0} 张</p>
         </div>
         <span className="border border-zinc-800 px-2 py-1 text-[10px] text-zinc-400">
           {generationStatus(identity, selectedPlan, provider, latestRun)}
@@ -1175,6 +1329,112 @@ function GenerationPanel({
       ) : (
         <div className="mt-4 border border-dashed border-zinc-800 bg-zinc-950/50 p-6 text-center text-xs text-zinc-500">
           当前策划尚未生成图片
+        </div>
+      )}
+
+      <CandidateHistory
+        candidateInfo={candidateInfo}
+        onSetPreferredCandidate={onSetPreferredCandidate}
+        onDeleteCandidate={onDeleteCandidate}
+        onDownloadCandidate={onDownloadCandidate}
+      />
+    </div>
+  );
+}
+
+function CandidateHistory({
+  candidateInfo,
+  onSetPreferredCandidate,
+  onDeleteCandidate,
+  onDownloadCandidate,
+}) {
+  const candidates = candidateInfo?.items || [];
+  return (
+    <div className="mt-5 border-t border-zinc-800 pt-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-xs font-black uppercase tracking-widest text-zinc-300">
+          候选图历史
+        </h3>
+        <span className="border border-zinc-800 px-2 py-1 text-[10px] text-zinc-400">
+          {candidateInfo?.stats?.candidateCount || 0} 张
+        </span>
+      </div>
+
+      {!candidates.length ? (
+        <div className="border border-dashed border-zinc-800 bg-zinc-950/50 p-6 text-center text-xs text-zinc-500">
+          暂无候选图
+        </div>
+      ) : (
+        <div className="grid gap-3 md:grid-cols-2">
+          {candidates.map((candidate) => (
+            <div key={candidate.id} className="border border-zinc-800 bg-zinc-950 p-3">
+              <div className="relative aspect-square bg-black">
+                <Image
+                  src={candidate.url}
+                  alt={`Candidate ${candidate.candidateNumber}`}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 320px"
+                  className="object-contain"
+                  unoptimized
+                />
+                <div className="absolute left-2 top-2 flex gap-2">
+                  <span className="bg-zinc-950/90 px-2 py-1 text-[10px] font-black text-zinc-100">
+                    候选 {candidate.candidateNumber}
+                  </span>
+                  {candidate.isPreferred && (
+                    <span className="bg-emerald-500 px-2 py-1 text-[10px] font-black text-zinc-950">
+                      首选
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                <Info label="生成时间" value={formatDate(candidate.createdAt)} />
+                <Info label="状态" value={candidate.run?.status || "completed"} />
+                <Info label="Provider" value={candidate.run?.provider || "未知"} />
+                <Info label="Model" value={candidate.run?.model || "未知"} />
+                <Info label="Protocol" value={formatProtocol(candidate.run?.protocol || "未知")} />
+                <Info label="尺寸" value={candidate.width ? `${candidate.width}x${candidate.height}` : "未知"} />
+                <Info label="大小" value={formatBytes(candidate.byteSize)} />
+                <Info label="Stale" value={candidate.run?.usedStaleInput ? "是" : "否"} />
+                <Info label="强制版本" value={candidate.isForcedVersion ? "是" : "否"} />
+                <Info label="新版本" value={candidate.isNewVersion ? "是" : "否"} />
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <button
+                  type="button"
+                  onClick={() => onDownloadCandidate(candidate)}
+                  className="flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-xs font-black text-zinc-200 hover:text-white"
+                >
+                  <FaDownload />
+                  下载
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSetPreferredCandidate(candidate)}
+                  className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-black ${
+                    candidate.isPreferred
+                      ? "border border-emerald-700 text-emerald-200 hover:border-emerald-500"
+                      : "bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
+                  }`}
+                >
+                  <FaStar />
+                  {candidate.isPreferred ? "取消首选" : "设为首选"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDeleteCandidate(candidate)}
+                  disabled={candidate.isPreferred}
+                  className="flex items-center justify-center gap-2 border border-red-900 px-3 py-2 text-xs font-black text-red-200 hover:border-red-600 disabled:border-zinc-800 disabled:text-zinc-600"
+                >
+                  <FaTrash />
+                  删除
+                </button>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
@@ -1302,8 +1562,19 @@ function formatDate(value) {
   }
 }
 
+function formatBytes(value) {
+  const bytes = Number(value || 0);
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  return `${Math.max(0, Math.round(bytes / 1024))} KB`;
+}
+
 function formatProtocol(protocol) {
   return protocol === "generic-async-image" ? "generic-async-image（约定协议）" : protocol;
+}
+
+function planTaskLabel(taskType) {
+  const tab = PLAN_TABS.find((item) => item.taskType === taskType);
+  return tab?.label.replace(/^图\d+\s*/, "") || taskType || "未命名";
 }
 
 function toIdentityForm(identity) {

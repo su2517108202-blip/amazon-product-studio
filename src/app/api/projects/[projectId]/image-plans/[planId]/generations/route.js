@@ -49,10 +49,10 @@ export async function GET(_req, context) {
       prisma.imageGenerationRun.findFirst({
         where: { projectId, imagePlanId: planId },
         orderBy: { createdAt: "desc" },
-        include: { generatedImages: { orderBy: { createdAt: "desc" } } },
+        include: { generatedImages: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } } },
       }),
       prisma.generatedImage.findFirst({
-        where: { projectId, imagePlanId: planId },
+        where: { projectId, imagePlanId: planId, deletedAt: null },
         orderBy: { createdAt: "desc" },
       }),
       prisma.imageGenerationRun.count({
@@ -146,10 +146,10 @@ export async function POST(req, context) {
           imagePlanId: planId,
           inputFingerprint,
           status: "completed",
-          generatedImages: { some: {} },
+          generatedImages: { some: { deletedAt: null } },
         },
         orderBy: { completedAt: "desc" },
-        include: { generatedImages: { orderBy: { createdAt: "desc" } } },
+        include: { generatedImages: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } } },
       });
       if (reusable) {
         return NextResponse.json({
@@ -177,6 +177,7 @@ export async function POST(req, context) {
         resolution: output.resolution,
         requestedCount: 1,
         usedStaleInput: project.productIdentity.isStale || imagePlan.isStale,
+        isForcedVersion: body.force === true,
       },
     });
 
@@ -220,7 +221,7 @@ export async function POST(req, context) {
         durationMs: Date.now() - startedAt,
         completedAt: new Date(),
       },
-      include: { generatedImages: { orderBy: { createdAt: "desc" } } },
+      include: { generatedImages: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } } },
     });
 
     return NextResponse.json({

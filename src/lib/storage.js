@@ -144,6 +144,22 @@ export async function deleteStoredFile(storageKey) {
   await fs.rm(filePath, { force: true });
 }
 
+export async function readStoredFile(storageKey) {
+  const filePath = resolveStoragePath(String(storageKey || "").split("/"));
+  return {
+    filePath,
+    buffer: await fs.readFile(filePath),
+  };
+}
+
+export async function statStoredFile(storageKey) {
+  const filePath = resolveStoragePath(String(storageKey || "").split("/"));
+  return {
+    filePath,
+    stat: await fs.stat(filePath),
+  };
+}
+
 function normalizeStorageParts(parts = []) {
   if (!Array.isArray(parts) || parts.length === 0) {
     throw new Error("Invalid storage path");

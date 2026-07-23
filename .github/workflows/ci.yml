@@ -68,6 +68,9 @@ jobs:
       - name: Stage 6.2 async auth checks
         run: npm run test:stage-6-2
 
+      - name: Stage 7 result management checks
+        run: npm run test:stage-7
+
       - name: Lint
         run: npm run lint
 

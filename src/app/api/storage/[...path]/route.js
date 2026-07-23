@@ -61,6 +61,7 @@ async function assertStorageAccess(parts, userId) {
         projectId,
         generationRunId: runIdOrFile,
         storageKey: key,
+        deletedAt: null,
       },
       select: { id: true },
     });

@@ -115,7 +115,7 @@ export async function POST(_req, context) {
         durationMs: Date.now() - startedAt,
         completedAt: new Date(),
       },
-      include: { generatedImages: { orderBy: { createdAt: "desc" } } },
+      include: { generatedImages: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } } },
     });
     if (!completed) {
       return NextResponse.json({ code: "RUN_NOT_FOUND", error: "Generation run not found" }, { status: 404 });
@@ -160,7 +160,11 @@ export async function POST(_req, context) {
   }
 }
 
-async function loadOwnedRun(runId, userId, include = { generatedImages: true }) {
+async function loadOwnedRun(
+  runId,
+  userId,
+  include = { generatedImages: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } } },
+) {
   if (!runId || !userId) return null;
   return prisma.imageGenerationRun.findFirst({
     where: { id: runId, project: { userId } },
@@ -168,7 +172,11 @@ async function loadOwnedRun(runId, userId, include = { generatedImages: true }) 
   });
 }
 
-async function updateOwnedRun(runId, userId, { data, include = { generatedImages: true } }) {
+async function updateOwnedRun(
+  runId,
+  userId,
+  { data, include = { generatedImages: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } } } },
+) {
   if (!runId || !userId) return null;
   const result = await prisma.imageGenerationRun.updateMany({
     where: { id: runId, project: { userId } },
@@ -193,6 +201,6 @@ async function markOwnedRunFailed(runId, userId, { code, message, durationMs, to
       durationMs,
       completedAt: new Date(),
     },
-    include: { generatedImages: true },
+    include: { generatedImages: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } } },
   });
 }

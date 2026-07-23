@@ -221,6 +221,7 @@ export function imageGenerationRunToResponse(run) {
     resolution: run.resolution || "",
     requestedCount: run.requestedCount,
     usedStaleInput: run.usedStaleInput,
+    isForcedVersion: run.isForcedVersion,
     checkAttempts: run.checkAttempts || 0,
     lastCheckedAt: run.lastCheckedAt || null,
     expiresAt: run.expiresAt || null,
@@ -230,7 +231,7 @@ export function imageGenerationRunToResponse(run) {
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
     completedAt: run.completedAt,
-    generatedImages: images.map(generatedImageToResponse),
+    generatedImages: images.filter((image) => !image.deletedAt).map(generatedImageToResponse),
   };
 }
 
