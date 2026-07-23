@@ -18,47 +18,68 @@ export async function PATCH(req, context) {
   try {
     const { imageId } = await context.params;
     const user = await requireCurrentUser();
-    const image = await getImageForUser(imageId, user.id);
-
-    if (!image) {
-      return NextResponse.json({ error: "图片不存在" }, { status: 404 });
-    }
-
     const body = await req.json();
 
-    if (body.isPrimary === true) {
-      await prisma.referenceImage.updateMany({
+    const updated = await prisma.$transaction(async (tx) => {
+      const image = await tx.referenceImage.findFirst({
+        where: {
+          id: imageId,
+          project: { userId: user.id },
+        },
+        include: { project: true },
+      });
+
+      if (!image) {
+        return null;
+      }
+
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${image.projectId}))`;
+
+      const data = {};
+      if (typeof body.imageRole === "string") data.imageRole = body.imageRole;
+      if (body.isPrimary === true) {
+        data.isPrimary = true;
+        data.includeInAnalysis = true;
+        data.includeInGeneration = true;
+        await tx.referenceImage.updateMany({
+          where: { projectId: image.projectId, id: { not: imageId }, isPrimary: true },
+          data: { isPrimary: false },
+        });
+      }
+      if (typeof body.includeInAnalysis === "boolean" || body.isPrimary === true) {
+        data.includeInAnalysis = body.isPrimary === true ? true : body.includeInAnalysis;
+      }
+      if (typeof body.includeInGeneration === "boolean" || body.isPrimary === true) {
+        data.includeInGeneration = body.isPrimary === true ? true : body.includeInGeneration;
+      }
+
+      const nextImage = await tx.referenceImage.update({
+        where: { id: imageId },
+        data,
+      });
+
+      if (body.isPrimary === true) {
+        await tx.project.update({
+          where: { id: image.projectId },
+          data: { coverImageUrl: nextImage.url },
+        });
+      }
+
+      await tx.productIdentity.updateMany({
         where: { projectId: image.projectId },
-        data: { isPrimary: false },
+        data: { isStale: true },
       });
-    }
+      await tx.imagePlan.updateMany({
+        where: { projectId: image.projectId },
+        data: { isStale: true },
+      });
 
-    const data = {};
-    if (typeof body.imageRole === "string") data.imageRole = body.imageRole;
-    if (typeof body.isPrimary === "boolean") data.isPrimary = body.isPrimary;
-    if (typeof body.includeInAnalysis === "boolean" || body.isPrimary === true) {
-      data.includeInAnalysis = body.isPrimary === true ? true : body.includeInAnalysis;
-    }
-    if (typeof body.includeInGeneration === "boolean" || body.isPrimary === true) {
-      data.includeInGeneration = body.isPrimary === true ? true : body.includeInGeneration;
-    }
-
-    const updated = await prisma.referenceImage.update({
-      where: { id: imageId },
-      data,
+      return nextImage;
     });
 
-    if (body.isPrimary === true) {
-      await prisma.project.update({
-        where: { id: image.projectId },
-        data: { coverImageUrl: updated.url },
-      });
+    if (!updated) {
+      return NextResponse.json({ error: "图片不存在" }, { status: 404 });
     }
-
-    await prisma.productIdentity.updateMany({
-      where: { projectId: image.projectId },
-      data: { isStale: true },
-    });
 
     return NextResponse.json(sanitizeReferenceImage(updated));
   } catch (error) {

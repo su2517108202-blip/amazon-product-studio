@@ -8,7 +8,7 @@ import { ProviderError, providerFetch } from "@/lib/providers/errors";
 
 export const storageRoot = path.join(process.cwd(), "storage");
 export const MAX_REFERENCE_IMAGE_BYTES = 12 * 1024 * 1024;
-export const MAX_REFERENCE_IMAGE_PIXELS = 50_000_000;
+export const MAX_REFERENCE_IMAGE_PIXELS = 25_000_000;
 const MAX_GENERATED_IMAGE_BYTES = 20 * 1024 * 1024;
 
 export function sanitizeFileName(fileName) {
@@ -70,10 +70,12 @@ export async function saveProjectReference(projectId, buffer, mimeType) {
 export async function validateReferenceImageContent(buffer, mimeType) {
   let metadata;
   try {
-    metadata = await sharp(buffer, {
+    const options = {
       failOn: "warning",
       limitInputPixels: MAX_REFERENCE_IMAGE_PIXELS,
-    }).metadata();
+    };
+    metadata = await sharp(buffer, options).metadata();
+    await sharp(buffer, options).rotate().raw().toBuffer();
   } catch {
     throw new ProviderError("INVALID_IMAGE_CONTENT", "图片文件无法完整解码");
   }

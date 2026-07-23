@@ -11,7 +11,10 @@ export async function GET(req, context) {
     const { projectId, planId } = await context.params;
     const user = await requireCurrentUser();
     const url = new URL(req.url);
-    const limit = Math.min(Number(url.searchParams.get("limit") || DEFAULT_LIMIT), MAX_LIMIT);
+    const requestedLimit = Number(url.searchParams.get("limit") || DEFAULT_LIMIT);
+    const limit = Number.isFinite(requestedLimit) && requestedLimit > 0
+      ? Math.min(requestedLimit, MAX_LIMIT)
+      : DEFAULT_LIMIT;
     const cursor = url.searchParams.get("cursor") || "";
 
     const project = await prisma.project.findFirst({
@@ -40,7 +43,7 @@ export async function GET(req, context) {
         prisma.generatedImage.findMany({
           where: { projectId, imagePlanId: planId, deletedAt: null },
           orderBy: [{ createdAt: "desc" }, { id: "desc" }],
-          take: Number.isFinite(limit) && limit > 0 ? limit : DEFAULT_LIMIT,
+          take: limit + 1,
           ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
           include: {
             generationRun: {
@@ -73,13 +76,13 @@ export async function GET(req, context) {
         }),
       ]);
 
+    const hasMore = items.length > limit;
+    const pageItems = hasMore ? items.slice(0, limit) : items;
     const candidateNumbers = new Map(ordered.map((image, index) => [image.id, index + 1]));
-    const nextCursor = items.length === (Number.isFinite(limit) && limit > 0 ? limit : DEFAULT_LIMIT)
-      ? items[items.length - 1]?.id || null
-      : null;
+    const nextCursor = hasMore ? pageItems[pageItems.length - 1]?.id || null : null;
 
     return NextResponse.json({
-      items: items.map((image) =>
+      items: pageItems.map((image) =>
         generatedCandidateToResponse(image, {
           candidateNumber: candidateNumbers.get(image.id) || 1,
           preferredGeneratedImageId: imagePlan.preferredGeneratedImageId,

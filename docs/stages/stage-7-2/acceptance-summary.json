@@ -28,7 +28,7 @@
   ],
   "results": {
     "mojibakeFix": true,
-    "remainingEnglishUserLabels": true,
+    "englishUserLabelsRemoved": true,
     "dateNowFilenameCollision": true,
     "storedExtensionFromDetectedMime": true,
     "fullImageDecodeValidation": true,

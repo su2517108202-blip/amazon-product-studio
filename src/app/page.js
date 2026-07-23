@@ -130,6 +130,7 @@ export default function ProjectsHomePage() {
               <input
                 value={form.name}
                 onChange={(event) => setForm({ ...form, name: event.target.value })}
+                data-testid="project-name-input"
                 className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
                 placeholder="例如：夏季保温杯主图"
                 required
@@ -142,6 +143,7 @@ export default function ProjectsHomePage() {
                 onChange={(event) =>
                   setForm({ ...form, productName: event.target.value })
                 }
+                data-testid="project-product-name-input"
                 className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
                 placeholder="例如：316 不锈钢保温杯"
               />
@@ -189,6 +191,7 @@ export default function ProjectsHomePage() {
             <button
               type="submit"
               disabled={saving}
+              data-testid="create-project-button"
               className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:bg-zinc-800 disabled:text-zinc-500"
             >
               {saving ? <FaSpinner className="animate-spin" /> : <FaPlus />}
@@ -262,6 +265,7 @@ export default function ProjectsHomePage() {
               {projects.map((project) => (
                 <article
                   key={project.id}
+                  data-testid="project-card"
                   className="overflow-hidden border border-zinc-800 bg-zinc-900/45"
                 >
                   <div className="aspect-[4/3] bg-zinc-950">

@@ -30,6 +30,9 @@ for (const file of files) {
   for (const pattern of mojibakePatterns) {
     if (text.includes(pattern)) offenders.push(`${relative}: contains ${JSON.stringify(pattern)}`);
   }
+  if (text.includes("text-[10px]")) {
+    offenders.push(`${relative}: contains user-visible text-[10px]`);
+  }
 }
 assert.deepEqual(offenders, [], `源码存在乱码：\n${offenders.join("\n")}`);
 
@@ -63,6 +66,13 @@ assert(!studio.includes('label="Provider"'), "候选图信息不应保留 Provid
 assert(!studio.includes('label="Model"'), "候选图信息不应保留 Model 标签");
 assert(!studio.includes('label="Protocol"'), "候选图信息不应保留 Protocol 标签");
 assert(!studio.includes('label="Stale"'), "候选图信息不应保留 Stale 标签");
+assert(!studio.includes("font-black"), "工作台不应继续使用过度 font-black");
+assert(!studio.includes("text-[10px]"), "工作台不应继续使用 10px 可读信息");
+assert(!studio.includes("image/gif"), "参考图文件选择器不应展示 GIF 支持");
+assert(
+  studio.includes('accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"'),
+  "参考图文件选择器必须只允许 JPG、PNG、WebP",
+);
 
 const home = await fs.readFile(path.join(root, "src/app/page.js"), "utf8");
 const navbar = await fs.readFile(path.join(root, "src/components/Navbar.js"), "utf8");
@@ -81,6 +91,8 @@ console.log(JSON.stringify({
   scannedFiles: files.length,
   mojibake: "none",
   requiredChineseStudioLabels: "present",
+  typography: "readable",
+  gifUploadSelector: "removed",
   englishBrandResidue: "none",
 }, null, 2));
 

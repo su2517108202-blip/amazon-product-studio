@@ -694,7 +694,7 @@ export default function ProjectStudioClient({ projectId }) {
             </Field>
             <button
               disabled={saving}
-              className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700 disabled:bg-zinc-800"
+              className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:bg-zinc-800"
             >
               {saving ? <FaSpinner className="animate-spin" /> : <FaCheck />}
               保存项目
@@ -782,8 +782,8 @@ export default function ProjectStudioClient({ projectId }) {
         </section>
 
         <aside className="border border-zinc-800 bg-zinc-900/45 p-4 xl:sticky xl:top-24 xl:self-start">
-          <h2 className="text-sm font-black text-white">调用统计</h2>
-          <dl className="mt-4 space-y-3 text-xs">
+          <h2 className="text-base font-semibold text-white">调用统计</h2>
+          <dl className="mt-4 space-y-3 text-sm">
             <Info label="识别成功" value={`${successfulRuns.length}`} />
             <Info label="识别失败" value={`${failedRuns.length}`} />
             <Info label="上次识别模型" value={lastRun?.model || "无"} />
@@ -801,9 +801,9 @@ export default function ProjectStudioClient({ projectId }) {
             />
           </dl>
           <div className="mt-5 space-y-2">
-            <h3 className="text-xs font-black text-zinc-400">最近策划记录</h3>
+            <h3 className="text-sm font-semibold text-zinc-400">最近策划记录</h3>
             {planningRuns.slice(0, 5).map((run) => (
-              <div key={run.id} className="border border-zinc-800 bg-zinc-950 p-2 text-xs">
+              <div key={run.id} className="border border-zinc-800 bg-zinc-950 p-2 text-sm">
                 <p className="font-bold text-zinc-200">{run.status}</p>
                 <p className="mt-1 truncate text-zinc-500">
                   {run.provider || "unknown"} / {run.model || "unknown"}
@@ -835,19 +835,19 @@ function WorkflowPanel({
   return (
     <div className="mt-5 space-y-5 border-t border-zinc-800 pt-4">
       <section>
-        <h2 className="text-sm font-black text-white">商品识别</h2>
-        <p className="mt-2 text-xs text-zinc-500">
+        <h2 className="text-base font-semibold text-white">商品识别</h2>
+        <p className="mt-2 text-sm text-zinc-500">
           当前视觉模型：
           {visionAssignment?.providerProfile
             ? `${visionAssignment.providerProfile.name} / ${visionAssignment.providerProfile.modelId}`
             : "未配置"}
         </p>
-        <p className="mt-2 text-xs text-zinc-500">已选 {selectedCount}/8 张</p>
+        <p className="mt-2 text-sm text-zinc-500">已选 {selectedCount}/8 张</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             onClick={() => onAnalyze({ force: false })}
             disabled={analyzing || !visionAssignment?.providerProfile}
-            className="flex items-center justify-center gap-2 bg-zinc-100 px-3 py-2.5 text-xs font-black text-zinc-950 hover:bg-white disabled:bg-zinc-800 disabled:text-zinc-500"
+            className="flex items-center justify-center gap-2 bg-zinc-100 px-3 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white disabled:bg-zinc-800 disabled:text-zinc-500"
           >
             {analyzing ? <FaSpinner className="animate-spin" /> : <FaEye />}
             识别商品
@@ -855,31 +855,31 @@ function WorkflowPanel({
           <button
             onClick={() => onAnalyze({ force: true })}
             disabled={analyzing || !identity}
-            className="border border-zinc-800 px-3 py-2.5 text-xs font-black text-zinc-300 hover:text-white disabled:text-zinc-600"
+            className="border border-zinc-800 px-3 py-2.5 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600"
           >
             重新识别
           </button>
         </div>
-        <p className="mt-3 text-xs text-zinc-500">
+        <p className="mt-3 text-sm text-zinc-500">
           状态：{analysisStatus(identity, visionAssignment, analyzing)}
         </p>
       </section>
 
       <section>
-        <h2 className="text-sm font-black text-white">5 张主图策划</h2>
-        <p className="mt-2 text-xs text-zinc-500">
+        <h2 className="text-base font-semibold text-white">5 张主图策划</h2>
+        <p className="mt-2 text-sm text-zinc-500">
           当前策划模型：
           {planningAssignment?.providerProfile
             ? `${planningAssignment.providerProfile.name} / ${planningAssignment.providerProfile.modelId}`
             : "未配置"}
         </p>
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-sm text-zinc-500">
           状态：{planningStatus(identity, planningAssignment, planning, planInfo)}
         </p>
         <button
           onClick={() => onGenerate({ force: hasPlans })}
           disabled={planning || !planningAssignment?.providerProfile || !identity}
-          className="mt-3 flex w-full items-center justify-center gap-2 bg-emerald-500 px-3 py-2.5 text-xs font-black text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-500"
+          className="mt-3 flex w-full items-center justify-center gap-2 bg-emerald-500 px-3 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-500"
         >
           {planning ? <FaSpinner className="animate-spin" /> : <FaLightbulb />}
           {hasPlans ? "重新生成 5 张策划" : "生成 5 张主图策划"}
@@ -887,14 +887,14 @@ function WorkflowPanel({
       </section>
 
       <section>
-        <h2 className="text-sm font-black text-white">单张图片生成</h2>
-        <p className="mt-2 text-xs text-zinc-500">
+        <h2 className="text-base font-semibold text-white">单张图片生成</h2>
+        <p className="mt-2 text-sm text-zinc-500">
           当前图片模型：
           {generationAssignment?.providerProfile
             ? `${generationAssignment.providerProfile.name} / ${generationAssignment.providerProfile.modelId}`
             : "未配置"}
         </p>
-        <p className="mt-2 text-xs text-zinc-500">
+        <p className="mt-2 text-sm text-zinc-500">
           状态：{generationAssignment?.providerProfile ? (generatingImage ? "正在生成" : "准备生成") : "等待配置图片模型"}
         </p>
       </section>
@@ -916,13 +916,14 @@ function ReferenceImages({
     <section className="border border-zinc-800 bg-zinc-900/35 p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h1 className="truncate text-xl font-black text-white">{project.name}</h1>
-          <p className="mt-1 text-xs text-zinc-500">{project.referenceImages.length}/14</p>
+          <h1 className="truncate text-xl font-bold text-white">{project.name}</h1>
+          <p className="mt-1 text-sm text-zinc-500">{project.referenceImages.length}/14</p>
         </div>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-2 bg-zinc-100 px-4 py-2.5 text-xs font-black text-zinc-950 hover:bg-white disabled:bg-zinc-700 disabled:text-zinc-400"
+          data-testid="reference-upload-button"
+          className="flex items-center gap-2 bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white disabled:bg-zinc-700 disabled:text-zinc-400"
         >
           {uploading ? <FaSpinner className="animate-spin" /> : <FaUpload />}
           上传参考图
@@ -933,7 +934,8 @@ function ReferenceImages({
         ref={fileInputRef}
         type="file"
         multiple
-        accept="image/png,image/jpeg,image/webp,image/gif"
+        accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+        data-testid="reference-file-input"
         className="hidden"
         onChange={(event) => onUpload(Array.from(event.target.files || []))}
       />
@@ -949,7 +951,12 @@ function ReferenceImages({
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {project.referenceImages.map((image) => (
-            <article key={image.id} className="border border-zinc-800 bg-zinc-950">
+            <article
+              key={image.id}
+              data-testid="reference-image-card"
+              data-primary={image.isPrimary ? "true" : "false"}
+              className="border border-zinc-800 bg-zinc-950"
+            >
               <div className="aspect-square bg-black">
                 <img
                   src={image.url}
@@ -958,8 +965,8 @@ function ReferenceImages({
                 />
               </div>
               <div className="space-y-3 p-3">
-                <p className="truncate text-xs font-bold text-zinc-300">{image.fileName}</p>
-                <label className="flex items-center gap-2 text-xs text-zinc-400">
+                <p className="truncate text-sm font-semibold text-zinc-300">{image.fileName}</p>
+                <label className="flex items-center gap-2 text-sm text-zinc-400">
                   <input
                     checked={image.includeInAnalysis || image.isPrimary}
                     disabled={image.isPrimary}
@@ -970,7 +977,7 @@ function ReferenceImages({
                   />
                   参与识别
                 </label>
-                <label className="flex items-center gap-2 text-xs text-zinc-400">
+                <label className="flex items-center gap-2 text-sm text-zinc-400">
                   <input
                     checked={image.includeInGeneration || image.isPrimary}
                     disabled={image.isPrimary}
@@ -984,7 +991,7 @@ function ReferenceImages({
                 <select
                   value={image.imageRole}
                   onChange={(event) => onUpdate(image.id, { imageRole: event.target.value })}
-                  className="w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-xs outline-none"
+                  className="w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-sm outline-none"
                 >
                   {ROLES.map((role) => (
                     <option key={role.value} value={role.value}>
@@ -995,7 +1002,7 @@ function ReferenceImages({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => onUpdate(image.id, { isPrimary: true })}
-                    className={`flex items-center justify-center gap-2 border px-3 py-2 text-xs font-bold ${
+                    className={`flex items-center justify-center gap-2 border px-3 py-2 text-sm font-semibold ${
                       image.isPrimary
                         ? "border-amber-600 text-amber-300"
                         : "border-zinc-800 text-zinc-400 hover:text-white"
@@ -1006,7 +1013,7 @@ function ReferenceImages({
                   </button>
                   <button
                     onClick={() => onDelete(image.id)}
-                    className="flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-xs font-bold text-zinc-400 hover:border-red-700 hover:text-red-300"
+                    className="flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-400 hover:border-red-700 hover:text-red-300"
                   >
                     <FaTrash />
                     删除
@@ -1062,15 +1069,15 @@ function PlanningSection({
     <section className="border border-zinc-800 bg-zinc-900/35 p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-black text-white">5 张主图策划</h2>
-          <p className="mt-1 text-xs text-zinc-500">
+          <h2 className="text-base font-semibold text-white">5 张主图策划</h2>
+          <p className="mt-1 text-sm text-zinc-500">
             {plans.length}/5 {plans.some((plan) => plan.isStale) ? "，可能过期" : ""}
           </p>
         </div>
         <button
           onClick={() => onGenerate({ force: plans.length === 5 })}
           disabled={planning}
-          className="flex items-center gap-2 bg-emerald-500 px-4 py-2.5 text-xs font-black text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-400"
+          className="flex items-center gap-2 bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-400"
         >
           {planning ? <FaSpinner className="animate-spin" /> : <FaLightbulb />}
           {plans.length === 5 ? "重新生成" : "生成 5 张"}
@@ -1093,13 +1100,13 @@ function PlanningSection({
             <button
               key={tab.index}
               onClick={() => onSelectPlan(tab.index)}
-              className={`min-h-20 border px-3 py-2 text-left text-xs ${
+              className={`min-h-20 border px-3 py-2 text-left text-sm ${
                 active
                   ? "border-emerald-500 bg-emerald-950/30 text-emerald-100"
                   : "border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-white"
               }`}
             >
-              <p className="font-black">{tab.label}</p>
+              <p className="font-semibold">{tab.label}</p>
               <p className="mt-1">{plan ? plan.status : "未生成"}</p>
               {planSummary && (
                 <p className="mt-1">
@@ -1187,10 +1194,10 @@ function PlanningSection({
             />
           </Field>
           <div className="lg:col-span-2">
-            {planDirty && <p className="mb-2 text-xs text-amber-300">有未保存修改</p>}
+            {planDirty && <p className="mb-2 text-sm text-amber-300">有未保存修改</p>}
             <button
               disabled={savingPlan}
-              className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700 disabled:bg-zinc-800"
+              className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:bg-zinc-800"
 	            >
 	              {savingPlan ? <FaSpinner className="animate-spin" /> : <FaSave />}
 	              保存当前策划
@@ -1228,7 +1235,7 @@ function GenerationSummaryBar({ summary, onDownloadPreferredZip }) {
     .join("、");
 
   return (
-    <div className="mb-4 grid gap-3 border border-zinc-800 bg-zinc-950 p-3 text-xs md:grid-cols-[1fr_1fr_auto]">
+    <div className="mb-4 grid gap-3 border border-zinc-800 bg-zinc-950 p-3 text-sm md:grid-cols-[1fr_1fr_auto]">
       <Info label="主图生成" value={`${summary?.generatedPlanCount || 0}/5`} />
       <Info label="首选图" value={`${summary?.preferredCount || 0}/5`} />
       <div className="flex min-w-0 flex-col gap-2">
@@ -1236,7 +1243,7 @@ function GenerationSummaryBar({ summary, onDownloadPreferredZip }) {
           type="button"
           onClick={onDownloadPreferredZip}
           disabled={!summary?.zipReady}
-          className="flex items-center justify-center gap-2 border border-emerald-800 px-3 py-2 font-black text-emerald-200 hover:border-emerald-500 disabled:border-zinc-800 disabled:text-zinc-600"
+          className="flex items-center justify-center gap-2 border border-emerald-800 px-3 py-2 font-semibold text-emerald-200 hover:border-emerald-500 disabled:border-zinc-800 disabled:text-zinc-600"
         >
           <FaDownload />
           下载整套首选图
@@ -1284,12 +1291,12 @@ function GenerationPanel({
     <div className="mt-5 border-t border-zinc-800 pt-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-300">
+          <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-300">
             单张图片生成
           </h3>
-          <p className="mt-1 text-xs text-zinc-500">当前策划候选 {candidateInfo?.stats?.candidateCount || 0} 张</p>
+          <p className="mt-1 text-sm text-zinc-500">当前策划候选 {candidateInfo?.stats?.candidateCount || 0} 张</p>
         </div>
-        <span className="border border-zinc-800 px-2 py-1 text-[10px] text-zinc-400">
+        <span className="border border-zinc-800 px-2 py-1 text-xs font-medium text-zinc-400">
           {generationStatus(identity, selectedPlan, provider, latestRun)}
         </span>
       </div>
@@ -1317,7 +1324,7 @@ function GenerationPanel({
           type="button"
           onClick={() => onGenerateImage({ force: false })}
           disabled={!canGenerate}
-          className="flex items-center justify-center gap-2 bg-sky-500 px-4 py-2.5 text-xs font-black text-zinc-950 hover:bg-sky-400 disabled:bg-zinc-800 disabled:text-zinc-500"
+          className="flex items-center justify-center gap-2 bg-sky-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-sky-400 disabled:bg-zinc-800 disabled:text-zinc-500"
         >
           {generatingImage ? <FaSpinner className="animate-spin" /> : <FaImage />}
           生成当前图片
@@ -1326,7 +1333,7 @@ function GenerationPanel({
           type="button"
           onClick={() => onGenerateImage({ force: true })}
           disabled={!canGenerate || !latestImage}
-          className="border border-zinc-800 px-4 py-2.5 text-xs font-black text-zinc-300 hover:text-white disabled:text-zinc-600"
+          className="border border-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600"
         >
           强制重新生成
         </button>
@@ -1337,7 +1344,7 @@ function GenerationPanel({
           type="button"
           onClick={onCheckGeneration}
           disabled={generatingImage}
-          className="mt-3 w-full border border-sky-900 px-4 py-2.5 text-xs font-black text-sky-200 hover:border-sky-700"
+          className="mt-3 w-full border border-sky-900 px-4 py-2.5 text-sm font-semibold text-sky-200 hover:border-sky-700"
         >
           检查异步生成状态
         </button>
@@ -1355,7 +1362,7 @@ function GenerationPanel({
               unoptimized
             />
           </div>
-          <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
             <Info label="状态" value={formatRunStatus(latestRun?.status || "completed")} />
             <Info label="模型" value={latestRun?.model || "未知"} />
             <Info label="生成时间" value={formatDate(latestImage.createdAt)} />
@@ -1394,16 +1401,16 @@ function CandidateHistory({
   return (
     <div className="mt-5 border-t border-zinc-800 pt-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-xs font-black uppercase tracking-widest text-zinc-300">
+        <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-300">
           候选图历史
         </h3>
-        <span className="border border-zinc-800 px-2 py-1 text-[10px] text-zinc-400">
+        <span className="border border-zinc-800 px-2 py-1 text-xs font-medium text-zinc-400">
           {candidateInfo?.stats?.candidateCount || 0} 张
         </span>
       </div>
 
       {!candidates.length ? (
-        <div className="border border-dashed border-zinc-800 bg-zinc-950/50 p-6 text-center text-xs text-zinc-500">
+        <div className="border border-dashed border-zinc-800 bg-zinc-950/50 p-6 text-center text-sm text-zinc-500">
           暂无候选图
         </div>
       ) : (
@@ -1420,18 +1427,18 @@ function CandidateHistory({
                   unoptimized
                 />
                 <div className="absolute left-2 top-2 flex gap-2">
-                  <span className="bg-zinc-950/90 px-2 py-1 text-[10px] font-black text-zinc-100">
+                  <span className="bg-zinc-950/90 px-2 py-1 text-xs font-medium text-zinc-100">
                     候选 {candidate.candidateNumber}
                   </span>
                   {candidate.isPreferred && (
-                    <span className="bg-emerald-500 px-2 py-1 text-[10px] font-black text-zinc-950">
+                    <span className="bg-emerald-500 px-2 py-1 text-xs font-medium text-zinc-950">
                       首选
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+              <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
                 <Info label="生成时间" value={formatDate(candidate.createdAt)} />
                 <Info label="状态" value={formatRunStatus(candidate.run?.status || "completed")} />
                 <Info label="服务商" value={candidate.run?.provider || "未知"} />
@@ -1448,7 +1455,7 @@ function CandidateHistory({
                 <button
                   type="button"
                   onClick={() => onDownloadCandidate(candidate)}
-                  className="flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-xs font-black text-zinc-200 hover:text-white"
+                  className="flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-200 hover:text-white"
                 >
                   <FaDownload />
                   下载
@@ -1456,7 +1463,7 @@ function CandidateHistory({
                 <button
                   type="button"
                   onClick={() => onSetPreferredCandidate(candidate)}
-                  className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-black ${
+                  className={`flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold ${
                     candidate.isPreferred
                       ? "border border-emerald-700 text-emerald-200 hover:border-emerald-500"
                       : "bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
@@ -1469,7 +1476,7 @@ function CandidateHistory({
                   type="button"
                   onClick={() => onDeleteCandidate(candidate)}
                   disabled={candidate.isPreferred}
-                  className="flex items-center justify-center gap-2 border border-red-900 px-3 py-2 text-xs font-black text-red-200 hover:border-red-600 disabled:border-zinc-800 disabled:text-zinc-600"
+                  className="flex items-center justify-center gap-2 border border-red-900 px-3 py-2 text-sm font-semibold text-red-200 hover:border-red-600 disabled:border-zinc-800 disabled:text-zinc-600"
                 >
                   <FaTrash />
                   删除
@@ -1499,9 +1506,9 @@ function IdentitySection({ identity, identityForm, savingIdentity, onChange, onS
   return (
     <section className="border border-zinc-800 bg-zinc-900/35 p-4">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-black text-white">产品身份证摘要</h2>
+        <h2 className="text-base font-semibold text-white">产品身份证摘要</h2>
         <span
-          className={`border px-2 py-1 text-[10px] font-bold ${
+          className={`border px-2 py-1 text-xs font-medium ${
             identity?.isStale
               ? "border-amber-900 text-amber-300"
               : identity
@@ -1512,7 +1519,7 @@ function IdentitySection({ identity, identityForm, savingIdentity, onChange, onS
           {identity?.isStale ? "可能过期" : identity ? "有效" : "未识别"}
         </span>
       </div>
-      <div className="grid gap-3 text-xs sm:grid-cols-3">
+      <div className="grid gap-3 text-sm sm:grid-cols-3">
         <Info label="商品名称" value={identity?.productName || "未填写"} />
         <Info label="类目" value={identity?.category || "未填写"} />
         <Info label="颜色" value={identity?.color || "未填写"} />
@@ -1565,7 +1572,7 @@ function IdentitySection({ identity, identityForm, savingIdentity, onChange, onS
         <div className="lg:col-span-2">
           <button
             disabled={savingIdentity}
-            className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700 disabled:bg-zinc-800"
+            className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:bg-zinc-800"
           >
             {savingIdentity ? <FaSpinner className="animate-spin" /> : <FaCheck />}
             保存产品身份证
@@ -1733,7 +1740,7 @@ function textToList(value) {
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">
+      <span className="mb-2 block text-sm font-semibold uppercase tracking-widest text-zinc-500">
         {label}
       </span>
       {children}

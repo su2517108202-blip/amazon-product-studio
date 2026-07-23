@@ -25,6 +25,9 @@ const concurrentPrimaryProjectId = `${prefix}-primary-project`;
 const limitProjectId = `${prefix}-limit-project`;
 const pageProjectId = `${prefix}-pagination-project`;
 const pagePlanId = `${prefix}-pagination-plan`;
+const pageExactProjectId = `${prefix}-pagination-exact-project`;
+const pageExactPlanId = `${prefix}-pagination-exact-plan`;
+const primarySwitchProjectId = `${prefix}-primary-switch-project`;
 let activeApp = null;
 
 try {
@@ -48,11 +51,17 @@ try {
   assert.match(mismatch.data[0].storageKey, /\.png$/);
   assert.equal(mismatch.data[0].fileName, "真实PNG但扩展名是JPG.jpg");
 
-  const corrupt = await uploadFiles(app.baseUrl, mismatchProjectId, [
-    fileFromBuffer(validPng.subarray(0, 16), "损坏但有PNG头.png", "image/png"),
-  ]);
-  assert.equal(corrupt.status, 400, "corrupt image with valid header must be rejected");
-  assert.equal(corrupt.data.code, "INVALID_IMAGE_CONTENT");
+  for (const [format, mime] of [
+    ["png", "image/png"],
+    ["jpeg", "image/jpeg"],
+    ["webp", "image/webp"],
+  ]) {
+    const corrupt = await uploadFiles(app.baseUrl, mismatchProjectId, [
+      fileFromBuffer(corruptMiddle(await imageBuffer(format, 64)), `中段损坏-${format}.${format === "jpeg" ? "jpg" : format}`, mime),
+    ]);
+    assert.equal(corrupt.status, 400, `middle-corrupt ${format} image must be rejected`);
+    assert.equal(corrupt.data.code, "INVALID_IMAGE_CONTENT");
+  }
 
   const beforeNames = await listReferenceStorage(concurrentPrimaryProjectId);
   const sameName = "同毫秒同名.png";
@@ -87,6 +96,33 @@ try {
   );
   assert.equal(await prisma.referenceImage.count({ where: { projectId: limitProjectId } }), 14);
 
+  const switchImages = await prisma.referenceImage.findMany({
+    where: { projectId: primarySwitchProjectId },
+    orderBy: { sortOrder: "asc" },
+  });
+  assert.equal(switchImages.length, 3);
+  const [switchA, switchB] = await Promise.all([
+    patchJson(app.baseUrl, `/api/reference-images/${switchImages[1].id}`, { isPrimary: true }),
+    patchJson(app.baseUrl, `/api/reference-images/${switchImages[2].id}`, { isPrimary: true }),
+  ]);
+  assert.equal(switchA.status, 200);
+  assert.equal(switchB.status, 200);
+  const switched = await prisma.referenceImage.findMany({
+    where: { projectId: primarySwitchProjectId },
+    orderBy: { sortOrder: "asc" },
+  });
+  const primaryAfterSwitch = switched.filter((image) => image.isPrimary);
+  assert.equal(primaryAfterSwitch.length, 1, "concurrent primary switches leave exactly one primary");
+  const projectAfterSwitch = await prisma.project.findUnique({ where: { id: primarySwitchProjectId } });
+  assert.equal(projectAfterSwitch.coverImageUrl, primaryAfterSwitch[0].url, "cover follows the final primary image");
+  const staleIdentity = await prisma.productIdentity.findUnique({ where: { projectId: primarySwitchProjectId } });
+  assert.equal(staleIdentity.isStale, true, "primary switch marks product identity stale");
+  assert.equal(
+    await prisma.imagePlan.count({ where: { projectId: primarySwitchProjectId, isStale: true } }),
+    1,
+    "primary switch marks image plans stale",
+  );
+
   const cross = await uploadFiles(app.baseUrl, `${prefix}-other-project`, [
     fileFromBuffer(validPng, "cross.png", "image/png"),
   ]);
@@ -116,6 +152,24 @@ try {
   assert.equal(allIds.length, 25);
   assert.equal(new Set(allIds).size, 25, "pagination has no duplicates");
 
+  const exactFirstPage = await jsonRequest(
+    app.baseUrl,
+    `/api/projects/${pageExactProjectId}/image-plans/${pageExactPlanId}/generated-images`,
+  );
+  assert.equal(exactFirstPage.status, 200);
+  assert.equal(exactFirstPage.data.items.length, 12);
+  assert(exactFirstPage.data.nextCursor, "24-candidate first page exposes nextCursor");
+  const exactSecondPage = await jsonRequest(
+    app.baseUrl,
+    `/api/projects/${pageExactProjectId}/image-plans/${pageExactPlanId}/generated-images?cursor=${exactFirstPage.data.nextCursor}`,
+  );
+  assert.equal(exactSecondPage.status, 200);
+  assert.equal(exactSecondPage.data.items.length, 12);
+  assert.equal(exactSecondPage.data.nextCursor, null, "24-candidate second page is terminal");
+  const exactIds = [...exactFirstPage.data.items, ...exactSecondPage.data.items].map((item) => item.id);
+  assert.equal(exactIds.length, 24);
+  assert.equal(new Set(exactIds).size, 24, "24-candidate pagination has no duplicates");
+
   await stopNextApp(app);
   activeApp = null;
 
@@ -125,9 +179,11 @@ try {
     corruptImageRejected: true,
     concurrentSameNameNoOverwrite: true,
     concurrentSinglePrimary: true,
+    concurrentPrimarySwitchAtomic: true,
     concurrentLimitEnforced: true,
+    fullPixelDecode: true,
     providerReferenceSupport: "passed",
-    candidatePagination: { loaded: 25, pages: 3 },
+    candidatePagination: { loaded25: 25, pages25: 3, loaded24: 24, pages24: 2 },
     paidProviderCalls: 0,
   }, null, 2));
 } finally {
@@ -149,6 +205,8 @@ async function createFixtures() {
       projectData(concurrentPrimaryProjectId, ownerUserId, "并发主图测试"),
       projectData(limitProjectId, ownerUserId, "并发数量限制测试"),
       projectData(pageProjectId, ownerUserId, "候选分页测试"),
+      projectData(pageExactProjectId, ownerUserId, "候选分页整页测试"),
+      projectData(primarySwitchProjectId, ownerUserId, "并发主图切换测试"),
       projectData(`${prefix}-other-project`, otherUserId, "他人项目"),
     ],
   });
@@ -168,31 +226,23 @@ async function createFixtures() {
       imageRole: "other",
     })),
   });
+  await createPrimarySwitchFixtures();
+  await createPaginationFixtures(pageProjectId, pagePlanId, 25, "page");
+  await createPaginationFixtures(pageExactProjectId, pageExactPlanId, 24, "exact-page");
+}
+
+async function createPaginationFixtures(projectId, planId, count, suffix) {
   await prisma.imagePlan.create({
-    data: {
-      id: pagePlanId,
-      projectId: pageProjectId,
-      planIndex: 1,
-      taskType: "hero",
-      coreSellingPoint: "分页测试",
-      scene: "分页测试",
-      composition: "分页测试",
-      mainTitle: "分页测试",
-      subTitle: "分页测试",
-      keyNotesJson: "[]",
-      mustKeepJson: "[]",
-      avoidJson: "[]",
-      finalPrompt: "分页测试",
-    },
+    data: imagePlanData(planId, projectId, "分页测试"),
   });
-  for (let index = 0; index < 25; index += 1) {
-    const runId = `${prefix}-page-run-${index + 1}`;
-    const imageId = `${prefix}-page-image-${index + 1}`;
+  for (let index = 0; index < count; index += 1) {
+    const runId = `${prefix}-${suffix}-run-${index + 1}`;
+    const imageId = `${prefix}-${suffix}-image-${index + 1}`;
     await prisma.imageGenerationRun.create({
       data: {
         id: runId,
-        projectId: pageProjectId,
-        imagePlanId: pagePlanId,
+        projectId,
+        imagePlanId: planId,
         provider: "local-test",
         model: "local-test",
         protocol: "openai-image-edit",
@@ -205,11 +255,11 @@ async function createFixtures() {
     await prisma.generatedImage.create({
       data: {
         id: imageId,
-        projectId: pageProjectId,
-        imagePlanId: pagePlanId,
+        projectId,
+        imagePlanId: planId,
         generationRunId: runId,
         outputIndex: 0,
-        storageKey: `projects/${pageProjectId}/generations/${runId}/${imageId}.png`,
+        storageKey: `projects/${projectId}/generations/${runId}/${imageId}.png`,
         mimeType: "image/png",
         width: 2,
         height: 2,
@@ -220,6 +270,67 @@ async function createFixtures() {
       },
     });
   }
+}
+
+async function createPrimarySwitchFixtures() {
+  await prisma.referenceImage.createMany({
+    data: Array.from({ length: 3 }, (_, index) => ({
+      id: `${prefix}-switch-ref-${index + 1}`,
+      projectId: primarySwitchProjectId,
+      url: `/api/storage/projects/${primarySwitchProjectId}/references/switch-${index + 1}.png`,
+      localPath: null,
+      storageKey: `projects/${primarySwitchProjectId}/references/switch-${index + 1}.png`,
+      fileName: `switch-${index + 1}.png`,
+      mimeType: "image/png",
+      sortOrder: index,
+      isPrimary: index === 0,
+      includeInAnalysis: true,
+      includeInGeneration: index === 0,
+      imageRole: "other",
+    })),
+  });
+  await prisma.project.update({
+    where: { id: primarySwitchProjectId },
+    data: { coverImageUrl: `/api/storage/projects/${primarySwitchProjectId}/references/switch-1.png` },
+  });
+  await prisma.productIdentity.create({
+    data: {
+      projectId: primarySwitchProjectId,
+      productName: "并发主图测试",
+      category: "测试",
+      color: "黑色",
+      material: "塑料",
+      structure: "测试结构",
+      visibleFunctionsJson: "[]",
+      sellingPointsJson: "[]",
+      targetUsersJson: "[]",
+      usageScenariosJson: "[]",
+      mustKeepJson: "[]",
+      avoidChangesJson: "[]",
+      isStale: false,
+    },
+  });
+  await prisma.imagePlan.create({
+    data: imagePlanData(`${prefix}-switch-plan`, primarySwitchProjectId, "并发主图切换"),
+  });
+}
+
+function imagePlanData(id, projectId, text) {
+  return {
+    id,
+    projectId,
+    planIndex: 1,
+    taskType: "hero",
+    coreSellingPoint: text,
+    scene: text,
+    composition: text,
+    mainTitle: text,
+    subTitle: text,
+    keyNotesJson: "[]",
+    mustKeepJson: "[]",
+    avoidJson: "[]",
+    finalPrompt: text,
+  };
 }
 
 function projectData(id, userId, name) {
@@ -239,6 +350,8 @@ async function resetData() {
     concurrentPrimaryProjectId,
     limitProjectId,
     pageProjectId,
+    pageExactProjectId,
+    primarySwitchProjectId,
     `${prefix}-other-project`,
   ];
   await prisma.generatedImage.deleteMany({ where: { projectId: { in: ids } } }).catch(() => {});
@@ -261,15 +374,21 @@ function assertProviderReferenceSupport() {
   assert.equal(referenceImageSupportStatus({ provider: "deepseek", protocol: "openai-compatible" }), "unsupported");
 }
 
-async function imageBuffer(format) {
+async function imageBuffer(format, size = 2) {
   return sharp({
     create: {
-      width: 2,
-      height: 2,
+      width: size,
+      height: size,
       channels: 3,
       background: { r: 120, g: 160, b: 220 },
     },
   })[format]().toBuffer();
+}
+
+function corruptMiddle(buffer) {
+  const head = Math.min(96, Math.floor(buffer.length / 2));
+  const tail = Math.min(16, Math.floor(buffer.length / 6));
+  return Buffer.concat([buffer.subarray(0, head), buffer.subarray(buffer.length - tail)]);
 }
 
 function fileFromBuffer(buffer, name, type) {
@@ -297,6 +416,16 @@ async function uploadLegacy(baseUrl) {
 
 async function jsonRequest(baseUrl, pathname) {
   const response = await fetch(`${baseUrl}${pathname}`, { redirect: "manual" });
+  return responsePayload(response);
+}
+
+async function patchJson(baseUrl, pathname, body) {
+  const response = await fetch(`${baseUrl}${pathname}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    redirect: "manual",
+  });
   return responsePayload(response);
 }
 

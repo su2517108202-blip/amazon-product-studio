@@ -74,8 +74,23 @@ jobs:
       - name: Stage 7.1 upload checks
         run: npm run test:stage-7-1
 
+      - name: Stage 7.2 remediation checks
+        run: npm run test:stage-7-2
+
+      - name: UI text checks
+        run: npm run test:ui-text
+
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
       - name: Lint
         run: npm run lint
 
       - name: Build
         run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Stage 7.2.1 Playwright upload E2E
+        run: npm run test:stage-7-2-1
