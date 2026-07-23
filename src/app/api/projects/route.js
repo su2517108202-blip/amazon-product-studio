@@ -11,7 +11,10 @@ export async function GET() {
       orderBy: { updatedAt: "desc" },
       include: {
         _count: {
-          select: { referenceImages: true },
+          select: { referenceImages: true, imagePlans: true },
+        },
+        imagePlans: {
+          select: { id: true, isStale: true },
         },
       },
     });
@@ -46,7 +49,10 @@ export async function POST(req) {
       },
       include: {
         _count: {
-          select: { referenceImages: true },
+          select: { referenceImages: true, imagePlans: true },
+        },
+        imagePlans: {
+          select: { id: true, isStale: true },
         },
       },
     });

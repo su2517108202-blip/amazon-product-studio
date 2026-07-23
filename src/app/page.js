@@ -296,6 +296,11 @@ export default function ProjectsHomePage() {
                       <span className="border border-zinc-800 px-2 py-1">
                         {project._count?.referenceImages || 0} 张参考图
                       </span>
+                      <span className="border border-zinc-800 px-2 py-1">
+                        {project.imagePlanSummary?.isStale
+                          ? "主图策划：需更新"
+                          : `主图策划：${project.imagePlanSummary?.count || 0}/5`}
+                      </span>
                     </div>
                     <div className="grid grid-cols-[1fr_auto_auto] gap-2">
                       <Link

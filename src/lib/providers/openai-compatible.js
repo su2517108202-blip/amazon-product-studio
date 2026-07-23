@@ -1,5 +1,6 @@
 import {
   analyzeOpenAICompatibleProduct,
+  createOpenAICompatibleImagePlan,
   listOpenAICompatibleModels,
   testOpenAICompatible,
 } from "./openai";
@@ -11,5 +12,6 @@ export const openAICompatibleAdapter = {
   testConnection: testOpenAICompatible,
   listModels: listOpenAICompatibleModels,
   analyzeProduct: analyzeOpenAICompatibleProduct,
+  createImagePlan: createOpenAICompatibleImagePlan,
   normalizeError: normalizeProviderError,
 };

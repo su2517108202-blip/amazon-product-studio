@@ -85,7 +85,10 @@ export async function POST(_req, context) {
       where: { id: copy.id },
       include: {
         _count: {
-          select: { referenceImages: true },
+          select: { referenceImages: true, imagePlans: true },
+        },
+        imagePlans: {
+          select: { id: true, isStale: true },
         },
       },
     });

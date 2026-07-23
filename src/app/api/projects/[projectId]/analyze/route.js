@@ -142,6 +142,11 @@ export async function POST(req, context) {
       },
     });
 
+    await prisma.imagePlan.updateMany({
+      where: { projectId },
+      data: { isStale: true },
+    });
+
     return NextResponse.json({
       ok: true,
       reused: false,

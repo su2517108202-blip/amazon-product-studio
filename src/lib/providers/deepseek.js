@@ -1,4 +1,5 @@
 import {
+  createOpenAICompatibleImagePlan,
   listOpenAICompatibleModels,
   testOpenAICompatible,
 } from "./openai";
@@ -9,5 +10,6 @@ export const deepSeekAdapter = {
   ...createBaseAdapter("deepseek"),
   testConnection: testOpenAICompatible,
   listModels: listOpenAICompatibleModels,
+  createImagePlan: createOpenAICompatibleImagePlan,
   normalizeError: normalizeProviderError,
 };

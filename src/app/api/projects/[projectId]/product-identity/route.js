@@ -88,6 +88,11 @@ export async function PATCH(req, context) {
       },
     });
 
+    await prisma.imagePlan.updateMany({
+      where: { projectId },
+      data: { isStale: true },
+    });
+
     return NextResponse.json(identityToResponse(saved));
   } catch (error) {
     return NextResponse.json(

@@ -45,6 +45,14 @@ export async function PATCH(req, context) {
     }
 
     const body = await req.json();
+    const planningInputsChanged =
+      (body.platform !== undefined && body.platform !== existing.platform) ||
+      (body.aspectRatio !== undefined && body.aspectRatio !== existing.aspectRatio) ||
+      (body.name !== undefined && (body.name || "").trim() !== existing.name) ||
+      (body.productName !== undefined &&
+        ((body.productName || "").trim() || null) !== existing.productName) ||
+      (body.notes !== undefined && ((body.notes || "").trim() || null) !== existing.notes);
+
     const project = await prisma.project.update({
       where: { id: projectId },
       data: {
@@ -64,6 +72,13 @@ export async function PATCH(req, context) {
         },
       },
     });
+
+    if (planningInputsChanged) {
+      await prisma.imagePlan.updateMany({
+        where: { projectId },
+        data: { isStale: true },
+      });
+    }
 
     return NextResponse.json(sanitizeProject(project));
   } catch (error) {
