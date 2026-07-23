@@ -57,27 +57,27 @@ export function supportsImageGenerationProfile(profile) {
 
 export function validateImageGenerationProtocol(profile) {
   if (profile.provider === "gemini" && profile.protocol !== "gemini-native-image") {
-    throw new ProviderError("UNSUPPORTED_PROTOCOL", "Gemini image generation requires gemini-native-image");
+    throw new ProviderError("UNSUPPORTED_PROTOCOL", "Gemini 图片生成必须使用 gemini-native-image");
   }
   if (profile.provider === "openai" && !["openai-images", "openai-image-edit"].includes(profile.protocol)) {
-    throw new ProviderError("UNSUPPORTED_PROTOCOL", "OpenAI image generation protocol is not supported");
+    throw new ProviderError("UNSUPPORTED_PROTOCOL", "当前 OpenAI 图片生成协议不受支持");
   }
   if (profile.provider === "doubao" && profile.protocol !== "doubao-image") {
-    throw new ProviderError("UNSUPPORTED_PROTOCOL", "Doubao image generation protocol is not supported");
+    throw new ProviderError("UNSUPPORTED_PROTOCOL", "豆包图片生成必须使用 doubao-image");
   }
   if (
     profile.provider === "openai-compatible" &&
     !["openai-images", "openai-image-edit", "generic-async-image"].includes(profile.protocol)
   ) {
-    throw new ProviderError("UNSUPPORTED_PROTOCOL", "OpenAI compatible image protocol is not supported");
+    throw new ProviderError("UNSUPPORTED_PROTOCOL", "当前 OpenAI 兼容图片协议不受支持");
   }
   if (profile.provider === "deepseek") {
-    throw new ProviderError("UNSUPPORTED_PROTOCOL", "DeepSeek does not support image generation");
+    throw new ProviderError("UNSUPPORTED_PROTOCOL", "DeepSeek 不支持图片生成");
   }
   if (!supportsReferenceImagesProfile(profile)) {
     throw new ProviderError(
       "REFERENCE_IMAGES_UNSUPPORTED",
-      "This image generation protocol does not truly transmit reference images",
+      "当前图片生成协议不会真实传递参考图",
     );
   }
 }
@@ -90,19 +90,19 @@ export function buildPromptSnapshot({ project, productIdentity, imagePlan, refer
   const mustKeep = parseStoredArray(productIdentity.mustKeepJson);
   const avoidChanges = parseStoredArray(productIdentity.avoidChangesJson);
   const roleSummary = referenceImages
-    .map((image, index) => `${index + 1}. ${image.imageRole}${image.isPrimary ? " primary" : ""}`)
+    .map((image, index) => `${index + 1}. ${image.imageRole}${image.isPrimary ? "，主参考图" : ""}`)
     .join("; ");
 
   return [
     imagePlan.finalPrompt,
     "",
-    "Product consistency constraints:",
-    `Product identity: ${productIdentity.productName || project.productName || project.name}`,
-    `Must keep: ${mustKeep.join("; ") || "all confirmed product shape, color, logo, and parts"}`,
-    `Avoid changes: ${avoidChanges.join("; ") || "do not alter verified product attributes"}`,
-    `Reference images for this generation: ${roleSummary}`,
-    `Output: ${output.aspectRatio || project.aspectRatio || "1:1"}, ${output.resolution || "1K"}, one ecommerce image.`,
-    "Use the reference images to preserve the real product. Do not create a collage, grid, extra accessories, or a different product.",
+    "产品一致性约束：",
+    `产品身份：${productIdentity.productName || project.productName || project.name}`,
+    `必须保持：${mustKeep.join("; ") || "已确认的商品形状、颜色、Logo、结构和真实部件"}`,
+    `禁止改变：${avoidChanges.join("; ") || "不得改变已验证的商品属性"}`,
+    `本次生成使用的参考图：${roleSummary}`,
+    `输出要求：${output.aspectRatio || project.aspectRatio || "1:1"}，${output.resolution || "1K"}，一张电商商品图。`,
+    "必须使用参考图保持真实商品一致性。不要生成拼图、九宫格、额外配件或不同商品。所有自然语言提示默认使用简体中文。",
   ].join("\n");
 }
 
@@ -162,31 +162,31 @@ export function pickDefaultGenerationReferences(referenceImages = []) {
 
 export async function loadGenerationReferences(referenceImages) {
   if (!referenceImages.some((image) => image.isPrimary)) {
-    throw new ProviderError("MISSING_PRIMARY_REFERENCE", "Missing primary reference image");
+    throw new ProviderError("MISSING_PRIMARY_REFERENCE", "缺少主参考图");
   }
   if (referenceImages.length > MAX_GENERATION_REFERENCES) {
-    throw new ProviderError("TOO_MANY_REFERENCE_IMAGES", "At most 4 reference images can be used");
+    throw new ProviderError("TOO_MANY_REFERENCE_IMAGES", "参与生成的参考图最多 4 张");
   }
 
   let totalBytes = 0;
   const output = [];
   for (const image of referenceImages) {
     if (!image.localPath) {
-      throw new ProviderError("REFERENCE_FILE_NOT_FOUND", "Reference image file is missing");
+      throw new ProviderError("REFERENCE_FILE_NOT_FOUND", "参考图文件不存在");
     }
     const stat = await fs.stat(image.localPath).catch(() => null);
     if (!stat || !stat.isFile()) {
-      throw new ProviderError("REFERENCE_FILE_NOT_FOUND", "Reference image file is missing");
+      throw new ProviderError("REFERENCE_FILE_NOT_FOUND", "参考图文件不存在");
     }
     if (stat.size > MAX_REFERENCE_BYTES) {
-      throw new ProviderError("INVALID_REFERENCE_IMAGE", "Reference image is too large");
+      throw new ProviderError("INVALID_REFERENCE_IMAGE", "参考图超过 12MB");
     }
     totalBytes += stat.size;
     if (totalBytes > MAX_REFERENCE_TOTAL_BYTES) {
-      throw new ProviderError("INVALID_REFERENCE_IMAGE", "Reference images are too large");
+      throw new ProviderError("INVALID_REFERENCE_IMAGE", "参考图总大小过大");
     }
     if (!["image/png", "image/jpeg", "image/webp"].includes(image.mimeType)) {
-      throw new ProviderError("INVALID_REFERENCE_IMAGE", "Reference image type is not supported");
+      throw new ProviderError("INVALID_REFERENCE_IMAGE", "参考图格式不支持");
     }
 
     output.push({

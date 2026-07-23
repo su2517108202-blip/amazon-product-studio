@@ -20,7 +20,7 @@ export async function PATCH(req, context) {
     });
 
     if (!plan) {
-      return NextResponse.json({ error: "Image plan not found" }, { status: 404 });
+      return NextResponse.json({ error: "未找到图片策划" }, { status: 404 });
     }
 
     const body = await req.json();
@@ -44,7 +44,7 @@ export async function PATCH(req, context) {
     return NextResponse.json(imagePlanToResponse(saved));
   } catch (error) {
     return NextResponse.json(
-      { error: error.message || "Unable to save image plan" },
+      { error: error.message || "无法保存图片策划" },
       { status: error.status || 500 },
     );
   }

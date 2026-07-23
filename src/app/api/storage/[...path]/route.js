@@ -21,7 +21,7 @@ export async function GET(_req, context) {
     });
   } catch (error) {
     if (error?.status === 401) {
-      return NextResponse.json({ code: "UNAUTHORIZED", error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ code: "UNAUTHORIZED", error: "未登录或无权访问" }, { status: 401 });
     }
     return NextResponse.json(
       { code: "STORAGE_FILE_NOT_FOUND", error: "文件不存在或无权访问" },

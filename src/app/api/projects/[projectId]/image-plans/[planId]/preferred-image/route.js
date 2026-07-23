@@ -17,7 +17,7 @@ export async function PATCH(req, context) {
         select: { id: true },
       });
       if (!project) {
-        return { status: 404, body: { code: "PROJECT_NOT_FOUND", error: "Project not found" } };
+        return { status: 404, body: { code: "PROJECT_NOT_FOUND", error: "未找到项目" } };
       }
 
       const imagePlan = await tx.imagePlan.findFirst({
@@ -25,7 +25,7 @@ export async function PATCH(req, context) {
         select: { id: true, preferredGeneratedImageId: true },
       });
       if (!imagePlan) {
-        return { status: 404, body: { code: "IMAGE_PLAN_NOT_FOUND", error: "Image plan not found" } };
+        return { status: 404, body: { code: "IMAGE_PLAN_NOT_FOUND", error: "未找到图片策划" } };
       }
 
       if (generatedImageId === null) {
@@ -40,7 +40,7 @@ export async function PATCH(req, context) {
       if (!generatedImageId) {
         return {
           status: 404,
-          body: { code: "GENERATED_IMAGE_NOT_FOUND", error: "Generated image not found" },
+          body: { code: "GENERATED_IMAGE_NOT_FOUND", error: "未找到生成图片" },
         };
       }
 
@@ -70,7 +70,7 @@ export async function PATCH(req, context) {
       if (!generatedImage) {
         return {
           status: 404,
-          body: { code: "GENERATED_IMAGE_NOT_FOUND", error: "Generated image not found" },
+          body: { code: "GENERATED_IMAGE_NOT_FOUND", error: "未找到生成图片" },
         };
       }
       if (generatedImage.imagePlanId !== planId) {
@@ -110,10 +110,10 @@ export async function PATCH(req, context) {
     return NextResponse.json(result.body, { status: result.status });
   } catch (error) {
     if (error?.status === 401) {
-      return NextResponse.json({ code: "UNAUTHORIZED", error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ code: "UNAUTHORIZED", error: "未登录或无权访问" }, { status: 401 });
     }
     return NextResponse.json(
-      { code: "PREFERRED_IMAGE_UPDATE_FAILED", error: "Unable to update preferred image" },
+      { code: "PREFERRED_IMAGE_UPDATE_FAILED", error: "无法更新首选图" },
       { status: 500 },
     );
   }

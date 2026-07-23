@@ -33,9 +33,9 @@ async function loadGenerationContext(projectId, planId, userId) {
     },
   });
 
-  if (!project) throw new ProviderError("PROJECT_NOT_FOUND", "Project not found");
+  if (!project) throw new ProviderError("PROJECT_NOT_FOUND", "未找到项目");
   const imagePlan = project.imagePlans[0];
-  if (!imagePlan) throw new ProviderError("MISSING_IMAGE_PLAN", "Image plan not found");
+  if (!imagePlan) throw new ProviderError("MISSING_IMAGE_PLAN", "未找到图片策划");
   return { project, imagePlan };
 }
 
@@ -88,7 +88,7 @@ export async function POST(req, context) {
     const { project, imagePlan } = await loadGenerationContext(projectId, planId, user.id);
 
     if (!project.productIdentity) {
-      throw new ProviderError("MISSING_PRODUCT_IDENTITY", "Product identity is required before image generation");
+      throw new ProviderError("MISSING_PRODUCT_IDENTITY", "请先生成产品身份证");
     }
     const allowStale = body.allowStaleInput === true;
     if ((project.productIdentity.isStale || imagePlan.isStale) && !allowStale) {
@@ -99,7 +99,7 @@ export async function POST(req, context) {
       );
     }
     if (!imagePlan.finalPrompt?.trim()) {
-      throw new ProviderError("INVALID_PROMPT", "Image plan final prompt is empty");
+      throw new ProviderError("INVALID_PROMPT", "图片策划提示词为空");
     }
 
     const assignment = await prisma.modelRoleAssignment.findUnique({
@@ -108,10 +108,10 @@ export async function POST(req, context) {
     });
     const profile = assignment?.providerProfile;
     if (!profile) {
-      throw new ProviderError("MISSING_IMAGE_GENERATION_PROVIDER", "Image generation provider is not configured");
+      throw new ProviderError("MISSING_IMAGE_GENERATION_PROVIDER", "请先配置图片生成模型");
     }
     if (!supportsImageGenerationProfile(profile)) {
-      throw new ProviderError("CAPABILITY_MISMATCH", "Provider is not image generation capable");
+      throw new ProviderError("CAPABILITY_MISMATCH", "当前服务商未勾选 image 能力");
     }
     validateImageGenerationProtocol(profile);
 

@@ -1,0 +1,104 @@
+{
+  "stage": "7.1",
+  "branch": "codex/stage-7-1-cn-upload-fix",
+  "tag": "stage-7-1-cn-upload-fix",
+  "baseCommit": "87bcb319668c55bc8599c10a895e3c789afdc5cd",
+  "scope": [
+    "simplified-chinese-ui",
+    "chinese-ai-output-prompts",
+    "reference-image-upload-hardening",
+    "global-typography-readability"
+  ],
+  "databaseModelChanges": [],
+  "uploadRootCause": "The previous upload route trusted browser-provided MIME type, did not validate image signatures before saving, lacked a dedicated 12MB image limit, did not reject empty images, and did not make mixed batches atomic.",
+  "uploadValidation": {
+    "maxBytesPerImage": 12582912,
+    "allowedMimeTypes": [
+      "image/jpeg",
+      "image/png",
+      "image/webp"
+    ],
+    "checksFileSignature": true,
+    "rejectsEmptyFile": true,
+    "rejectsOversizedFile": true,
+    "rejectsNonImage": true,
+    "rejectsMimeSignatureMismatch": true,
+    "batchAtomicity": true,
+    "cleansTemporaryFilesOnFailure": true,
+    "createsStorageDirectoryIfMissing": true,
+    "keepsProjectOwnershipCheck": true,
+    "doesNotExposeLocalAbsolutePath": true
+  },
+  "realUiAcceptance": {
+    "browser": "Chrome",
+    "viewports": [
+      "1440x900",
+      "390x844"
+    ],
+    "routes": [
+      "/",
+      "/settings/providers",
+      "/projects/cmrxtauxc000u3opgnmbeixjs"
+    ],
+    "projectId": "cmrxtauxc000u3opgnmbeixjs",
+    "referenceImageCount": 8,
+    "primaryReference": "tumbler-front.png",
+    "analysisReferenceCount": 4,
+    "generationReferenceCount": 4,
+    "productIdentitySaved": true,
+    "recognizedProductName": "哑光黑不锈钢随行杯",
+    "imagePlansSaved": 5,
+    "imagePlansAreChinese": true,
+    "refreshRecovery": true,
+    "serviceRestartRecovery": true,
+    "blockingConsoleErrors": []
+  },
+  "providerCalls": {
+    "realVisionRecognitionCalls": 1,
+    "realFiveImagePlanningCalls": 1,
+    "newPaidImageGenerationCalls": 0
+  },
+  "fontReadability": {
+    "fontStack": "-apple-system, BlinkMacSystemFont, Segoe UI, PingFang SC, Microsoft YaHei, Noto Sans CJK SC, Noto Sans SC, Arial, sans-serif",
+    "mobileMinimumBodyPx": 14,
+    "mobileMinimumInputPx": 16,
+    "minimumTapTargetPx": 42,
+    "cleanedText10Count": 23,
+    "remainingText10Count": 0,
+    "cleanedText9Count": 8,
+    "remainingText9Count": 0,
+    "cleanedText11Count": 4,
+    "remainingText11Count": 0,
+    "cleanedFontBlackCount": 54,
+    "remainingFontBlackCount": 0
+  },
+  "screenshots": [
+    "docs/stages/stage-7-1/ui-acceptance/01-chinese-project-list.png",
+    "docs/stages/stage-7-1/ui-acceptance/02-chinese-provider-settings.png",
+    "docs/stages/stage-7-1/ui-acceptance/03-upload-before.png",
+    "docs/stages/stage-7-1/ui-acceptance/04-upload-success.png",
+    "docs/stages/stage-7-1/ui-acceptance/05-chinese-product-identity.png",
+    "docs/stages/stage-7-1/ui-acceptance/06-chinese-five-image-plans.png",
+    "docs/stages/stage-7-1/ui-acceptance/07-mobile-chinese-project.png"
+  ],
+  "regression": {
+    "stage7CandidateHistory": true,
+    "stage7PreferredImage": true,
+    "singleImageDownload": true,
+    "preferredZipDownload": true,
+    "productRecognition": true,
+    "fiveImagePlanning": true,
+    "singleImageGenerationEntryPreserved": true,
+    "existingProjectDataPreserved": true
+  },
+  "checks": {
+    "prismaGenerate": "passed",
+    "stage71Tests": "passed",
+    "stage7Regression": "passed",
+    "lint": "passed-with-existing-img-warnings",
+    "build": "passed"
+  },
+  "secretsIncluded": false,
+  "base64Included": false,
+  "localAbsolutePathsIncluded": false
+}

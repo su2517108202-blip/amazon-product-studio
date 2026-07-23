@@ -53,7 +53,7 @@ export async function POST(req, context) {
     const project = await getProject(projectId, user.id);
 
     if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      return NextResponse.json({ error: "未找到项目" }, { status: 404 });
     }
     if (!project.productIdentity) {
       const error = new Error("Please create a product identity before planning");

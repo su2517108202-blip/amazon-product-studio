@@ -24,7 +24,7 @@ export async function GET(_req, context) {
       },
     });
     if (!project) {
-      return NextResponse.json({ code: "PROJECT_NOT_FOUND", error: "Project not found" }, { status: 404 });
+      return NextResponse.json({ code: "PROJECT_NOT_FOUND", error: "未找到项目" }, { status: 404 });
     }
 
     const prepared = await loadPreferredZipEntries(project);
@@ -34,8 +34,8 @@ export async function GET(_req, context) {
           code: prepared.code,
           error:
             prepared.code === "PREFERRED_FILE_MISSING"
-              ? "Preferred image file is missing"
-              : "Preferred image set is incomplete",
+              ? "首选图文件缺失"
+              : "首选图未满 5 张",
           missingPlans: prepared.missing,
         },
         { status: 409 },
@@ -54,10 +54,10 @@ export async function GET(_req, context) {
     });
   } catch (error) {
     if (error?.status === 401) {
-      return NextResponse.json({ code: "UNAUTHORIZED", error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ code: "UNAUTHORIZED", error: "未登录或无权访问" }, { status: 401 });
     }
     return NextResponse.json(
-      { code: "ZIP_EXPORT_FAILED", error: "Unable to export preferred images" },
+      { code: "ZIP_EXPORT_FAILED", error: "无法导出整套首选图" },
       { status: 500 },
     );
   }

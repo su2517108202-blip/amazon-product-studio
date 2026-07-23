@@ -19,13 +19,13 @@ export async function DELETE(_req, context) {
     });
     if (!image) {
       return NextResponse.json(
-        { code: "GENERATED_IMAGE_NOT_FOUND", error: "Generated image not found" },
+        { code: "GENERATED_IMAGE_NOT_FOUND", error: "未找到生成图片" },
         { status: 404 },
       );
     }
     if (image.imagePlan.preferredGeneratedImageId === image.id) {
       return NextResponse.json(
-        { code: "PREFERRED_IMAGE_DELETE_BLOCKED", error: "Preferred image cannot be deleted" },
+        { code: "PREFERRED_IMAGE_DELETE_BLOCKED", error: "首选图不能直接删除" },
         { status: 409 },
       );
     }
@@ -45,7 +45,7 @@ export async function DELETE(_req, context) {
     });
     if (updated.count !== 1) {
       return NextResponse.json(
-        { code: "GENERATED_IMAGE_NOT_FOUND", error: "Generated image not found" },
+        { code: "GENERATED_IMAGE_NOT_FOUND", error: "未找到生成图片" },
         { status: 404 },
       );
     }
@@ -57,7 +57,7 @@ export async function DELETE(_req, context) {
         .updateMany({ where: { id: image.id, deletedAt }, data: { deletedAt: null } })
         .catch(() => {});
       return NextResponse.json(
-        { code: "GENERATED_FILE_DELETE_FAILED", error: "Unable to delete generated image file" },
+        { code: "GENERATED_FILE_DELETE_FAILED", error: "无法删除生成图片文件" },
         { status: 500 },
       );
     }
@@ -65,10 +65,10 @@ export async function DELETE(_req, context) {
     return NextResponse.json({ ok: true, id: image.id, deletedAt });
   } catch (error) {
     if (error?.status === 401) {
-      return NextResponse.json({ code: "UNAUTHORIZED", error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ code: "UNAUTHORIZED", error: "未登录或无权访问" }, { status: 401 });
     }
     return NextResponse.json(
-      { code: "GENERATED_FILE_DELETE_FAILED", error: "Unable to delete generated image" },
+      { code: "GENERATED_FILE_DELETE_FAILED", error: "无法删除生成图片" },
       { status: 500 },
     );
   }

@@ -71,6 +71,9 @@ jobs:
       - name: Stage 7 result management checks
         run: npm run test:stage-7
 
+      - name: Stage 7.1 upload checks
+        run: npm run test:stage-7-1
+
       - name: Lint
         run: npm run lint
 

@@ -80,7 +80,7 @@ export const geminiAdapter = {
     const startedAt = Date.now();
     try {
       if (!config.apiKey) {
-        throw new ProviderError("MISSING_API_KEY", "Missing API Key");
+        throw new ProviderError("MISSING_API_KEY", "缺少 API Key");
       }
 
       const suffix = geminiModelPath(config.modelId);
@@ -91,7 +91,7 @@ export const geminiAdapter = {
       });
 
       if (!response.ok) {
-        throw new ProviderError(classifyHttpError(response.status), "Provider test failed", {
+        throw new ProviderError(classifyHttpError(response.status), "服务商连接测试失败", {
           httpStatus: response.status,
         });
       }
@@ -101,7 +101,7 @@ export const geminiAdapter = {
         provider: config.provider,
         modelId: config.modelId,
         latencyMs: Date.now() - startedAt,
-        message: "Connection succeeded",
+        message: "连接成功",
       };
     } catch (error) {
       return normalizeProviderError(error);
@@ -111,7 +111,7 @@ export const geminiAdapter = {
     const startedAt = Date.now();
     try {
       if (!config.apiKey) {
-        throw new ProviderError("MISSING_API_KEY", "Missing API Key");
+        throw new ProviderError("MISSING_API_KEY", "缺少 API Key");
       }
 
       const response = await providerFetch(safeJoinUrl(config.baseUrl, "models"), {
@@ -121,7 +121,7 @@ export const geminiAdapter = {
       });
 
       if (!response.ok) {
-        throw new ProviderError(classifyHttpError(response.status), "Unable to read models", {
+        throw new ProviderError(classifyHttpError(response.status), "无法读取模型列表", {
           httpStatus: response.status,
         });
       }
@@ -136,7 +136,7 @@ export const geminiAdapter = {
         provider: config.provider,
         latencyMs: Date.now() - startedAt,
         models,
-        message: models.length ? "Models loaded" : "Provider returned no models",
+        message: models.length ? "模型列表已读取" : "服务商未返回模型列表",
       };
     } catch (error) {
       return normalizeProviderError(error);
@@ -145,19 +145,19 @@ export const geminiAdapter = {
   async analyzeProduct(config, input) {
     try {
       if (!config.apiKey) {
-        throw new ProviderError("MISSING_API_KEY", "Missing API Key");
+        throw new ProviderError("MISSING_API_KEY", "缺少 API Key");
       }
       if (!config.capabilities?.includes("vision")) {
-        throw new ProviderError("CAPABILITY_MISMATCH", "Model is not marked as vision capable");
+        throw new ProviderError("CAPABILITY_MISMATCH", "当前模型未勾选 vision 能力");
       }
 
       const parts = [
         {
-          text: `${PRODUCT_ANALYSIS_PROMPT}\n\nProject: ${input.project.name || ""}\nProduct hint: ${input.project.productName || ""}`,
+          text: `${PRODUCT_ANALYSIS_PROMPT}\n\n项目：${input.project.name || ""}\n商品提示：${input.project.productName || ""}`,
         },
         {
-          text: `Reference image order and roles: ${input.images
-            .map((image, index) => `${index + 1}. ${image.role}${image.isPrimary ? " primary" : ""}`)
+          text: `参考图顺序和角色：${input.images
+            .map((image, index) => `${index + 1}. ${image.role}${image.isPrimary ? " 主参考图" : ""}`)
             .join("; ")}`,
         },
         ...input.images.map((image) => ({
@@ -185,14 +185,14 @@ export const geminiAdapter = {
       });
 
       if (!response.ok) {
-        throw new ProviderError(classifyHttpError(response.status), "Vision analysis request failed", {
+        throw new ProviderError(classifyHttpError(response.status), "商品识别请求失败", {
           httpStatus: response.status,
         });
       }
 
       const text = readGeminiText(await response.json());
       if (!text) {
-        throw new ProviderError("INVALID_RESPONSE", "Provider returned no parseable content");
+        throw new ProviderError("INVALID_RESPONSE", "服务商未返回可解析内容");
       }
 
       return sanitizeProductIdentity(parseModelJson(text));
@@ -206,10 +206,10 @@ export const geminiAdapter = {
   async createImagePlan(config, input) {
     try {
       if (!config.apiKey) {
-        throw new ProviderError("MISSING_API_KEY", "Missing API Key");
+        throw new ProviderError("MISSING_API_KEY", "缺少 API Key");
       }
       if (!config.capabilities?.includes("text")) {
-        throw new ProviderError("CAPABILITY_MISMATCH", "Model is not marked as text capable");
+        throw new ProviderError("CAPABILITY_MISMATCH", "当前模型未勾选 text 能力");
       }
 
       const suffix = `${geminiModelPath(config.modelId)}:generateContent`;
@@ -237,14 +237,14 @@ export const geminiAdapter = {
       });
 
       if (!response.ok) {
-        throw new ProviderError(classifyHttpError(response.status), "Image planning request failed", {
+        throw new ProviderError(classifyHttpError(response.status), "五图策划请求失败", {
           httpStatus: response.status,
         });
       }
 
       const text = readGeminiText(await response.json());
       if (!text) {
-        throw new ProviderError("INVALID_RESPONSE", "Provider returned no parseable content");
+        throw new ProviderError("INVALID_RESPONSE", "服务商未返回可解析内容");
       }
 
       return sanitizeImagePlans(parsePlanningJson(text));
@@ -258,13 +258,13 @@ export const geminiAdapter = {
   async generateImage(config, input) {
     try {
       if (!config.apiKey) {
-        throw new ProviderError("MISSING_API_KEY", "Missing API Key");
+        throw new ProviderError("MISSING_API_KEY", "缺少 API Key");
       }
       if (!config.capabilities?.includes("image")) {
-        throw new ProviderError("CAPABILITY_MISMATCH", "Model is not marked as image capable");
+        throw new ProviderError("CAPABILITY_MISMATCH", "当前模型未勾选 image 能力");
       }
       if (config.protocol !== "gemini-native-image") {
-        throw new ProviderError("UNSUPPORTED_PROTOCOL", "Gemini image generation requires gemini-native-image");
+        throw new ProviderError("UNSUPPORTED_PROTOCOL", "Gemini 图片生成必须使用 gemini-native-image");
       }
 
       const promptInput = [
@@ -295,14 +295,14 @@ export const geminiAdapter = {
       });
 
       if (!response.ok) {
-        throw new ProviderError(await classifyGeminiError(response), "Image generation request failed", {
+        throw new ProviderError(await classifyGeminiError(response), "图片生成请求失败", {
           httpStatus: response.status,
         });
       }
 
       const images = readGeminiInteractionImages(await response.json());
       if (!images.length) {
-        throw new ProviderError("INVALID_IMAGE_RESPONSE", "Provider returned no image");
+        throw new ProviderError("INVALID_IMAGE_RESPONSE", "服务商未返回图片");
       }
 
       return {
@@ -321,7 +321,7 @@ export const geminiAdapter = {
     }
   },
   async checkGeneration() {
-    throw new ProviderError("UNSUPPORTED_PROTOCOL", "Gemini native image generation is synchronous");
+    throw new ProviderError("UNSUPPORTED_PROTOCOL", "Gemini 原生图片生成是同步协议");
   },
   normalizeError: normalizeProviderError,
 };

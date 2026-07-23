@@ -22,6 +22,7 @@
 | 6.1 generation hardening | `codex/stage-6-1-hardening` | `04bc277be6442578fd5d4c31e73349faecdb2c82` | `stage-6-1-hardening` | `3b1b119ff89dca74a68433fe85b9981745e5baa8` |
 | 6.2 async auth CI fix | `codex/stage-6-2-auth-ci-fix` | `c69a302bb6bd581e49c6f4e838fb81711e53943d` | `stage-6-2-auth-ci-fix` | Reported in final reply |
 | 7 result management | `codex/stage-7-result-management` | `0ff10b893309bffa6e3c3688838fb7bdf43f33d1` | `stage-7-result-management` | Reported in final reply |
+| 7.1 CN upload fix | `codex/stage-7-1-cn-upload-fix` | Reported in final reply | `stage-7-1-cn-upload-fix` | Reported in final reply |
 
 ## Current Prisma Models
 
@@ -172,6 +173,33 @@ Stage 7 real UI acceptance:
 
 Stage 7 did not add Stage 8 features, external editors, webhooks, ComfyUI, or automatic paid batch generation.
 
+## Stage 7.1 Completion
+
+Stage 7.1 keeps Stage 7 result management intact and adds Chinese localization, upload hardening, and global readability improvements:
+
+- User-facing UI copy is simplified Chinese across the project list, project creation, project studio, provider settings, product recognition, product identity, five-image planning, image generation, candidate history, preferred image management, download, ZIP export, loading, success, failure, empty, confirmation, and mobile states.
+- Product recognition, five-image planning, and final image-generation prompts now require simplified Chinese natural-language output while preserving required English JSON field names.
+- Chinese-output guards reject mostly English product identity or five-image planning payloads in Chinese workflows.
+- Reference-image upload now enforces a 12MB per-image limit and only allows JPEG, PNG, and WebP with matching content signatures.
+- Empty files, non-images, MIME/signature mismatches, oversized files, over-limit uploads, and invalid mixed batches are rejected with Chinese errors.
+- Batch upload validation is atomic and cleans saved files if a later write fails.
+- Upload responses do not expose local absolute paths, raw system errors, secrets, headers, image Base64, or storage internals.
+- The first reference image still becomes the primary reference automatically.
+- Global Chinese font stack and readable desktop/mobile text rules were added.
+- `text-[10px]`, `text-[9px]`, `text-[11px]`, and excessive `font-black` usage were removed from main app source.
+
+Stage 7.1 real UI acceptance:
+
+- Actual routes visited: `/`, `/settings/providers`, `/projects/cmrxtauxc000u3opgnmbeixjs`.
+- Desktop `1440x900` and mobile `390x844` were checked.
+- Screenshots are stored under `docs/stages/stage-7-1/ui-acceptance/`.
+- UI acceptance details are stored in `docs/stages/stage-7-1/UI_ACCEPTANCE.md`.
+- Sanitized machine-readable acceptance is stored in `docs/stages/stage-7-1/acceptance-summary.json`.
+- Real Gemini product recognition and five-image planning were completed on a new Chinese test project.
+- No new paid upstream image-generation call occurred during Stage 7.1 acceptance.
+
+Stage 7.1 did not add Stage 8 features, automatic batch generation, external editors, webhooks, or ComfyUI.
+
 ## Known Issues
 
 - Existing 6 `<img>` lint warnings remain by instruction.
@@ -180,4 +208,4 @@ Stage 7 did not add Stage 8 features, external editors, webhooks, ComfyUI, or au
 
 ## Next Stage Direction
 
-Stage 8 should build on Stage 7 saved result management. Candidate history, preferred selection, single download, preferred ZIP export, and safe version management are now implemented and should be preserved.
+Stage 8 should build on Stage 7 and Stage 7.1. Candidate history, preferred selection, single download, preferred ZIP export, safe version management, Chinese UX copy, upload validation, and readable typography are now implemented and should be preserved.

@@ -8,10 +8,10 @@ import axios from "axios";
 import toast, { Toaster } from "react-hot-toast";
 
 const PLANS = [
-  { id: "basic", name: "Basic Pack", price: "$5", credits: 100, description: "Perfect for testing custom prompts and exploring styles." },
-  { id: "standard", name: "Standard Pack", price: "$10", credits: 250, description: "Ideal for regular creators wanting high resolution outputs." },
-  { id: "pro", name: "Professional Pack", price: "$20", credits: 600, description: "Designed for power users demanding batch exports and high speed.", popular: true },
-  { id: "business", name: "Business Pack", price: "$50", credits: 2000, description: "Maximum value pack for agency workflows and large volume generations." }
+  { id: "basic", name: "基础包", price: "$5", credits: 100, description: "适合测试提示词和探索风格。" },
+  { id: "standard", name: "标准包", price: "$10", credits: 250, description: "适合经常创作高清图的用户。" },
+  { id: "pro", name: "专业包", price: "$20", credits: 600, description: "适合需要批量导出和高效生成的用户。", popular: true },
+  { id: "business", name: "商业包", price: "$50", credits: 2000, description: "适合团队或高频商品图生成。" }
 ];
 
 export default function Pricing() {
@@ -20,7 +20,7 @@ export default function Pricing() {
 
   const handleCheckout = async (planId) => {
     if (status !== "authenticated") {
-      toast.error("You must sign in with Google to purchase credit packages.");
+      toast.error("请先使用 Google 登录后再购买积分包。");
       return;
     }
 
@@ -30,11 +30,11 @@ export default function Pricing() {
       if (data.url) {
         window.location.assign(data.url);
       } else {
-        throw new Error("No redirection URL returned");
+        throw new Error("未返回支付跳转地址");
       }
     } catch (err) {
       console.error(err);
-      toast.error(err.response?.data?.error || "Failed to trigger Stripe checkout session.");
+      toast.error(err.response?.data?.error || "无法打开 Stripe 支付会话。");
     } finally {
       setLoadingPlan(null);
     }
@@ -47,11 +47,11 @@ export default function Pricing() {
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 py-12 sm:px-6 lg:px-8 flex flex-col gap-10 overflow-y-auto scrollbar-subtle items-center">
         <div className="text-center space-y-4">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 border border-primary/20 rounded-full mb-1">
-            <FaInfoCircle className="text-primary text-xs" />
-            <span className="text-[10px] font-black text-primary uppercase tracking-widest">Pricing Plans</span>
+            <FaInfoCircle className="text-primary text-sm" />
+            <span className="text-[13px] font-semibold text-primary uppercase tracking-widest">积分套餐</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black tracking-tight uppercase">Buy Credits Packs</h1>
-          <p className="text-xs sm:text-sm text-secondary-text max-w-lg leading-relaxed">
+          <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight uppercase">购买积分包</h1>
+          <p className="text-sm sm:text-sm text-secondary-text max-w-lg leading-relaxed">
             Purchase flexible credit packages to perform high-resolution predictions. Keep all profits — we handle AI infrastructure.
           </p>
         </div>
@@ -66,35 +66,35 @@ export default function Pricing() {
               }`}
             >
               {plan.popular && (
-                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-[9px] font-black uppercase px-3 py-1 rounded-full tracking-wider shadow">
-                  Most Popular
+                <span className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-white text-[13px] font-semibold uppercase px-3 py-1 rounded-full tracking-wider shadow">
+                  最受欢迎
                 </span>
               )}
 
               <div className="space-y-4">
                 <div className="space-y-1">
-                  <h3 className="text-sm font-extrabold uppercase tracking-wide text-primary-text">{plan.name}</h3>
-                  <p className="text-2xl font-black tracking-tight text-white">{plan.price}</p>
+                  <h3 className="text-sm font-semibold uppercase tracking-wide text-primary-text">{plan.name}</h3>
+                  <p className="text-2xl font-semibold tracking-tight text-white">{plan.price}</p>
                 </div>
                 
-                <div className="text-xs bg-bg-page/50 border border-divider/30 p-3 rounded text-center font-extrabold text-primary">
-                  {plan.credits} Art Credits
+                <div className="text-sm bg-bg-page/50 border border-divider/30 p-3 rounded text-center font-semibold text-primary">
+                  {plan.credits} 图片积分
                 </div>
 
-                <p className="text-xs text-secondary-text leading-relaxed font-medium min-h-[3rem]">{plan.description}</p>
+                <p className="text-sm text-secondary-text leading-relaxed font-medium min-h-[3rem]">{plan.description}</p>
                 
-                <ul className="space-y-2 border-t border-divider/30 pt-4 text-xs font-semibold text-secondary-text">
+                <ul className="space-y-2 border-t border-divider/30 pt-4 text-sm font-semibold text-secondary-text">
                   <li className="flex items-center gap-2">
-                    <FaCheck className="text-primary text-[10px]" />
-                    <span>Dynamic aspect ratios</span>
+                    <FaCheck className="text-primary text-[13px]" />
+                    <span>支持多种图片比例</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <FaCheck className="text-primary text-[10px]" />
-                    <span>HD image downloads</span>
+                    <FaCheck className="text-primary text-[13px]" />
+                    <span>高清图下载</span>
                   </li>
                   <li className="flex items-center gap-2">
-                    <FaCheck className="text-primary text-[10px]" />
-                    <span>No subscription required</span>
+                    <FaCheck className="text-primary text-[13px]" />
+                    <span>无需订阅</span>
                   </li>
                 </ul>
               </div>
@@ -102,11 +102,11 @@ export default function Pricing() {
               <button
                 onClick={() => handleCheckout(plan.id)}
                 disabled={loadingPlan !== null}
-                className={`w-full py-3 rounded-full text-xs font-bold transition-all shadow-md cursor-pointer select-none active:scale-[0.98] ${
+                className={`w-full py-3 rounded-full text-sm font-semibold transition-all shadow-md cursor-pointer select-none active:scale-[0.98] ${
                   plan.popular ? "bg-primary text-white hover:bg-primary-hover shadow-primary/15" : "bg-bg-page hover:bg-bg-card text-primary-text border border-divider"
                 }`}
               >
-                {loadingPlan === plan.id ? "Loading checkout..." : "Purchase Credits"}
+                {loadingPlan === plan.id ? "正在打开支付..." : "购买积分"}
               </button>
             </div>
           ))}

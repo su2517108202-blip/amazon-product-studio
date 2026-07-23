@@ -59,6 +59,27 @@ function cleanArray(value) {
   return items;
 }
 
+function assertMostlyChineseIdentity(identity) {
+  const text = [
+    ...STRING_FIELDS.map((field) => identity[field]),
+    ...ARRAY_FIELDS.flatMap((field) => identity[field]),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (!text.trim()) return;
+
+  const cjkCount = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  const englishWords = (text.match(/[A-Za-z]{3,}/g) || []).filter(
+    (word) => !["json", "api", "logo", "webp", "jpg", "png"].includes(word.toLowerCase()),
+  ).length;
+
+  if (englishWords >= 10 && cjkCount < 12) {
+    const error = new Error("商品识别结果必须使用简体中文");
+    error.code = "INVALID_MODEL_RESPONSE";
+    throw error;
+  }
+}
+
 export function stripJsonMarkdown(value) {
   if (typeof value !== "string") return value;
   const trimmed = value.trim();
@@ -79,7 +100,7 @@ export function parseModelJson(value) {
 
 export function sanitizeProductIdentity(input) {
   if (!input || typeof input !== "object" || Array.isArray(input)) {
-    const error = new Error("模型返回不是有效对象");
+    const error = new Error("模型返回的产品身份证不是有效对象");
     error.code = "INVALID_MODEL_RESPONSE";
     throw error;
   }
@@ -96,6 +117,7 @@ export function sanitizeProductIdentity(input) {
     }
   }
 
+  assertMostlyChineseIdentity(output);
   return output;
 }
 

@@ -9,6 +9,7 @@
     "test:stage-6-1": "node scripts/stage-6-1-acceptance.mjs",
     "test:stage-6-2": "node scripts/stage-6-2-async-auth-tests.mjs",
     "test:stage-7": "node scripts/stage-7-result-management-tests.mjs",
+    "test:stage-7-1": "node scripts/stage-7-1-upload-tests.mjs && node scripts/stage-7-1-cn-output-tests.mjs",
     "lint": "eslint",
     "generate:credential-key": "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""
   },

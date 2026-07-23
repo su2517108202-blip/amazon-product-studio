@@ -229,14 +229,14 @@ export default function ProviderSettingsClient() {
       <div className="mx-auto grid max-w-7xl gap-5 px-4 py-6 xl:grid-cols-[380px_1fr]">
         <section className="border border-zinc-800 bg-zinc-900/45 p-5">
           <div className="mb-5">
-            <h1 className="text-lg font-black text-white">API 与模型设置</h1>
-            <p className="mt-1 text-xs text-zinc-500">
+            <h1 className="text-lg font-semibold text-white">API 与模型设置</h1>
+            <p className="mt-1 text-sm text-zinc-500">
               保存自己的 API Key，并为三个模型角色选择默认配置。
             </p>
           </div>
 
           {!credentialKeyConfigured && (
-            <div className="mb-4 border border-amber-900/70 bg-amber-950/40 px-3 py-2 text-xs text-amber-200">
+            <div className="mb-4 border border-amber-900/70 bg-amber-950/40 px-3 py-2 text-sm text-amber-200">
               缺少 CREDENTIAL_ENCRYPTION_KEY。请运行 npm run generate:credential-key
               后写入 .env。
             </div>
@@ -252,7 +252,7 @@ export default function ProviderSettingsClient() {
               />
             </Field>
 
-            <Field label="供应商">
+            <Field label="服务商">
               <select
                 value={form.provider}
                 onChange={(event) => updateProvider(event.target.value)}
@@ -266,7 +266,7 @@ export default function ProviderSettingsClient() {
               </select>
             </Field>
 
-            <Field label="Base URL">
+            <Field label="接口地址">
               <input
                 value={form.baseUrl}
                 onChange={(event) => setForm({ ...form, baseUrl: event.target.value })}
@@ -286,7 +286,7 @@ export default function ProviderSettingsClient() {
             </Field>
 
             <div className="grid grid-cols-2 gap-3">
-              <Field label="Model ID">
+              <Field label="模型 ID">
                 <input
                   value={form.modelId}
                   onChange={(event) =>
@@ -339,14 +339,14 @@ export default function ProviderSettingsClient() {
             </div>
 
             <div>
-              <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">
+              <span className="mb-2 block text-[13px] font-semibold uppercase tracking-widest text-zinc-500">
                 能力标签
               </span>
               <div className="grid grid-cols-2 gap-2">
                 {CAPABILITIES.map((capability) => (
                   <label
                     key={capability}
-                    className="flex items-center gap-2 border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs"
+                    className="flex items-center gap-2 border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm"
                   >
                     <input
                       checked={form.capabilities.includes(capability)}
@@ -359,7 +359,7 @@ export default function ProviderSettingsClient() {
               </div>
             </div>
 
-            <label className="flex items-center gap-2 text-xs font-bold text-zinc-300">
+            <label className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
               <input
                 checked={form.enabled}
                 onChange={(event) =>
@@ -373,7 +373,7 @@ export default function ProviderSettingsClient() {
             <div className="grid grid-cols-2 gap-2">
               <button
                 disabled={saving}
-                className="flex items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700 disabled:bg-zinc-800"
+                className="flex items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:bg-zinc-800"
               >
                 {saving ? <FaSpinner className="animate-spin" /> : <FaCheck />}
                 {editingId ? "保存修改" : "新建配置"}
@@ -381,7 +381,7 @@ export default function ProviderSettingsClient() {
               <button
                 type="button"
                 onClick={resetForm}
-                className="border border-zinc-800 px-4 py-2.5 text-xs font-black text-zinc-300 hover:text-white"
+                className="border border-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:text-white"
               >
                 清空
               </button>
@@ -392,7 +392,7 @@ export default function ProviderSettingsClient() {
         <section className="space-y-5">
           {(message || error) && (
             <div
-              className={`border px-3 py-2 text-xs ${
+              className={`border px-3 py-2 text-sm ${
                 error
                   ? "border-red-900/60 bg-red-950/40 text-red-200"
                   : "border-emerald-900/60 bg-emerald-950/40 text-emerald-200"
@@ -403,7 +403,7 @@ export default function ProviderSettingsClient() {
           )}
 
           <div className="border border-zinc-800 bg-zinc-900/35 p-4">
-            <h2 className="mb-4 text-sm font-black text-white">Provider 配置</h2>
+            <h2 className="mb-4 text-sm font-semibold text-white">服务商配置</h2>
             {profiles.length === 0 ? (
               <p className="border border-dashed border-zinc-800 p-8 text-center text-sm text-zinc-500">
                 暂无 API 配置
@@ -414,18 +414,18 @@ export default function ProviderSettingsClient() {
                   <article key={profile.id} className="border border-zinc-800 bg-zinc-950 p-4">
                     <div className="mb-3 flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="truncate text-sm font-black text-white">
+                        <h3 className="truncate text-sm font-semibold text-white">
                           {profile.name}
                         </h3>
-                        <p className="mt-1 truncate text-xs text-zinc-500">
+                        <p className="mt-1 truncate text-sm text-zinc-500">
                           {profile.provider} / {profile.modelId}
                         </p>
-                        <p className="mt-1 truncate text-xs text-zinc-500">
+                        <p className="mt-1 truncate text-sm text-zinc-500">
                           协议：{formatProtocol(profile.protocol)}
                         </p>
                       </div>
                       <span
-                        className={`border px-2 py-1 text-[10px] font-bold ${
+                        className={`border px-2 py-1 text-[13px] font-semibold ${
                           profile.enabled
                             ? "border-emerald-900 text-emerald-300"
                             : "border-zinc-800 text-zinc-500"
@@ -438,21 +438,21 @@ export default function ProviderSettingsClient() {
                       {profile.capabilities.map((capability) => (
                         <span
                           key={capability}
-                          className="border border-zinc-800 px-2 py-1 text-[10px] font-bold text-zinc-400"
+                          className="border border-zinc-800 px-2 py-1 text-[13px] font-semibold text-zinc-400"
                         >
                           {capability}
                         </span>
                       ))}
                     </div>
-                    <p className="mb-3 truncate text-xs text-zinc-500">
-                      Key: {profile.maskedApiKey || "未保存"}
+                    <p className="mb-3 truncate text-sm text-zinc-500">
+                      密钥：{profile.maskedApiKey || "未保存"}
                     </p>
-                    <p className="mb-3 text-xs text-zinc-500">
+                    <p className="mb-3 text-sm text-zinc-500">
                       参考图：{profile.supportsReferenceImages ? "真实参与生成" : "纯文生图/未实现"}
                     </p>
                     {profile.lastTestMessage && (
                       <p
-                        className={`mb-3 text-xs ${
+                        className={`mb-3 text-sm ${
                           profile.lastTestOk ? "text-emerald-300" : "text-red-300"
                         }`}
                       >
@@ -462,14 +462,14 @@ export default function ProviderSettingsClient() {
                     <div className="grid grid-cols-5 gap-2">
                       <button
                         onClick={() => editProfile(profile)}
-                        className="col-span-1 border border-zinc-800 px-3 py-2 text-xs font-bold text-zinc-300 hover:text-white"
+                        className="col-span-1 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white"
                       >
                         编辑
                       </button>
                       <button
                         onClick={() => testProfile(profile.id)}
                         disabled={testingId === profile.id}
-                        className="col-span-2 flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-xs font-bold text-zinc-300 hover:text-white disabled:text-zinc-600"
+                        className="col-span-2 flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600"
                       >
                         {testingId === profile.id ? (
                           <FaSpinner className="animate-spin" />
@@ -480,13 +480,13 @@ export default function ProviderSettingsClient() {
                       </button>
                       <button
                         onClick={() => listModels(profile.id)}
-                        className="col-span-1 border border-zinc-800 px-3 py-2 text-xs font-bold text-zinc-300 hover:text-white"
+                        className="col-span-1 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white"
                       >
                         模型
                       </button>
                       <button
                         onClick={() => deleteProfile(profile.id)}
-                        className="col-span-1 border border-zinc-800 px-3 py-2 text-xs font-bold text-zinc-400 hover:border-red-700 hover:text-red-300"
+                        className="col-span-1 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-400 hover:border-red-700 hover:text-red-300"
                       >
                         <FaTrash />
                       </button>
@@ -497,13 +497,13 @@ export default function ProviderSettingsClient() {
             )}
             {models.length > 0 && (
               <div className="mt-4 border border-zinc-800 bg-zinc-950 p-3">
-                <h3 className="mb-2 text-xs font-black text-zinc-300">模型列表</h3>
+                <h3 className="mb-2 text-sm font-semibold text-zinc-300">模型列表</h3>
                 <div className="flex max-h-32 flex-wrap gap-2 overflow-y-auto">
                   {models.map((model) => (
                     <button
                       key={model}
                       onClick={() => setForm((current) => ({ ...current, modelId: model }))}
-                      className="border border-zinc-800 px-2 py-1 text-[10px] text-zinc-400 hover:text-white"
+                      className="border border-zinc-800 px-2 py-1 text-[13px] text-zinc-400 hover:text-white"
                     >
                       {model}
                     </button>
@@ -514,7 +514,7 @@ export default function ProviderSettingsClient() {
           </div>
 
           <div className="border border-zinc-800 bg-zinc-900/35 p-4">
-            <h2 className="mb-4 flex items-center gap-2 text-sm font-black text-white">
+            <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white">
               <FaWrench />
               三角色默认配置
             </h2>
@@ -526,8 +526,8 @@ export default function ProviderSettingsClient() {
                 const current = assignmentMap[role];
                 return (
                   <article key={role} className="border border-zinc-800 bg-zinc-950 p-4">
-                    <h3 className="text-sm font-black text-white">{config.label}</h3>
-                    <p className="mt-1 min-h-8 text-xs text-zinc-500">
+                    <h3 className="text-sm font-semibold text-white">{config.label}</h3>
+                    <p className="mt-1 min-h-8 text-sm text-zinc-500">
                       {current?.providerProfile
                         ? `${current.providerProfile.name} / ${current.providerProfile.modelId}`
                         : "未配置"}
@@ -537,7 +537,7 @@ export default function ProviderSettingsClient() {
                       onChange={(event) =>
                         event.target.value && assignRole(role, event.target.value)
                       }
-                      className="mt-3 w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-xs outline-none"
+                      className="mt-3 w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-sm outline-none"
                     >
                       <option value="">选择配置</option>
                       {eligible.map((profile) => (
@@ -548,7 +548,7 @@ export default function ProviderSettingsClient() {
                     </select>
                     <button
                       onClick={() => clearRole(role)}
-                      className="mt-2 w-full border border-zinc-800 px-3 py-2 text-xs font-bold text-zinc-400 hover:text-white"
+                      className="mt-2 w-full border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-400 hover:text-white"
                     >
                       清除配置
                     </button>
@@ -566,7 +566,7 @@ export default function ProviderSettingsClient() {
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">
+      <span className="mb-2 block text-[13px] font-semibold uppercase tracking-widest text-zinc-500">
         {label}
       </span>
       {children}

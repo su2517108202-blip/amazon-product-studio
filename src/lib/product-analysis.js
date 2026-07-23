@@ -3,14 +3,9 @@ import { promises as fs } from "fs";
 import path from "path";
 
 export const MAX_ANALYSIS_IMAGES = 8;
-export const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-export const MAX_TOTAL_IMAGE_BYTES = 24 * 1024 * 1024;
-export const SAFE_IMAGE_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp",
-  "image/gif",
-]);
+export const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+export const MAX_TOTAL_IMAGE_BYTES = 32 * 1024 * 1024;
+export const SAFE_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
 const ROLE_PRIORITY = {
   front: 1,
@@ -23,11 +18,11 @@ const ROLE_PRIORITY = {
   scene: 8,
 };
 
-export const PRODUCT_ANALYSIS_PROMPT = `你是严谨的电商商品识图助手。请综合所有参考图，不只看第一张。
-只描述能从图片确认的商品事实；无法确认时填写空字符串或空数组。
-不要猜测品牌、尺寸、承重、成分、认证、具体材质等级或图片中看不清的信息。
-区分商品事实与营销建议。必须保持内容只写真实外观和结构约束。
-禁止改变重点包括颜色、材质外观、部件数量、结构、开合方式、包装形态、Logo 与文字位置（仅在确实可见时）。
+export const PRODUCT_ANALYSIS_PROMPT = `你是严谨的电商商品识图助手。请综合所有参考图，不要只看第一张。
+所有自然语言输出必须使用简体中文；JSON 字段名保持英文，不要翻译字段名。
+商品名称、类目、颜色、材质、结构、visibleFunctions、sellingPoints、targetUsers、usageScenarios、mustKeep、avoidChanges 和 primaryReferenceDescription 都必须用简体中文表达。
+只描述能从图片确认的商品事实；无法确认时填写空字符串或空数组。不要猜测品牌、尺寸、承重、容量、成分、认证、价格、具体材质等级或图片里看不清的信息。
+区分商品事实与营销建议。mustKeep 只写真实外观和结构约束。avoidChanges 应包含颜色、材质外观、部件数量、结构、开合方式、包装形态、Logo 与文字位置等必须避免改变的点，但仅在图片确实可见时记录。
 输出严格 JSON，不使用 Markdown 代码块，不输出 JSON 之外的解释。
 JSON 字段必须为：
 productName, category, color, material, structure, visibleFunctions, sellingPoints, targetUsers, usageScenarios, mustKeep, avoidChanges, primaryReferenceDescription。`;
@@ -72,7 +67,7 @@ export async function buildAnalysisImages(project) {
 
   for (const image of selected) {
     if (!SAFE_IMAGE_TYPES.has(image.mimeType)) {
-      const error = new Error("图片格式不支持");
+      const error = new Error("图片格式不支持，仅支持 JPG、PNG、WebP");
       error.code = "UNSUPPORTED_IMAGE_TYPE";
       throw error;
     }
@@ -83,8 +78,13 @@ export async function buildAnalysisImages(project) {
     }
 
     const stat = await fs.stat(image.localPath);
+    if (stat.size === 0) {
+      const error = new Error("参考图文件为空");
+      error.code = "EMPTY_IMAGE";
+      throw error;
+    }
     if (stat.size > MAX_IMAGE_BYTES) {
-      const error = new Error("单张图片过大");
+      const error = new Error("单张图片超过 12MB");
       error.code = "IMAGE_TOO_LARGE";
       throw error;
     }

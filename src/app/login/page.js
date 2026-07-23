@@ -21,29 +21,29 @@ function LoginContent() {
     <div className="min-h-dvh flex items-center justify-center bg-bg-page px-6 text-primary-text select-none">
       <div className="relative bg-bg-card border border-divider w-full max-w-md rounded-lg p-8 space-y-8 shadow-2xl animate-scale-up">
         <div className="flex flex-col items-center text-center space-y-4">
-          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-2xl text-primary font-black shadow-md shadow-primary/15">
+          <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-2xl text-primary font-semibold shadow-md shadow-primary/15">
             A
           </div>
-          <h2 className="text-2xl font-black uppercase tracking-tight">Sign In to Studio</h2>
-          <p className="text-xs font-semibold text-secondary-text leading-relaxed px-4">
-            Sign in with Google to enable predictions, save generation history, and top up credits packages.
+          <h2 className="text-2xl font-semibold uppercase tracking-tight">登录工作室</h2>
+          <p className="text-sm font-semibold text-secondary-text leading-relaxed px-4">
+            使用 Google 登录后可保存生成历史并管理积分。
           </p>
         </div>
 
         <div className="space-y-4">
           <button
             onClick={() => signIn("google", { callbackUrl: next })}
-            className="w-full py-3.5 bg-white text-neutral-900 rounded-full text-xs font-bold flex items-center justify-center gap-3 hover:opacity-90 transition-all shadow-md active:scale-[0.98] cursor-pointer"
+            className="w-full py-3.5 bg-white text-neutral-900 rounded-full text-sm font-semibold flex items-center justify-center gap-3 hover:opacity-90 transition-all shadow-md active:scale-[0.98] cursor-pointer"
           >
             <FaGoogle className="text-sm text-red-500" />
-            <span>Continue with Google</span>
+            <span>使用 Google 继续</span>
           </button>
         </div>
 
-        <div className="flex items-start gap-2.5 bg-primary/5 border border-primary/10 p-3.5 rounded text-[11px] leading-relaxed text-secondary-text">
-          <FaInfoCircle className="text-primary text-xs shrink-0 mt-0.5" />
+        <div className="flex items-start gap-2.5 bg-primary/5 border border-primary/10 p-3.5 rounded text-[13px] leading-relaxed text-secondary-text">
+          <FaInfoCircle className="text-primary text-sm shrink-0 mt-0.5" />
           <span>
-            By signing in, you agree to our Terms of Service. Purchases are stripe-secured and credit balance addition is automated.
+            登录表示你同意服务条款。本地模式下不强制 Google 登录。
           </span>
         </div>
       </div>

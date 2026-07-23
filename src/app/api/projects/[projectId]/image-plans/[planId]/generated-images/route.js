@@ -19,7 +19,7 @@ export async function GET(req, context) {
       select: { id: true },
     });
     if (!project) {
-      return NextResponse.json({ code: "PROJECT_NOT_FOUND", error: "Project not found" }, { status: 404 });
+      return NextResponse.json({ code: "PROJECT_NOT_FOUND", error: "未找到项目" }, { status: 404 });
     }
 
     const imagePlan = await prisma.imagePlan.findFirst({
@@ -27,7 +27,7 @@ export async function GET(req, context) {
       select: { id: true, preferredGeneratedImageId: true },
     });
     if (!imagePlan) {
-      return NextResponse.json({ code: "IMAGE_PLAN_NOT_FOUND", error: "Image plan not found" }, { status: 404 });
+      return NextResponse.json({ code: "IMAGE_PLAN_NOT_FOUND", error: "未找到图片策划" }, { status: 404 });
     }
 
     const [ordered, items, candidateCount, completedRunCount, failedRunCount, latestProcessingRun] =
@@ -96,10 +96,10 @@ export async function GET(req, context) {
     });
   } catch (error) {
     if (error?.status === 401) {
-      return NextResponse.json({ code: "UNAUTHORIZED", error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ code: "UNAUTHORIZED", error: "未登录或无权访问" }, { status: 401 });
     }
     return NextResponse.json(
-      { code: "GENERATED_IMAGE_LIST_FAILED", error: "Unable to read generated images" },
+      { code: "GENERATED_IMAGE_LIST_FAILED", error: "无法读取候选图" },
       { status: 500 },
     );
   }

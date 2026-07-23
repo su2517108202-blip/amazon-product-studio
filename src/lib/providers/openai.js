@@ -22,7 +22,7 @@ async function testOpenAICompatible(config) {
   const startedAt = Date.now();
   try {
     if (!config.apiKey) {
-      throw new ProviderError("MISSING_API_KEY", "Missing API Key");
+      throw new ProviderError("MISSING_API_KEY", "缺少 API Key");
     }
 
     const response = await providerFetch(
@@ -37,7 +37,7 @@ async function testOpenAICompatible(config) {
     );
 
     if (!response.ok) {
-      throw new ProviderError(classifyHttpError(response.status), "Provider test failed", {
+      throw new ProviderError(classifyHttpError(response.status), "服务商连接测试失败", {
         httpStatus: response.status,
       });
     }
@@ -47,7 +47,7 @@ async function testOpenAICompatible(config) {
       provider: config.provider,
       modelId: config.modelId,
       latencyMs: Date.now() - startedAt,
-      message: "Connection succeeded",
+      message: "连接成功",
     };
   } catch (error) {
     return normalizeProviderError(error);
@@ -58,7 +58,7 @@ async function listOpenAICompatibleModels(config) {
   const startedAt = Date.now();
   try {
     if (!config.apiKey) {
-      throw new ProviderError("MISSING_API_KEY", "Missing API Key");
+      throw new ProviderError("MISSING_API_KEY", "缺少 API Key");
     }
 
     const response = await providerFetch(safeJoinUrl(config.baseUrl, "models"), {
@@ -70,7 +70,7 @@ async function listOpenAICompatibleModels(config) {
     });
 
     if (!response.ok) {
-      throw new ProviderError(classifyHttpError(response.status), "Unable to read models", {
+      throw new ProviderError(classifyHttpError(response.status), "无法读取模型列表", {
         httpStatus: response.status,
       });
     }
@@ -85,7 +85,7 @@ async function listOpenAICompatibleModels(config) {
       provider: config.provider,
       latencyMs: Date.now() - startedAt,
       models,
-      message: models.length ? "Models loaded" : "Provider returned no models",
+      message: models.length ? "模型列表已读取" : "服务商未返回模型列表",
     };
   } catch (error) {
     return normalizeProviderError(error);
@@ -95,21 +95,21 @@ async function listOpenAICompatibleModels(config) {
 async function analyzeOpenAICompatibleProduct(config, input) {
   try {
     if (!config.apiKey) {
-      throw new ProviderError("MISSING_API_KEY", "Missing API Key");
+      throw new ProviderError("MISSING_API_KEY", "缺少 API Key");
     }
     if (!config.capabilities?.includes("vision")) {
-      throw new ProviderError("CAPABILITY_MISMATCH", "Model is not marked as vision capable");
+      throw new ProviderError("CAPABILITY_MISMATCH", "当前模型未勾选 vision 能力");
     }
 
     const content = [
       {
         type: "text",
-        text: `${PRODUCT_ANALYSIS_PROMPT}\n\nProject: ${input.project.name || ""}\nProduct hint: ${input.project.productName || ""}`,
+        text: `${PRODUCT_ANALYSIS_PROMPT}\n\n项目：${input.project.name || ""}\n商品提示：${input.project.productName || ""}`,
       },
       {
         type: "text",
-        text: `Reference image order and roles: ${input.images
-          .map((image, index) => `${index + 1}. ${image.role}${image.isPrimary ? " primary" : ""}`)
+        text: `参考图顺序和角色：${input.images
+          .map((image, index) => `${index + 1}. ${image.role}${image.isPrimary ? " 主参考图" : ""}`)
           .join("; ")}`,
       },
       ...input.images.map((image) => ({
@@ -136,7 +136,7 @@ async function analyzeOpenAICompatibleProduct(config, input) {
     });
 
     if (!response.ok) {
-      throw new ProviderError(classifyHttpError(response.status), "Vision analysis request failed", {
+      throw new ProviderError(classifyHttpError(response.status), "商品识别请求失败", {
         httpStatus: response.status,
       });
     }
@@ -144,7 +144,7 @@ async function analyzeOpenAICompatibleProduct(config, input) {
     const data = await response.json();
     const text = data?.choices?.[0]?.message?.content;
     if (!text) {
-      throw new ProviderError("INVALID_RESPONSE", "Provider returned no parseable content");
+      throw new ProviderError("INVALID_RESPONSE", "服务商未返回可解析内容");
     }
 
     return sanitizeProductIdentity(parseModelJson(text));
@@ -159,10 +159,10 @@ async function analyzeOpenAICompatibleProduct(config, input) {
 async function createOpenAICompatibleImagePlan(config, input) {
   try {
     if (!config.apiKey) {
-      throw new ProviderError("MISSING_API_KEY", "Missing API Key");
+      throw new ProviderError("MISSING_API_KEY", "缺少 API Key");
     }
     if (!config.capabilities?.includes("text")) {
-      throw new ProviderError("CAPABILITY_MISMATCH", "Model is not marked as text capable");
+      throw new ProviderError("CAPABILITY_MISMATCH", "当前模型未勾选 text 能力");
     }
 
     const response = await providerFetch(safeJoinUrl(config.baseUrl, "chat/completions"), {
@@ -183,7 +183,7 @@ async function createOpenAICompatibleImagePlan(config, input) {
     });
 
     if (!response.ok) {
-      throw new ProviderError(classifyHttpError(response.status), "Image planning request failed", {
+      throw new ProviderError(classifyHttpError(response.status), "五图策划请求失败", {
         httpStatus: response.status,
       });
     }
@@ -191,7 +191,7 @@ async function createOpenAICompatibleImagePlan(config, input) {
     const data = await response.json();
     const text = data?.choices?.[0]?.message?.content;
     if (!text) {
-      throw new ProviderError("INVALID_RESPONSE", "Provider returned no parseable content");
+      throw new ProviderError("INVALID_RESPONSE", "服务商未返回可解析内容");
     }
 
     return sanitizeImagePlans(parsePlanningJson(text));
@@ -221,15 +221,15 @@ function normalizeOpenAIImages(data) {
 async function generateOpenAIImage(config, input) {
   try {
     if (!config.apiKey) {
-      throw new ProviderError("MISSING_API_KEY", "Missing API Key");
+      throw new ProviderError("MISSING_API_KEY", "缺少 API Key");
     }
     if (!config.capabilities?.includes("image") && !config.capabilities?.includes("asyncImage")) {
-      throw new ProviderError("CAPABILITY_MISMATCH", "Model is not marked as image capable");
+      throw new ProviderError("CAPABILITY_MISMATCH", "当前模型未勾选 image 能力");
     }
     if (!supportsReferenceImagesProfile(config)) {
       throw new ProviderError(
         "REFERENCE_IMAGES_UNSUPPORTED",
-        "This image generation protocol does not truly transmit reference images",
+        "当前图片生成协议不会真实传递参考图",
       );
     }
 
@@ -240,7 +240,7 @@ async function generateOpenAIImage(config, input) {
       return submitGenericAsyncImage(config, input);
     }
     if (config.protocol !== "openai-images" && config.protocol !== "doubao-image") {
-      throw new ProviderError("UNSUPPORTED_PROTOCOL", "Image generation protocol is not supported");
+      throw new ProviderError("UNSUPPORTED_PROTOCOL", "图片生成协议不受支持");
     }
 
     const response = await providerFetch(safeJoinUrl(config.baseUrl, "images/generations"), {
@@ -260,7 +260,7 @@ async function generateOpenAIImage(config, input) {
     });
 
     if (!response.ok) {
-      throw new ProviderError(classifyHttpError(response.status), "Image generation request failed", {
+      throw new ProviderError(classifyHttpError(response.status), "图片生成请求失败", {
         httpStatus: response.status,
       });
     }
@@ -309,7 +309,7 @@ async function generateOpenAIImageEdit(config, input) {
   });
 
   if (!response.ok) {
-    throw new ProviderError(classifyHttpError(response.status), "Image edit request failed", {
+    throw new ProviderError(classifyHttpError(response.status), "图片编辑请求失败", {
       httpStatus: response.status,
     });
   }
@@ -347,7 +347,7 @@ async function submitGenericAsyncImage(config, input) {
   });
 
   if (!response.ok) {
-    throw new ProviderError(classifyHttpError(response.status), "Async image request failed", {
+    throw new ProviderError(classifyHttpError(response.status), "异步图片请求失败", {
       httpStatus: response.status,
     });
   }
@@ -355,7 +355,7 @@ async function submitGenericAsyncImage(config, input) {
   const data = await response.json();
   const taskId = parseGenericAsyncSubmit(data);
   if (!taskId) {
-    throw new ProviderError("INVALID_IMAGE_RESPONSE", "Provider returned no async task id");
+    throw new ProviderError("INVALID_IMAGE_RESPONSE", "服务商未返回异步任务 ID");
   }
 
   return {
@@ -370,7 +370,7 @@ async function submitGenericAsyncImage(config, input) {
 
 async function checkGenericAsyncImage(config, task) {
   if (config.protocol !== "generic-async-image") {
-    throw new ProviderError("UNSUPPORTED_PROTOCOL", "Async check is not supported by this protocol");
+    throw new ProviderError("UNSUPPORTED_PROTOCOL", "当前协议不支持异步检查");
   }
   const response = await providerFetch(safeJoinUrl(config.baseUrl, `generations/${encodeURIComponent(task.externalTaskId)}`), {
     method: "GET",
@@ -381,7 +381,7 @@ async function checkGenericAsyncImage(config, task) {
   });
 
   if (!response.ok) {
-    throw new ProviderError(classifyHttpError(response.status), "Async image check failed", {
+    throw new ProviderError(classifyHttpError(response.status), "异步图片状态检查失败", {
       httpStatus: response.status,
     });
   }
@@ -433,10 +433,10 @@ function normalizeGenericAsyncError(error) {
   if (typeof error === "object") {
     return {
       code: String(error.code || "ASYNC_TASK_FAILED").slice(0, 80),
-      message: String(error.message || "Async image generation failed").slice(0, 500),
+      message: String(error.message || "异步图片生成失败").slice(0, 500),
     };
   }
-  return { code: "ASYNC_TASK_FAILED", message: "Async image generation failed" };
+  return { code: "ASYNC_TASK_FAILED", message: "异步图片生成失败" };
 }
 
 function imageSizeForOutput(output = {}) {

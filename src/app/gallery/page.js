@@ -21,7 +21,7 @@ export default function GalleryPage() {
         setCreations(data.filter(c => c.status === "completed"));
       }
     } catch (err) {
-      console.error("Error fetching creations:", err);
+      console.error("读取作品失败:", err);
     } finally {
       setLoading(false);
     }
@@ -43,7 +43,7 @@ export default function GalleryPage() {
       const filename = `amazon-listing-${id}.jpg`;
       const downloadUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
       const response = await fetch(downloadUrl);
-      if (!response.ok) throw new Error("Failed to download image");
+      if (!response.ok) throw new Error("图片下载失败");
       const blob = await response.blob();
       const blobUrl = window.URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -54,8 +54,8 @@ export default function GalleryPage() {
       document.body.removeChild(link);
       window.URL.revokeObjectURL(blobUrl);
     } catch (err) {
-      console.error("Error downloading file:", err);
-      alert("Failed to download directly. Opening in a new tab instead.");
+      console.error("下载文件失败:", err);
+      alert("直接下载失败，已改为在新标签页打开。");
       window.open(url, "_blank");
     } finally {
       setDownloading(null);
@@ -66,7 +66,7 @@ export default function GalleryPage() {
     return (
       <main className="flex-1 flex flex-col items-center justify-center bg-zinc-950 text-zinc-100">
         <FaSpinner className="animate-spin text-2xl text-violet-500 mb-3" />
-        <p className="text-sm text-zinc-400 font-medium">Loading gallery...</p>
+        <p className="text-sm text-zinc-400 font-medium">正在读取素材库...</p>
       </main>
     );
   }
@@ -77,15 +77,15 @@ export default function GalleryPage() {
         <div className="h-12 w-12 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center text-zinc-500 mb-4 shadow-inner">
           <FaImage className="text-md" />
         </div>
-        <h2 className="text-lg font-bold text-white">Access Denied</h2>
-        <p className="text-xs text-zinc-500 max-w-sm mt-2 leading-relaxed">
-          Please sign in to view your personal Amazon listing creations gallery.
+        <h2 className="text-lg font-semibold text-white">需要登录</h2>
+        <p className="text-sm text-zinc-500 max-w-sm mt-2 leading-relaxed">
+          请先登录后查看你的作品素材库。
         </p>
         <button
           onClick={() => signIn("google")}
-          className="mt-6 px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs rounded transition-all cursor-pointer"
+          className="mt-6 px-6 py-2.5 bg-violet-600 hover:bg-violet-700 text-white font-semibold text-sm rounded transition-all cursor-pointer"
         >
-          Sign In
+          登录
         </button>
       </main>
     );
@@ -96,29 +96,29 @@ export default function GalleryPage() {
       <div className="mx-auto max-w-7xl">
         <div className="border-b border-zinc-800 pb-5 mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-white sm:text-3xl">
-              Creations Gallery
+            <h1 className="text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              作品素材库
             </h1>
-            <p className="mt-1.5 text-xs text-zinc-500">
-              View and download all your previously generated Amazon product ad listings.
+            <p className="mt-1.5 text-sm text-zinc-500">
+              查看并下载你之前生成的商品图。
             </p>
           </div>
           <button
             onClick={fetchCreations}
-            className="px-4 py-2 border border-zinc-800 hover:bg-zinc-900 text-xs font-semibold rounded text-zinc-300 transition-all cursor-pointer self-start"
+            className="px-4 py-2 border border-zinc-800 hover:bg-zinc-900 text-sm font-semibold rounded text-zinc-300 transition-all cursor-pointer self-start"
           >
-            Refresh
+            刷新
           </button>
         </div>
 
         {creations.length === 0 ? (
           <div className="border border-dashed border-zinc-800 rounded-lg bg-zinc-900/10 p-12 text-center max-w-md mx-auto my-12">
             <div className="h-10 w-10 bg-zinc-900 border border-zinc-800 rounded-full flex items-center justify-center text-zinc-500 mb-3 mx-auto">
-              <FaImage className="text-xs" />
+              <FaImage className="text-sm" />
             </div>
-            <p className="text-xs font-semibold text-zinc-300">No creations found</p>
-            <p className="text-[11px] text-zinc-500 mt-1 leading-relaxed">
-              You haven&apos;t generated any completed product ad listings yet. Head over to the Product Studio to start creating.
+            <p className="text-sm font-semibold text-zinc-300">暂无作品</p>
+            <p className="text-[13px] text-zinc-500 mt-1 leading-relaxed">
+              还没有已完成的商品图。请到工作台开始创建。
             </p>
           </div>
         ) : (
@@ -139,8 +139,8 @@ export default function GalleryPage() {
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-102"
                   />
                   <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <span className="text-[11px] font-bold text-white uppercase tracking-wider bg-violet-600 px-3 py-1.5 rounded-sm shadow-md">
-                      View details
+                    <span className="text-[13px] font-semibold text-white uppercase tracking-wider bg-violet-600 px-3 py-1.5 rounded-sm shadow-md">
+                      查看详情
                     </span>
                   </div>
                 </div>
@@ -148,11 +148,11 @@ export default function GalleryPage() {
                 {/* Info block */}
                 <div className="p-4 flex-1 flex flex-col justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-xs font-bold text-white truncate">{item.prompt}</p>
+                    <p className="text-sm font-semibold text-white truncate">{item.prompt}</p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[9px] text-zinc-500 font-bold uppercase">Aspect: {item.aspectRatio || "1:1"}</span>
-                      <span className="text-[9px] text-zinc-500">•</span>
-                      <span className="text-[9px] text-zinc-500 font-medium">
+                      <span className="text-[13px] text-zinc-500 font-semibold uppercase">比例：{item.aspectRatio || "1:1"}</span>
+                      <span className="text-[13px] text-zinc-500">•</span>
+                      <span className="text-[13px] text-zinc-500 font-medium">
                         {new Date(item.createdAt).toLocaleDateString(undefined, {
                           month: "short",
                           day: "numeric",
@@ -165,14 +165,14 @@ export default function GalleryPage() {
                   <button
                     onClick={() => handleDownload(item.outputUrl, item.id)}
                     disabled={downloading === item.id}
-                    className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:bg-zinc-800 text-white rounded font-bold text-[11px] transition-all cursor-pointer"
+                    className="w-full inline-flex items-center justify-center gap-1.5 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:bg-zinc-800 text-white rounded font-semibold text-[13px] transition-all cursor-pointer"
                   >
                     {downloading === item.id ? (
-                      <FaSpinner className="animate-spin text-[10px]" />
+                      <FaSpinner className="animate-spin text-[13px]" />
                     ) : (
-                      <FaDownload className="text-[10px]" />
+                      <FaDownload className="text-[13px]" />
                     )}
-                    {downloading === item.id ? "Downloading..." : "Download image"}
+                    {downloading === item.id ? "正在下载..." : "下载图片"}
                   </button>
                 </div>
               </div>
@@ -188,10 +188,10 @@ export default function GalleryPage() {
             
             {/* Modal header */}
             <div className="px-5 py-4 border-b border-zinc-800 flex items-center justify-between">
-              <span className="text-xs font-bold text-white uppercase tracking-widest">Creation Details</span>
+              <span className="text-sm font-semibold text-white uppercase tracking-widest">作品详情</span>
               <button
                 onClick={() => setSelectedCreation(null)}
-                className="text-zinc-500 hover:text-zinc-300 text-sm font-bold cursor-pointer"
+                className="text-zinc-500 hover:text-zinc-300 text-sm font-semibold cursor-pointer"
               >
                 ✕
               </button>
@@ -203,7 +203,7 @@ export default function GalleryPage() {
               <div className="w-full md:w-1/2 aspect-square bg-zinc-950 border border-zinc-800 rounded overflow-hidden">
                 <img
                   src={selectedCreation.outputUrl}
-                  alt="detail"
+                  alt="作品详情"
                   className="w-full h-full object-contain"
                 />
               </div>
@@ -212,18 +212,18 @@ export default function GalleryPage() {
               <div className="w-full md:w-1/2 flex flex-col justify-between">
                 <div className="space-y-4">
                   <div>
-                    <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-1">Generated Prompt</span>
-                    <p className="text-xs text-zinc-200 leading-relaxed bg-zinc-950 p-3 rounded border border-zinc-800">{selectedCreation.prompt}</p>
+                    <span className="text-[13px] font-semibold text-zinc-500 uppercase tracking-widest block mb-1">生成提示词</span>
+                    <p className="text-sm text-zinc-200 leading-relaxed bg-zinc-950 p-3 rounded border border-zinc-800">{selectedCreation.prompt}</p>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Aspect Ratio</span>
-                      <span className="text-xs text-zinc-200 font-semibold">{selectedCreation.aspectRatio || "1:1"}</span>
+                      <span className="text-[13px] font-semibold text-zinc-500 uppercase tracking-widest block">图片比例</span>
+                      <span className="text-sm text-zinc-200 font-semibold">{selectedCreation.aspectRatio || "1:1"}</span>
                     </div>
                     <div>
-                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block">Created On</span>
-                      <span className="text-xs text-zinc-200 font-medium">
+                      <span className="text-[13px] font-semibold text-zinc-500 uppercase tracking-widest block">创建时间</span>
+                      <span className="text-sm text-zinc-200 font-medium">
                         {new Date(selectedCreation.createdAt).toLocaleString()}
                       </span>
                     </div>
@@ -231,13 +231,13 @@ export default function GalleryPage() {
 
                   {selectedCreation.inputUrls && (Array.isArray(selectedCreation.inputUrls) ? selectedCreation.inputUrls : JSON.parse(selectedCreation.inputUrls)).length > 0 && (
                     <div>
-                      <span className="text-[9px] font-bold text-zinc-500 uppercase tracking-widest block mb-1.5">Original Product Inputs</span>
+                      <span className="text-[13px] font-semibold text-zinc-500 uppercase tracking-widest block mb-1.5">原始商品输入</span>
                       <div className="flex gap-2">
                         {(Array.isArray(selectedCreation.inputUrls) ? selectedCreation.inputUrls : JSON.parse(selectedCreation.inputUrls)).map((url, i) => (
                           <img
                             key={i}
                             src={url}
-                            alt="input detail"
+                            alt="输入图片"
                             className="w-10 h-10 rounded border border-zinc-800 object-cover"
                           />
                         ))}
@@ -250,20 +250,20 @@ export default function GalleryPage() {
                   <button
                     onClick={() => handleDownload(selectedCreation.outputUrl, selectedCreation.id)}
                     disabled={downloading === selectedCreation.id}
-                    className="flex-1 inline-flex items-center justify-center gap-2 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded font-bold text-xs transition-all cursor-pointer"
+                    className="flex-1 inline-flex items-center justify-center gap-2 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded font-semibold text-sm transition-all cursor-pointer"
                   >
                     {downloading === selectedCreation.id ? (
-                      <FaSpinner className="animate-spin text-xs" />
+                      <FaSpinner className="animate-spin text-sm" />
                     ) : (
-                      <FaDownload className="text-xs" />
+                      <FaDownload className="text-sm" />
                     )}
-                    Download HD Image
+                    下载高清图
                   </button>
                   <button
                     onClick={() => setSelectedCreation(null)}
-                    className="px-4 py-2 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 rounded text-xs font-semibold transition-all cursor-pointer"
+                    className="px-4 py-2 border border-zinc-800 hover:bg-zinc-800 text-zinc-300 rounded text-sm font-semibold transition-all cursor-pointer"
                   >
-                    Close
+                    关闭
                   </button>
                 </div>
               </div>

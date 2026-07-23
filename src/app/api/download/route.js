@@ -16,7 +16,7 @@ export async function GET(req) {
     // Fetch the image from the external CDN (server-side bypasses CORS)
     const response = await fetch(url);
     if (!response.ok) {
-      return new NextResponse("Failed to fetch image from source", { status: 500 });
+      return new NextResponse("无法从来源读取图片", { status: 500 });
     }
 
     const contentType = response.headers.get("content-type") || "application/octet-stream";

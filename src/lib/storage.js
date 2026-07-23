@@ -6,6 +6,7 @@ import path from "path";
 import { ProviderError, providerFetch } from "@/lib/providers/errors";
 
 export const storageRoot = path.join(process.cwd(), "storage");
+export const MAX_REFERENCE_IMAGE_BYTES = 12 * 1024 * 1024;
 const MAX_GENERATED_IMAGE_BYTES = 20 * 1024 * 1024;
 
 export function sanitizeFileName(fileName) {
@@ -42,13 +43,12 @@ export function getPublicStorageUrl(storageKey) {
   return `/api/storage/${storageKey}`;
 }
 
-export async function saveProjectReference(projectId, file) {
+export async function saveProjectReference(projectId, file, buffer, mimeType) {
   const dir = getProjectReferenceDir(projectId);
   await fs.mkdir(dir, { recursive: true });
 
   const fileName = sanitizeFileName(file.name);
   const localPath = path.join(dir, fileName);
-  const buffer = Buffer.from(await file.arrayBuffer());
   await fs.writeFile(localPath, buffer);
 
   const storageKey = getStorageKey(projectId, fileName);
@@ -56,6 +56,7 @@ export async function saveProjectReference(projectId, file) {
     fileName,
     localPath,
     storageKey,
+    mimeType,
     url: getPublicStorageUrl(storageKey),
   };
 }
@@ -103,7 +104,7 @@ export async function downloadImageToBuffer(url, { timeoutMs = 30000 } = {}) {
     throw new ProviderError("IMAGE_DOWNLOAD_FAILED", "Image download redirect was blocked");
   }
   if (!response.ok) {
-    throw new ProviderError("IMAGE_DOWNLOAD_FAILED", "Unable to download generated image", {
+    throw new ProviderError("IMAGE_DOWNLOAD_FAILED", "无法下载生成图片", {
       httpStatus: response.status,
     });
   }
@@ -214,7 +215,7 @@ export function detectImageMime(buffer) {
   return "";
 }
 
-function imageExtension(mimeType) {
+export function imageExtension(mimeType) {
   if (mimeType === "image/jpeg") return ".jpg";
   if (mimeType === "image/webp") return ".webp";
   if (mimeType === "image/gif") return ".gif";

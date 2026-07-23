@@ -29,16 +29,16 @@ export default function Navbar() {
 
   const navLinks = currentAppId
         ? [
-            { name: "Workspace", path: `/app/${currentAppId}` },
-            { name: "Gallery", path: `/app/${currentAppId}/gallery` },
+            { name: "工作台", path: `/app/${currentAppId}` },
+            { name: "素材库", path: `/app/${currentAppId}/gallery` },
             { name: "API 设置", path: "/settings/providers" },
-            ...(!isLocalApp ? [{ name: "Pricing", path: `/app/${currentAppId}/pricing` }] : []),
+            ...(!isLocalApp ? [{ name: "充值", path: `/app/${currentAppId}/pricing` }] : []),
           ]
         : [
-            { name: "Workspace", path: "/" },
-            { name: "Gallery", path: "/gallery" },
+            { name: "工作台", path: "/" },
+            { name: "素材库", path: "/gallery" },
             { name: "API 设置", path: "/settings/providers" },
-            ...(!isLocalApp ? [{ name: "Pricing", path: "/pricing" }] : []),
+            ...(!isLocalApp ? [{ name: "充值", path: "/pricing" }] : []),
           ];
 
   return (
@@ -47,10 +47,10 @@ export default function Navbar() {
         
         {/* Logo and Brand Title (Visible at all times) */}
         <Link href="/" className="flex items-center gap-2 transition-transform hover:scale-[1.02] active:scale-95">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white font-extrabold text-lg shadow-md shadow-primary/30">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white font-semibold text-lg shadow-md shadow-primary/30">
             {logoLetter}
           </div>
-          <span className="text-lg font-black tracking-tight text-primary-text text-nowrap">
+          <span className="text-lg font-semibold tracking-tight text-primary-text text-nowrap">
             {appName}
           </span>
         </Link>
@@ -84,22 +84,22 @@ export default function Navbar() {
             href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FSamurAIGPT%2Fcommon-saas-template"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-full border border-divider px-4 py-1.5 text-xs font-bold text-secondary-text hover:text-primary-text hover:bg-bg-card transition-colors shadow-sm"
+            className="flex items-center gap-2 rounded-full border border-divider px-4 py-1.5 text-sm font-semibold text-secondary-text hover:text-primary-text hover:bg-bg-card transition-colors shadow-sm"
           >
-            <SiVercel className="text-xs text-white" />
-            <span>Deploy</span>
+            <SiVercel className="text-sm text-white" />
+            <span>发布</span>
           </a>
 
           {isLocalApp ? (
-            <span className="rounded-full border border-divider px-4 py-1.5 text-xs font-bold text-secondary-text">
-              Local Mode
+            <span className="rounded-full border border-divider px-4 py-1.5 text-sm font-semibold text-secondary-text">
+              本地模式
             </span>
           ) : status === "authenticated" ? (
             <div className="flex items-center">
               {/* Credit Balance indicator */}
               <div className="flex items-center h-9 border border-divider rounded-l bg-bg-page/30 overflow-hidden pr-2">
-                <span className="font-bold text-[13px] px-3 flex items-center text-primary-text gap-1">
-                  <FiDollarSign className="text-emerald-500 text-xs" />
+                <span className="font-semibold text-[13px] px-3 flex items-center text-primary-text gap-1">
+                  <FiDollarSign className="text-emerald-500 text-sm" />
                   {session.user.credits !== undefined ? session.user.credits : 0}
                 </span>
                 <Link
@@ -131,7 +131,7 @@ export default function Navbar() {
                 {/* Profile Dropdown */}
                 {isProfileOpen && (
                   <div className="absolute right-0 top-11 w-48 rounded border border-divider bg-bg-card p-1 shadow-lg z-[100] animate-scale-up">
-                    <div className="px-3 py-2 text-xs text-secondary-text border-b border-divider/50 mb-1 truncate">
+                    <div className="px-3 py-2 text-sm text-secondary-text border-b border-divider/50 mb-1 truncate">
                       {session.user.email}
                     </div>
                     <button
@@ -139,7 +139,7 @@ export default function Navbar() {
                       className="flex w-full items-center gap-2 rounded px-3 py-2 text-left text-sm font-semibold text-red-500 hover:bg-red-500/10 transition-colors"
                     >
                       <FiLogOut size={14} />
-                      <span>Sign Out</span>
+                      <span>退出</span>
                     </button>
                   </div>
                 )}
@@ -148,9 +148,9 @@ export default function Navbar() {
           ) : (
             <Link
               href="/login"
-              className="bg-primary text-white px-5 py-1.5 rounded-full text-sm font-bold hover:bg-primary-hover transition-all shadow-md shadow-primary/20"
+              className="bg-primary text-white px-5 py-1.5 rounded-full text-sm font-semibold hover:bg-primary-hover transition-all shadow-md shadow-primary/20"
             >
-              Sign In
+              登录
             </Link>
           )}
         </div>
@@ -158,12 +158,12 @@ export default function Navbar() {
         {/* Mobile Navbar Hamburger Menu Controls */}
         <div className="flex md:hidden items-center gap-2">
           {isLocalApp ? (
-            <div className="flex items-center h-8 border border-divider rounded bg-bg-page/30 px-2.5 text-xs font-bold text-primary-text">
+            <div className="flex items-center h-8 border border-divider rounded bg-bg-page/30 px-2.5 text-sm font-semibold text-primary-text">
               Local
             </div>
           ) : status === "authenticated" && (
-            <div className="flex items-center h-8 border border-divider rounded bg-bg-page/30 px-2.5 text-xs font-bold text-primary-text gap-0.5">
-              <FiDollarSign className="text-emerald-500 text-[10px]" />
+            <div className="flex items-center h-8 border border-divider rounded bg-bg-page/30 px-2.5 text-sm font-semibold text-primary-text gap-0.5">
+              <FiDollarSign className="text-emerald-500 text-[13px]" />
               {session.user.credits !== undefined ? session.user.credits : 0}
             </div>
           )}
@@ -171,7 +171,7 @@ export default function Navbar() {
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="hover:bg-bg-card p-2 rounded cursor-pointer transition-colors text-primary-text border border-divider/50"
-            aria-label="Toggle Menu"
+            aria-label="切换菜单"
           >
             {isOpen ? <IoClose size={20} /> : <IoMenu size={20} />}
           </button>
@@ -182,7 +182,7 @@ export default function Navbar() {
       {isOpen && (
         <div className="absolute top-full left-0 right-0 z-[200] glass-dropdown border-b border-divider shadow-2xl py-4 px-6 md:hidden animate-fade-in">
           <nav className="flex flex-col gap-3">
-            <span className="text-[10px] uppercase font-bold text-secondary-text tracking-widest mb-1">Navigation</span>
+            <span className="text-[13px] uppercase font-semibold text-secondary-text tracking-widest mb-1">导航</span>
             {navLinks.map((link) => (
               <Link
                 key={link.name}
@@ -203,15 +203,15 @@ export default function Navbar() {
               href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FSamurAIGPT%2Fcommon-saas-template"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-full border border-divider py-3 text-xs font-bold text-secondary-text hover:text-primary-text hover:bg-bg-card transition-all"
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-divider py-3 text-sm font-semibold text-secondary-text hover:text-primary-text hover:bg-bg-card transition-all"
             >
-              <SiVercel className="text-xs text-white" />
-              <span>Clone & Deploy Template</span>
+              <SiVercel className="text-sm text-white" />
+              <span>复制并发布模板</span>
             </a>
 
             {isLocalApp ? (
-              <span className="flex w-full items-center justify-center rounded border border-divider py-3 text-xs font-bold text-secondary-text">
-                Local Mode
+              <span className="flex w-full items-center justify-center rounded border border-divider py-3 text-sm font-semibold text-secondary-text">
+                本地模式
               </span>
             ) : status === "authenticated" ? (
               <button
@@ -219,18 +219,18 @@ export default function Navbar() {
                   setIsOpen(false);
                   signOut({ callbackUrl: "/login" });
                 }}
-                className="flex w-full items-center justify-center gap-2 rounded bg-red-500/10 text-red-500 py-3 text-sm font-bold hover:bg-red-500/20 transition-all border border-red-500/20 mt-2"
+                className="flex w-full items-center justify-center gap-2 rounded bg-red-500/10 text-red-500 py-3 text-sm font-semibold hover:bg-red-500/20 transition-all border border-red-500/20 mt-2"
               >
                 <FiLogOut size={16} />
-                <span>Sign Out</span>
+                <span>退出</span>
               </button>
             ) : (
               <Link
                 href="/login"
                 onClick={() => setIsOpen(false)}
-                className="flex w-full items-center justify-center rounded bg-primary text-white py-3 text-sm font-bold hover:bg-primary-hover transition-all shadow-md shadow-primary/20 mt-2"
+                className="flex w-full items-center justify-center rounded bg-primary text-white py-3 text-sm font-semibold hover:bg-primary-hover transition-all shadow-md shadow-primary/20 mt-2"
               >
-                Sign In
+                登录
               </Link>
             )}
           </nav>

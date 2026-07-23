@@ -34,7 +34,7 @@ export async function getCurrentUser() {
 export async function requireCurrentUser() {
   const user = await getCurrentUser();
   if (!user) {
-    const error = new Error("Unauthorized");
+    const error = new Error("未登录或无权访问");
     error.status = 401;
     throw error;
   }

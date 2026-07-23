@@ -13,7 +13,7 @@ export async function GET(_req, context) {
       select: { id: true },
     });
     if (!project) {
-      return NextResponse.json({ code: "PROJECT_NOT_FOUND", error: "Project not found" }, { status: 404 });
+      return NextResponse.json({ code: "PROJECT_NOT_FOUND", error: "未找到项目" }, { status: 404 });
     }
 
     const [plans, candidateGroups, runGroups, latestRuns, latestProcessingRuns] = await Promise.all([
@@ -117,10 +117,10 @@ export async function GET(_req, context) {
     });
   } catch (error) {
     if (error?.status === 401) {
-      return NextResponse.json({ code: "UNAUTHORIZED", error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ code: "UNAUTHORIZED", error: "未登录或无权访问" }, { status: 401 });
     }
     return NextResponse.json(
-      { code: "GENERATION_SUMMARY_FAILED", error: "Unable to read generation summary" },
+      { code: "GENERATION_SUMMARY_FAILED", error: "无法读取生成进度" },
       { status: 500 },
     );
   }

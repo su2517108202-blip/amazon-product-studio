@@ -13,7 +13,7 @@ export async function GET(_req, context) {
     });
 
     if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      return NextResponse.json({ error: "未找到项目" }, { status: 404 });
     }
 
     const runs = await prisma.imagePlanningRun.findMany({
@@ -25,7 +25,7 @@ export async function GET(_req, context) {
     return NextResponse.json(runs.map(planningRunToResponse));
   } catch (error) {
     return NextResponse.json(
-      { error: error.message || "Unable to read image planning runs" },
+      { error: error.message || "无法读取策划记录" },
       { status: error.status || 500 },
     );
   }

@@ -124,7 +124,7 @@ export async function POST(_req, context) {
     return NextResponse.json(imageGenerationRunToResponse(completed));
   } catch (error) {
     if (error?.status === 401) {
-      return NextResponse.json({ code: "UNAUTHORIZED", error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ code: "UNAUTHORIZED", error: "未登录或无权访问" }, { status: 401 });
     }
 
     const normalized = normalizedGenerationError(error);

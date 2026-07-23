@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { parseStoredArray, stripJsonMarkdown } from "@/lib/product-identity";
+import { parseStoredArray, stripJsonMarkdown } from "./product-identity.js";
 
 export const PLAN_TASKS = [
   { index: 1, taskType: "hero", label: "点击首图" },
@@ -62,6 +62,27 @@ function cleanArray(value, maxItems = 10, { rejectMarkup = false } = {}) {
   return output;
 }
 
+function assertMostlyChinesePlan(plan) {
+  const text = [
+    ...STRING_FIELDS.map((field) => plan[field]),
+    ...ARRAY_FIELDS.flatMap((field) => plan[field]),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  if (!text.trim()) return;
+
+  const cjkCount = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+  const englishWords = (text.match(/[A-Za-z]{3,}/g) || []).filter(
+    (word) => !["json", "api", "logo", "webp", "jpg", "png"].includes(word.toLowerCase()),
+  ).length;
+
+  if (englishWords >= 12 && cjkCount < 16) {
+    const error = new Error("五图策划自然语言必须使用简体中文");
+    error.code = "INVALID_MODEL_RESPONSE";
+    throw error;
+  }
+}
+
 export function parsePlanningJson(value) {
   const cleaned = stripJsonMarkdown(value);
   try {
@@ -101,7 +122,9 @@ export function sanitizeImagePlans(input) {
         throw error;
       }
       seenIndexes.add(index);
-      return sanitizeOneImagePlan(item, { rejectMarkup: true });
+      const plan = sanitizeOneImagePlan(item, { rejectMarkup: true });
+      assertMostlyChinesePlan(plan);
+      return plan;
     })
     .sort((a, b) => a.index - b.index);
 
@@ -324,22 +347,20 @@ export function buildImagePlanningInput(project, identity, referenceImages = [])
   };
 }
 
-export const IMAGE_PLANNING_PROMPT = `你是严谨的电商主图策划，不是自由艺术创作者。只能基于输入的产品身份证和项目资料策划，不能编造尺寸、认证、成分、承重、低价、夸张广告词或不存在的配件。
-
+export const IMAGE_PLANNING_PROMPT = `你是严谨的电商主图策划师，不是自由艺术创作者。只能基于输入的产品身份证和项目资料策划，不得编造尺寸、认证、成分、承重、低价、夸张广告词或不存在的配件。
+所有自然语言输出必须使用简体中文；JSON 字段名保持英文，不要翻译字段名。
 请一次返回 5 张不同电商主图策划，必须是严格 JSON 数组，不要 Markdown，不要解释，不要 JSON 之外内容。
-
 固定分工：
 1 hero 点击首图：第一眼看清卖什么，商品主体最大，一个核心卖点，不拼图。
 2 structure 核心结构：展示最重要结构或外观构成，不编造剖面。
 3 function 核心功能：展示已确认的关键可见功能，不夸大性能。
 4 scenario 使用场景：符合商品类别的真实使用场景，商品仍是主体。
 5 detail 细节理由：展示一个细节或信任理由，不做九宫格，不堆参数。
-
-每项字段：
-index, taskType, coreSellingPoint, scene, composition, mainTitle, subTitle, keyNotes, mustKeep, avoid, finalPrompt。
-
-taskType 必须依次为 hero, structure, function, scenario, detail。mainTitle 用中文，尽量不超过 14 个汉字。subTitle 不超过 22 个汉字，可为空。keyNotes 最多 4 条。五张图的卖点、场景、构图不能重复，不能只是换背景。
-
-mustKeep 必须继承产品身份证 mustKeep。avoid 必须继承 avoidChanges，并加入不改变商品颜色、不改变结构、不增加不存在配件、不减少真实部件、不修改品牌或 Logo、不做拼图、不做九宫格。
-
-finalPrompt 必须包含商品主体、当前图片任务、核心卖点、场景、构图、产品一致性、必须保持、禁止改变、目标比例、电商平台风格、文字排版要求，并明确不允许拼图和合集。`;
+每项字段必须为：index, taskType, coreSellingPoint, scene, composition, mainTitle, subTitle, keyNotes, mustKeep, avoid, finalPrompt。
+taskType 必须依次为 hero, structure, function, scenario, detail。
+五条策划的卖点、场景、构图、标题、副标题、说明和 finalPrompt 都必须使用简体中文。
+mainTitle 尽量不超过 14 个汉字。subTitle 不超过 22 个汉字，可为空。keyNotes 最多 4 条。
+五张图的卖点、场景、构图不能重复，不能只是换背景。
+mustKeep 必须继承产品身份证 mustKeep。
+avoid 必须继承 avoidChanges，并加入不改变商品颜色、不改变结构、不增加不存在配件、不减少真实部件、不修改品牌或 Logo、不做拼图、不做九宫格。
+finalPrompt 必须默认使用中文，包含商品主体、当前图片任务、核心卖点、场景、构图、产品一致性、必须保持、禁止改变、目标比例、电商平台风格、文字排版要求，并明确不允许拼图和合集。`;

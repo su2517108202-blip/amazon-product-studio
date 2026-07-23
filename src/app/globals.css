@@ -1,8 +1,10 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: var(--font-inter), sans-serif;
-  --font-outfit: var(--font-inter), sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", Arial, sans-serif;
+  --font-outfit: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", Arial, sans-serif;
   
   --color-bg-page: var(--bg-page, #09090b);
   --color-bg-card: var(--bg-card, #18181b);
@@ -78,9 +80,113 @@
     background-color: var(--color-bg-page);
     color: var(--color-primary-text);
     font-family: var(--font-sans);
+    font-size: 15px;
+    line-height: 1.5;
+    letter-spacing: 0;
     height: 100%;
     margin: 0;
     padding: 0;
+  }
+}
+
+.readable-ui {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", "Noto Sans CJK SC", "Noto Sans SC", Arial, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.readable-ui h1 {
+  font-size: clamp(24px, 2vw, 28px);
+  line-height: 1.25;
+  font-weight: 700;
+}
+
+.readable-ui h2 {
+  font-size: clamp(18px, 1.5vw, 20px);
+  line-height: 1.35;
+  font-weight: 600;
+}
+
+.readable-ui h3 {
+  font-size: 16px;
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+.readable-ui p,
+.readable-ui li,
+.readable-ui dt,
+.readable-ui dd,
+.readable-ui label,
+.readable-ui textarea {
+  line-height: 1.5;
+}
+
+.readable-ui textarea,
+.readable-ui [data-long-text="true"] {
+  line-height: 1.6;
+}
+
+.readable-ui button,
+.readable-ui input,
+.readable-ui select,
+.readable-ui textarea {
+  font-family: inherit;
+  letter-spacing: 0;
+}
+
+.readable-ui button,
+.readable-ui [role="button"] {
+  min-height: 42px;
+  font-size: 14px;
+  line-height: 1.45;
+  font-weight: 600;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.readable-ui input,
+.readable-ui select,
+.readable-ui textarea {
+  min-height: 42px;
+  font-size: 15px;
+  line-height: 1.5;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.readable-ui .text-xs {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.readable-ui .text-\[12px\],
+.readable-ui .text-\[13px\] {
+  line-height: 1.5;
+}
+
+@media (max-width: 640px) {
+  .readable-ui {
+    font-size: 14px;
+  }
+
+  .readable-ui h1 {
+    font-size: 22px;
+  }
+
+  .readable-ui button,
+  .readable-ui [role="button"] {
+    min-height: 42px;
+    font-size: 14px;
+  }
+
+  .readable-ui input,
+  .readable-ui select,
+  .readable-ui textarea {
+    min-height: 42px;
+    font-size: 16px;
   }
 }
 

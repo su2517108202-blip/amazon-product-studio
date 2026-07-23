@@ -117,10 +117,10 @@ export default function ProjectsHomePage() {
         <section className="border border-zinc-800 bg-zinc-900/45 p-5">
           <div className="mb-5 flex items-center justify-between">
             <div>
-              <h1 className="text-lg font-black text-white">灵图电商工作室</h1>
-              <p className="mt-1 text-xs text-zinc-500">Lingtu E-commerce Studio</p>
+              <h1 className="text-lg font-semibold text-white">灵图电商工作室</h1>
+              <p className="mt-1 text-sm text-zinc-500">Lingtu E-commerce Studio</p>
             </div>
-            <span className="rounded border border-emerald-900/60 px-2 py-1 text-[10px] font-bold uppercase text-emerald-400">
+            <span className="rounded border border-emerald-900/60 px-2 py-1 text-[13px] font-semibold uppercase text-emerald-400">
               Local
             </span>
           </div>
@@ -189,7 +189,7 @@ export default function ProjectsHomePage() {
             <button
               type="submit"
               disabled={saving}
-              className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-violet-700 disabled:bg-zinc-800 disabled:text-zinc-500"
+              className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-700 disabled:bg-zinc-800 disabled:text-zinc-500"
             >
               {saving ? <FaSpinner className="animate-spin" /> : <FaPlus />}
               新建商品项目
@@ -197,7 +197,7 @@ export default function ProjectsHomePage() {
           </form>
 
           {error && (
-            <p className="mt-4 border border-red-900/60 bg-red-950/40 px-3 py-2 text-xs text-red-200">
+            <p className="mt-4 border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
               {error}
             </p>
           )}
@@ -206,10 +206,10 @@ export default function ProjectsHomePage() {
         <section className="min-w-0">
           <div className="mb-5 border border-zinc-800 bg-zinc-900/35 p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-black text-white">模型配置状态</h2>
+              <h2 className="text-sm font-semibold text-white">模型配置状态</h2>
               <Link
                 href="/settings/providers"
-                className="border border-zinc-800 px-3 py-2 text-xs font-bold text-zinc-300 hover:text-white"
+                className="border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white"
               >
                 API 设置
               </Link>
@@ -229,19 +229,19 @@ export default function ProjectsHomePage() {
               />
             </div>
             {assignments.length === 0 && (
-              <p className="mt-3 text-xs text-amber-300">
+              <p className="mt-3 text-sm text-amber-300">
                 尚未配置 API。你仍然可以创建项目、上传参考图和管理素材。
               </p>
             )}
           </div>
 
           <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-black uppercase tracking-widest text-zinc-400">
+            <h2 className="text-sm font-semibold uppercase tracking-widest text-zinc-400">
               最近项目
             </h2>
             <button
               onClick={fetchProjects}
-              className="border border-zinc-800 px-3 py-2 text-xs font-bold text-zinc-300 hover:border-zinc-700 hover:text-white"
+              className="border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 hover:border-zinc-700 hover:text-white"
             >
               刷新
             </button>
@@ -255,7 +255,7 @@ export default function ProjectsHomePage() {
           ) : projects.length === 0 ? (
             <div className="flex min-h-[360px] flex-col items-center justify-center border border-dashed border-zinc-800 bg-zinc-900/20 text-center">
               <FaImage className="mb-3 text-2xl text-zinc-600" />
-              <p className="text-sm font-bold text-zinc-300">暂无项目</p>
+              <p className="text-sm font-semibold text-zinc-300">暂无项目</p>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -279,14 +279,14 @@ export default function ProjectsHomePage() {
                   </div>
                   <div className="space-y-3 p-4">
                     <div>
-                      <h3 className="truncate text-sm font-black text-white">
+                      <h3 className="truncate text-sm font-semibold text-white">
                         {project.name}
                       </h3>
-                      <p className="mt-1 truncate text-xs text-zinc-500">
+                      <p className="mt-1 truncate text-sm text-zinc-500">
                         {project.productName || "未填写商品名称"}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2 text-[10px] font-bold text-zinc-400">
+                    <div className="flex flex-wrap gap-2 text-[13px] font-semibold text-zinc-400">
                       <span className="border border-zinc-800 px-2 py-1">
                         {project.platform}
                       </span>
@@ -305,7 +305,7 @@ export default function ProjectsHomePage() {
                     <div className="grid grid-cols-[1fr_auto_auto] gap-2">
                       <Link
                         href={`/projects/${project.id}`}
-                        className="flex items-center justify-center gap-2 bg-zinc-100 px-3 py-2 text-xs font-black text-zinc-950 hover:bg-white"
+                        className="flex items-center justify-center gap-2 bg-zinc-100 px-3 py-2 text-sm font-semibold text-zinc-950 hover:bg-white"
                       >
                         <FaFolderOpen />
                         打开
@@ -341,7 +341,7 @@ export default function ProjectsHomePage() {
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">
+      <span className="mb-2 block text-[13px] font-semibold uppercase tracking-widest text-zinc-500">
         {label}
       </span>
       {children}
@@ -352,14 +352,14 @@ function Field({ label, children }) {
 function RoleStatus({ label, assignment }) {
   return (
     <div className="border border-zinc-800 bg-zinc-950 px-3 py-3">
-      <p className="text-[10px] font-black uppercase tracking-widest text-zinc-500">
+      <p className="text-[13px] font-semibold uppercase tracking-widest text-zinc-500">
         {label}
       </p>
-      <p className={`mt-1 text-sm font-black ${assignment ? "text-emerald-300" : "text-zinc-500"}`}>
+      <p className={`mt-1 text-sm font-semibold ${assignment ? "text-emerald-300" : "text-zinc-500"}`}>
         {assignment ? "已配置" : "未配置"}
       </p>
       {assignment?.providerProfile && (
-        <p className="mt-1 truncate text-xs text-zinc-500">
+        <p className="mt-1 truncate text-sm text-zinc-500">
           {assignment.providerProfile.name}
         </p>
       )}

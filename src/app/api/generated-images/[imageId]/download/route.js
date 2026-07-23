@@ -19,7 +19,7 @@ export async function GET(_req, context) {
     });
     if (!image) {
       return NextResponse.json(
-        { code: "GENERATED_IMAGE_NOT_FOUND", error: "Generated image not found" },
+        { code: "GENERATED_IMAGE_NOT_FOUND", error: "未找到生成图片" },
         { status: 404 },
       );
     }
@@ -56,10 +56,10 @@ export async function GET(_req, context) {
     });
   } catch (error) {
     if (error?.status === 401) {
-      return NextResponse.json({ code: "UNAUTHORIZED", error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ code: "UNAUTHORIZED", error: "未登录或无权访问" }, { status: 401 });
     }
     return NextResponse.json(
-      { code: "DOWNLOAD_FAILED", error: "Unable to download generated image" },
+      { code: "DOWNLOAD_FAILED", error: "无法下载生成图片" },
       { status: 500 },
     );
   }
