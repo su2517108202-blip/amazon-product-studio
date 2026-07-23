@@ -1,0 +1,78 @@
+{
+  "stage": "pre-stage-8-full-audit",
+  "repository": "su2517108202-blip/amazon-product-studio",
+  "branch": "codex/pre-stage-8-full-audit",
+  "baseline": {
+    "tag": "stage-7-1-cn-upload-fix",
+    "commit": "1f5a79b2c3e06a0b624de0f61c4b62f8b0320678"
+  },
+  "scope": [
+    "remote refs",
+    "migration chain",
+    "route permissions",
+    "provider roles",
+    "real browser smoke",
+    "test coverage",
+    "security review"
+  ],
+  "remoteSeal": {
+    "stageBranches1To5PushedDuringAudit": true,
+    "stageTagsVerified": true,
+    "oldTagsMoved": false,
+    "stage61LocalRemoteMismatchRecorded": true
+  },
+  "migrationAudit": {
+    "freshDatabase": true,
+    "npmCi": "passed",
+    "prismaGenerate": "passed",
+    "migrateDeploy": "passed",
+    "migrationCount": 8
+  },
+  "qualityChecks": {
+    "testStage61": "passed",
+    "testStage62": "passed",
+    "testStage7": "passed",
+    "testStage71": "passed",
+    "lint": "passed-with-6-existing-img-warnings",
+    "build": "passed",
+    "npmAudit": {
+      "moderate": 4,
+      "high": 9,
+      "critical": 1,
+      "total": 14
+    }
+  },
+  "realBrowserSmoke": {
+    "newProjectCreated": true,
+    "jpgUpload": 201,
+    "pngUpload": 201,
+    "webpUpload": 201,
+    "chineseFilenameUpload": 201,
+    "batchUpload4": 201,
+    "nonImageRejected": 400,
+    "emptyRejected": 400,
+    "oversizedRejected": 413,
+    "overLimitRejected": 409,
+    "productRecognition": 200,
+    "fiveImagePlanning": 200,
+    "candidateHistory": 200,
+    "singleDownload": 200,
+    "zipExport": 200,
+    "refreshRecovery": true,
+    "serviceRestartRecovery": true,
+    "testProjectDeleted": true,
+    "newPaidImageGenerationCalls": 0
+  },
+  "findingCounts": {
+    "P0": 0,
+    "P1": 0,
+    "P2": 6,
+    "P3": 2,
+    "P4": 2
+  },
+  "uploadFailureRootCause": "No valid JPG/PNG/WebP upload failure was reproduced. Invalid upload failures occur at the API validation layer. Remaining risks are Date.now filename collision, magic-byte-only validation, concurrent 14-image limit bypass, concurrent multiple-primary creation, and client-extension storage.",
+  "secretsIncluded": false,
+  "localAbsolutePathsIncluded": false,
+  "imageBase64Included": false,
+  "stage8Started": false
+}
