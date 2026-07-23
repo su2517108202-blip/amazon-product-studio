@@ -19,7 +19,7 @@
 | 4 product analysis | `codex/stage-4-product-analysis` | `7b18db6` | `stage-4-product-analysis` |
 | 5 image planning | `codex/stage-5-image-planning` | `61549a5` | `stage-5-image-planning` |
 | 6 image generation | `codex/stage-6-image-generation` | `ef818d0fd063c94d3c1cf251ef4481dd05daaf9c` | `stage-6-image-generation` |
-| 6.1 generation hardening | `codex/stage-6-1-hardening` | `335e857c9507826985ea0c7f51541d4f45c4618c` | `stage-6-1-hardening` |
+| 6.1 generation hardening | `codex/stage-6-1-hardening` | `04bc277be6442578fd5d4c31e73349faecdb2c82` | `stage-6-1-hardening` |
 
 ## Current Prisma Models
 
