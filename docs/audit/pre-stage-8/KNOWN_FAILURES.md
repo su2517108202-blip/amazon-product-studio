@@ -8,6 +8,19 @@
 - P3: `2`
 - P4: `2`
 
+## Stage 7.2 Remediation Status
+
+- `AUD-P2-001`: resolved by UUID-based reference-image storage names and concurrent same-name upload tests.
+- `AUD-P2-002`: resolved by full JPEG, PNG, and WebP decode validation with `sharp`.
+- `AUD-P2-003`: resolved by project-scoped PostgreSQL advisory locks and locked transaction count checks.
+- `AUD-P2-004`: resolved by locked first-upload logic plus a unique partial primary-image index.
+- `AUD-P2-005`: resolved by deriving stored file extensions from detected MIME.
+- `AUD-P2-006`: production critical and high advisories resolved; three moderate development-chain advisories remain.
+- `AUD-P3-001`: resolved by repairing project-studio Chinese text and adding mojibake source checks.
+- `AUD-P3-002`: resolved by localizing the remaining home and navigation user-facing labels.
+- `AUD-P4-001`: documented only; local historical ref cleanup was out of scope and old tags were not moved.
+- `AUD-P4-002`: resolved by declaring the package as ESM.
+
 ## AUD-P2-001 Date.now Filename Collision Risk
 
 - Stage source: Stage 7.1 upload hardening.

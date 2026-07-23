@@ -200,12 +200,38 @@ Stage 7.1 real UI acceptance:
 
 Stage 7.1 did not add Stage 8 features, automatic batch generation, external editors, webhooks, or ComfyUI.
 
+## Stage 7.2 Completion
+
+Stage 7.2 remediates the blocking findings from the pre-Stage-8 full repository audit while keeping Stage 8 unopened:
+
+- Project-studio mojibake was repaired and guarded with a UI text scan.
+- Remaining user-facing English labels from the home page and navigation were localized.
+- Reference-image storage names now use collision-resistant UUIDs instead of `Date.now()`.
+- Reference-image extensions are generated from detected MIME.
+- JPEG, PNG, and WebP uploads now require successful image decoding, not just matching magic bytes.
+- Reference-image batch uploads are serialized per project with PostgreSQL advisory locks.
+- The 14-image project limit is enforced inside the locked transaction.
+- Concurrent first uploads now leave exactly one primary reference image.
+- A database migration adds a partial unique index for one primary reference image per project.
+- The local-mode legacy MUAPI upload route now returns a safe disabled response.
+- Provider profiles expose explicit reference-image support status.
+- Candidate history supports paginated loading without duplicate candidates.
+- Production `npm audit --omit=dev` critical and high counts are both zero.
+
+Stage 7.2 evidence:
+
+- Stage report: `docs/stages/stage-7-2/STAGE_7_2_REPORT.md`
+- UI report: `docs/stages/stage-7-2/UI_ACCEPTANCE.md`
+- Acceptance summary: `docs/stages/stage-7-2/acceptance-summary.json`
+- UI screenshots: `docs/stages/stage-7-2/ui-acceptance/`
+- Instruction source: `docs/stages/stage-7-2/Stage_7_2_Pre_Stage_8_Remediation_Codex.md`
+
 ## Known Issues
 
 - Existing 6 `<img>` lint warnings remain by instruction.
-- Existing npm audit risks remain out of scope.
+- `npm audit --omit=dev` still reports three moderate development-chain advisories through Prisma CLI dependencies; production critical and high counts are zero.
 - Webhooks, ComfyUI, external editors, and Stage 8 workflows are not implemented.
 
 ## Next Stage Direction
 
-Stage 8 should build on Stage 7 and Stage 7.1. Candidate history, preferred selection, single download, preferred ZIP export, safe version management, Chinese UX copy, upload validation, and readable typography are now implemented and should be preserved.
+Stage 8 should build on Stage 7.2. Candidate history, preferred selection, single download, preferred ZIP export, safe version management, Chinese UX copy, upload validation, upload concurrency protection, Provider reference-image capability, candidate pagination, and readable typography are now implemented and should be preserved.

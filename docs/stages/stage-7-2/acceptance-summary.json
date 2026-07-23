@@ -1,0 +1,66 @@
+{
+  "stage": "7.2",
+  "branch": "codex/stage-7-2-pre-stage-8-remediation",
+  "baselineTag": "pre-stage-8-full-audit",
+  "baselineCommit": "77b476aff85c5bc3971957ba3750f98c4b074431",
+  "implementationCommit": "9c376193ab967770b6793bac4a9caeb35840192a",
+  "tag": "stage-7-2-pre-stage-8-remediation",
+  "stage8Started": false,
+  "paidImageGenerationCalls": 0,
+  "routesVisited": [
+    "/",
+    "/settings/providers",
+    "/projects/cmrxz44ft0000f8pg6tyda8yo"
+  ],
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900,
+      "passed": true
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "passed": true
+    }
+  ],
+  "results": {
+    "mojibakeFix": true,
+    "remainingEnglishUserLabels": true,
+    "dateNowFilenameCollision": true,
+    "storedExtensionFromDetectedMime": true,
+    "fullImageDecodeValidation": true,
+    "concurrentUploadLimit": true,
+    "concurrentFirstPrimary": true,
+    "legacyMuapiRouteDisabled": true,
+    "providerReferenceImageCapability": true,
+    "candidatePagination": true,
+    "candidatePaginationNoDuplicates": true,
+    "productionAuditCritical": 0,
+    "productionAuditHigh": 0,
+    "productionAuditModerate": 3,
+    "lint": true,
+    "build": true,
+    "emptyMigrationDeploy": true
+  },
+  "screenshots": [
+    "docs/stages/stage-7-2/ui-acceptance/01-home-cn.png",
+    "docs/stages/stage-7-2/ui-acceptance/02-navbar-cn.png",
+    "docs/stages/stage-7-2/ui-acceptance/03-provider-cn.png",
+    "docs/stages/stage-7-2/ui-acceptance/04-upload-cn.png",
+    "docs/stages/stage-7-2/ui-acceptance/05-project-studio-cn.png",
+    "docs/stages/stage-7-2/ui-acceptance/06-five-plans-cn.png",
+    "docs/stages/stage-7-2/ui-acceptance/07-candidate-pagination.png",
+    "docs/stages/stage-7-2/ui-acceptance/08-mobile-cn.png"
+  ],
+  "sanitization": {
+    "apiKeys": false,
+    "databasePasswords": false,
+    "proxyCredentials": false,
+    "authorizationHeaders": false,
+    "imageBase64": false,
+    "localAbsolutePaths": false
+  }
+}
