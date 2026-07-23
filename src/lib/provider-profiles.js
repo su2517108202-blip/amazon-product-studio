@@ -31,7 +31,8 @@ export const MODEL_ROLES = {
     label: "图片生成",
     accepts: (capabilities, profile = {}) =>
       profile.provider !== "deepseek" &&
-      (capabilities.includes("image") || capabilities.includes("asyncImage")),
+      (capabilities.includes("image") || capabilities.includes("asyncImage")) &&
+      supportsReferenceImagesProfile(profile),
   },
 };
 
@@ -79,6 +80,18 @@ export function parseCapabilities(profile) {
   }
 }
 
+export function supportsReferenceImagesProfile(profile = {}) {
+  return protocolSupportsReferenceImages(profile.provider, profile.protocol);
+}
+
+export function protocolSupportsReferenceImages(provider, protocol) {
+  if (provider === "gemini") return protocol === "gemini-native-image";
+  if (provider === "openai") return protocol === "openai-image-edit";
+  if (provider === "openai-compatible") return protocol === "openai-image-edit";
+  if (provider === "doubao") return false;
+  return false;
+}
+
 export function sanitizeProviderProfile(profile) {
   const capabilities = parseCapabilities(profile);
   return {
@@ -90,6 +103,7 @@ export function sanitizeProviderProfile(profile) {
     modelId: profile.modelId,
     protocol: profile.protocol,
     capabilities,
+    supportsReferenceImages: supportsReferenceImagesProfile(profile),
     timeoutMs: profile.timeoutMs,
     maxRetries: profile.maxRetries,
     enabled: profile.enabled,
@@ -156,6 +170,13 @@ export function validateProviderInput(input, { requireApiKey = false } = {}) {
     errors.push("重试次数必须在 0 到 5 之间");
   }
   if (capabilities.length === 0) errors.push("至少选择一个能力标签");
+  if (
+    provider === "doubao" &&
+    (capabilities.includes("image") || capabilities.includes("asyncImage")) &&
+    !supportsReferenceImagesProfile({ provider, protocol: (input.protocol || "").trim() })
+  ) {
+    errors.push("豆包图片协议暂未实现真实参考图传输，不能用于默认电商商品图生成");
+  }
   if (
     (capabilities.includes("image") || capabilities.includes("asyncImage")) &&
     !IMAGE_GENERATION_PROTOCOLS.includes((input.protocol || "").trim())

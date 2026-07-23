@@ -16,6 +16,7 @@ import {
   parsePlanningJson,
   sanitizeImagePlans,
 } from "@/lib/image-planning";
+import { supportsReferenceImagesProfile } from "@/lib/provider-profiles";
 
 async function testOpenAICompatible(config) {
   const startedAt = Date.now();
@@ -225,6 +226,12 @@ async function generateOpenAIImage(config, input) {
     if (!config.capabilities?.includes("image") && !config.capabilities?.includes("asyncImage")) {
       throw new ProviderError("CAPABILITY_MISMATCH", "Model is not marked as image capable");
     }
+    if (!supportsReferenceImagesProfile(config)) {
+      throw new ProviderError(
+        "REFERENCE_IMAGES_UNSUPPORTED",
+        "This image generation protocol does not truly transmit reference images",
+      );
+    }
 
     if (config.protocol === "openai-image-edit") {
       return generateOpenAIImageEdit(config, input);
@@ -346,7 +353,7 @@ async function submitGenericAsyncImage(config, input) {
   }
 
   const data = await response.json();
-  const taskId = data.id || data.taskId || data.task_id || data.requestId;
+  const taskId = parseGenericAsyncSubmit(data);
   if (!taskId) {
     throw new ProviderError("INVALID_IMAGE_RESPONSE", "Provider returned no async task id");
   }
@@ -380,22 +387,56 @@ async function checkGenericAsyncImage(config, task) {
   }
 
   const data = await response.json();
-  const status = normalizeAsyncStatus(data.status);
+  const status = parseGenericAsyncStatus(data);
   const images = status === "completed" ? normalizeOpenAIImages(data) : [];
+  if (status === "completed" && !images.length) {
+    throw new ProviderError("INVALID_IMAGE_RESPONSE", "Provider completed without an image");
+  }
   return {
     mode: "async",
     status,
     externalTaskId: task.externalTaskId,
     images,
-    error: data.error ? { message: String(data.error).slice(0, 500) } : null,
+    error: normalizeGenericAsyncError(data.error),
     rawMetadata: {},
   };
 }
 
-function normalizeAsyncStatus(status) {
-  if (["completed", "succeeded", "success", "done"].includes(status)) return "completed";
-  if (["failed", "error", "expired"].includes(status)) return "failed";
-  return "processing";
+function parseGenericAsyncSubmit(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new ProviderError("INVALID_IMAGE_RESPONSE", "Generic async response must be an object");
+  }
+  if (typeof data.externalTaskId !== "string" || !data.externalTaskId.trim()) {
+    throw new ProviderError("INVALID_IMAGE_RESPONSE", "Generic async response missing externalTaskId");
+  }
+  if (data.status && !["queued", "processing"].includes(data.status)) {
+    throw new ProviderError("INVALID_IMAGE_RESPONSE", "Generic async submit status is invalid");
+  }
+  return data.externalTaskId.trim();
+}
+
+function parseGenericAsyncStatus(data) {
+  if (!data || typeof data !== "object" || Array.isArray(data)) {
+    throw new ProviderError("INVALID_IMAGE_RESPONSE", "Generic async check response must be an object");
+  }
+  if (!["processing", "completed", "failed"].includes(data.status)) {
+    throw new ProviderError("INVALID_IMAGE_RESPONSE", "Generic async status is invalid");
+  }
+  return data.status;
+}
+
+function normalizeGenericAsyncError(error) {
+  if (!error) return null;
+  if (typeof error === "string") {
+    return { code: "ASYNC_TASK_FAILED", message: error.slice(0, 500) };
+  }
+  if (typeof error === "object") {
+    return {
+      code: String(error.code || "ASYNC_TASK_FAILED").slice(0, 80),
+      message: String(error.message || "Async image generation failed").slice(0, 500),
+    };
+  }
+  return { code: "ASYNC_TASK_FAILED", message: "Async image generation failed" };
 }
 
 function imageSizeForOutput(output = {}) {

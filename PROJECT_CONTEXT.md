@@ -1,9 +1,10 @@
-# Amazon Product Studio Project Context
+﻿# Amazon Product Studio Project Context
 
 ## Project
 
-- Repository base: `SamurAIGPT/amazon-product-studio`
-- Local path: `F:\codex\amazon-product-studio`
+- Repository: `su2517108202-blip/amazon-product-studio`
+- Upstream repository: `SamurAIGPT/amazon-product-studio`
+- Local path: not recorded in repository documents
 - Local URL: `http://localhost:3000`
 - Database: `amazon_product_studio_stage1`
 - PostgreSQL: local portable database on port `55432`
@@ -17,7 +18,8 @@
 | 3 BYOK provider center | `codex/stage-3-provider-center` | `7a942cd` | `stage-3-provider-center` |
 | 4 product analysis | `codex/stage-4-product-analysis` | `7b18db6` | `stage-4-product-analysis` |
 | 5 image planning | `codex/stage-5-image-planning` | `61549a5` | `stage-5-image-planning` |
-| 6 image generation | `codex/stage-6-image-generation` | sealed by `stage-6-image-generation` | `stage-6-image-generation` |
+| 6 image generation | `codex/stage-6-image-generation` | `ef818d0fd063c94d3c1cf251ef4481dd05daaf9c` | `stage-6-image-generation` |
+| 6.1 generation hardening | `codex/stage-6-1-hardening` | `335e857c9507826985ea0c7f51541d4f45c4618c` | `stage-6-1-hardening` |
 
 ## Current Prisma Models
 
@@ -56,7 +58,7 @@ Current model roles:
 - `image_generation`
 
 Stage 5 uses `image_planning` and requires `text` capability.
-Stage 6 uses `image_generation` and requires `image` or `asyncImage` capability.
+Stage 6 uses `image_generation` and requires `image` or `asyncImage` capability plus a protocol that truly transmits reference images.
 
 ## Stage 5 Completion
 
@@ -93,6 +95,7 @@ Stage 6 adds the real single-image generation loop:
 - Failed generation does not delete old images or change `ImagePlan.finalPrompt`.
 - Studio shows the current plan's latest successful generated image.
 - Stage 7 candidate history, preferred image, downloads, and version management are not implemented.
+- Stage 6.1 later hardens storage access, async idempotency, protocol honesty, and CI without adding Stage 7 features.
 
 Real image validation:
 
@@ -102,6 +105,22 @@ Real image validation:
 - Project: `Stage 4 Gemini Acceptance`
 - Plan: image plan 1 / `hero`
 - Result: 1K `1024x1024` JPEG saved locally and restored after service restart.
+
+## Stage 6.1 Completion
+
+Stage 6.1 hardens the Stage 6 generation workflow:
+
+- Gemini requests no longer put API keys in URL query parameters.
+- Storage serving requires the current user, project ownership, and a matching reference/generated image database record.
+- Storage path resolution rejects traversal and sibling-prefix paths.
+- `GeneratedImage.outputIndex` and a unique run/index constraint make async completion idempotent.
+- Async runs track check attempts, last checked time, and expiration.
+- Expired and terminal async failures are persisted as `failed`; transient network failures stay `processing`.
+- Image generation role binding and execution now require a protocol that truly supports reference images.
+- Generic async is documented as a convention protocol, not a universal standard.
+- GitHub Actions CI was added for install, Prisma generate, migration deploy, Stage 6.1 checks, lint, and build.
+
+Stage 6.1 did not add candidate history, preferred image selection, download, ZIP, batch generation, or other Stage 7 features.
 
 ## Known Issues
 

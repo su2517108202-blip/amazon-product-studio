@@ -428,6 +428,10 @@ export default function ProjectStudioClient({ projectId }) {
 	      setError("请先到 API 设置绑定图片生成模型");
 	      return;
 	    }
+	    if (!generationAssignment.providerProfile.supportsReferenceImages) {
+	      setError("当前图片生成协议未真实支持参考图，不能用于默认电商商品图生成");
+	      return;
+	    }
 	    if (!identity) {
 	      setError("请先完成商品识别");
 	      return;
@@ -1075,6 +1079,7 @@ function GenerationPanel({
   const latestImage = generationInfo?.latestImage;
   const canGenerate =
     provider &&
+    provider.supportsReferenceImages &&
     identity &&
     selectedPlan &&
     !generatingImage &&
@@ -1099,7 +1104,8 @@ function GenerationPanel({
 
       <div className="grid gap-3 md:grid-cols-4">
         <Info label="图片模型" value={provider ? `${provider.name} / ${provider.modelId}` : "未配置"} />
-        <Info label="协议" value={provider?.protocol || "未配置"} />
+        <Info label="协议" value={formatProtocol(provider?.protocol || "未配置")} />
+        <Info label="参考图协议" value={provider?.supportsReferenceImages ? "真实参与" : "未支持"} />
         <Info label="比例" value={project.aspectRatio || "1:1"} />
         <Info label="参考图" value={`${generationReferenceCount}/4`} />
       </div>
@@ -1280,6 +1286,7 @@ function generationStatus(identity, selectedPlan, provider, latestRun) {
   if (!selectedPlan) return "等待主图策划";
   if (selectedPlan.isStale) return "策划已过期";
   if (!provider) return "等待配置图片模型";
+  if (!provider.supportsReferenceImages) return "参考图协议未支持";
   if (latestRun?.status === "processing") return "生成处理中";
   if (latestRun?.status === "completed") return "生成成功";
   if (latestRun?.status === "failed") return "生成失败";
@@ -1293,6 +1300,10 @@ function formatDate(value) {
   } catch {
     return "未知";
   }
+}
+
+function formatProtocol(protocol) {
+  return protocol === "generic-async-image" ? "generic-async-image（约定协议）" : protocol;
 }
 
 function toIdentityForm(identity) {

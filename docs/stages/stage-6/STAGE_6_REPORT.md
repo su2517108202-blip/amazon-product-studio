@@ -3,8 +3,10 @@
 ## 1. Branch, Commit, Tag
 
 - Branch: `codex/stage-6-image-generation`
-- Commit: sealed by tag `stage-6-image-generation`; final SHA is reported in chat after commit.
+- Commit: `ef818d0fd063c94d3c1cf251ef4481dd05daaf9c`
 - Tag: `stage-6-image-generation`
+- Repository: `su2517108202-blip/amazon-product-studio`
+- Upstream repository: `SamurAIGPT/amazon-product-studio`
 
 Stage 6 stopped after the real single-image generation workflow. Stage 7 work was not started.
 
@@ -92,7 +94,7 @@ Provider behavior:
 
 - Gemini uses the native image endpoint documented by Google AI for Gemini image generation: `v1beta/interactions`.
 - OpenAI/OpenAI Compatible support synchronous image generation and image edit style requests.
-- Generic async protocol supports submit/check structure.
+- Generic async is a convention protocol for services that explicitly match the documented submit/check request and response shape.
 - DeepSeek is explicitly blocked from `image_generation`.
 
 Reference:

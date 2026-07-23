@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - codex/stage-6-1-hardening
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: amazon_product_studio_ci
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d amazon_product_studio_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      APP_MODE: local
+      NEXT_PUBLIC_APP_MODE: local
+      DEFAULT_LOCAL_USER_ID: local-user
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/amazon_product_studio_ci
+      DIRECT_URL: postgresql://postgres:postgres@localhost:5432/amazon_product_studio_ci
+      CREDENTIAL_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef
+      NEXTAUTH_URL: http://localhost:3000
+      NEXTAUTH_SECRET: ci-local-secret
+      GOOGLE_CLIENT_ID: ""
+      GOOGLE_CLIENT_SECRET: ""
+      MU_API_KEY: ""
+      WEBHOOK_URL: http://localhost:3000
+      STRIPE_SECRET_KEY: ""
+      NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: ""
+      STRIPE_WEBHOOK_SECRET: ""
+      PROVIDER_PROXY_URL: ""
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate --config prisma.config.ts
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy --config prisma.config.ts
+
+      - name: Stage 6.1 acceptance checks
+        run: npm run test:stage-6-1
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Build
+        run: npm run build

@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
+    "test:stage-6-1": "node scripts/stage-6-1-acceptance.mjs",
     "lint": "eslint",
     "generate:credential-key": "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""
   },

@@ -8,18 +8,18 @@ datasource db {
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?  @db.Text
-  access_token       String?  @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?  @db.Text
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -72,18 +72,18 @@ model AmazonProductCreation {
 }
 
 model Project {
-  id              String           @id @default(cuid())
+  id              String               @id @default(cuid())
   userId          String
   name            String
   productName     String?
-  platform        String           @default("通用电商")
-  aspectRatio     String           @default("1:1")
-  notes           String?          @db.Text
-  status          String           @default("draft")
-  coverImageUrl   String?          @db.Text
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
-  User            User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform        String               @default("通用电商")
+  aspectRatio     String               @default("1:1")
+  notes           String?              @db.Text
+  status          String               @default("draft")
+  coverImageUrl   String?              @db.Text
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  User            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   referenceImages ReferenceImage[]
   productIdentity ProductIdentity?
   analysisRuns    ProductAnalysisRun[]
@@ -96,20 +96,20 @@ model Project {
 }
 
 model ReferenceImage {
-  id          String   @id @default(cuid())
-  projectId   String
-  url         String   @db.Text
-  localPath   String?  @db.Text
-  storageKey  String?
-  fileName    String
-  mimeType    String
-  sortOrder   Int      @default(0)
-  isPrimary   Boolean  @default(false)
-  includeInAnalysis Boolean @default(true)
-  includeInGeneration Boolean @default(false)
-  imageRole   String   @default("other")
-  createdAt   DateTime @default(now())
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  id                  String   @id @default(cuid())
+  projectId           String
+  url                 String   @db.Text
+  localPath           String?  @db.Text
+  storageKey          String?
+  fileName            String
+  mimeType            String
+  sortOrder           Int      @default(0)
+  isPrimary           Boolean  @default(false)
+  includeInAnalysis   Boolean  @default(true)
+  includeInGeneration Boolean  @default(false)
+  imageRole           String   @default("other")
+  createdAt           DateTime @default(now())
+  project             Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
@@ -159,31 +159,31 @@ model ProductAnalysisRun {
 }
 
 model ImagePlan {
-  id                   String   @id @default(cuid())
-  projectId            String
-  planIndex            Int
-  taskType             String
-  coreSellingPoint     String   @db.Text
-  scene                String   @db.Text
-  composition          String   @db.Text
-  mainTitle            String?
-  subTitle             String?
-  keyNotesJson         String   @db.Text
-  mustKeepJson         String   @db.Text
-  avoidJson            String   @db.Text
-  finalPrompt          String   @db.Text
-  status               String   @default("ready")
-  isManuallyEdited     Boolean  @default(false)
-  isStale              Boolean  @default(false)
-  inputFingerprint     String?
-  sourceProvider       String?
-  sourceModel          String?
-  sourceProfileId      String?
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
-  project              Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  generationRuns       ImageGenerationRun[]
-  generatedImages      GeneratedImage[]
+  id               String               @id @default(cuid())
+  projectId        String
+  planIndex        Int
+  taskType         String
+  coreSellingPoint String               @db.Text
+  scene            String               @db.Text
+  composition      String               @db.Text
+  mainTitle        String?
+  subTitle         String?
+  keyNotesJson     String               @db.Text
+  mustKeepJson     String               @db.Text
+  avoidJson        String               @db.Text
+  finalPrompt      String               @db.Text
+  status           String               @default("ready")
+  isManuallyEdited Boolean              @default(false)
+  isStale          Boolean              @default(false)
+  inputFingerprint String?
+  sourceProvider   String?
+  sourceModel      String?
+  sourceProfileId  String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  project          Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  generationRuns   ImageGenerationRun[]
+  generatedImages  GeneratedImage[]
 
   @@unique([projectId, planIndex])
   @@index([projectId])
@@ -209,30 +209,33 @@ model ImagePlanningRun {
 }
 
 model ImageGenerationRun {
-  id                String    @id @default(cuid())
+  id                String           @id @default(cuid())
   projectId         String
   imagePlanId       String
   providerProfileId String?
   provider          String?
   model             String?
   protocol          String?
-  status            String    @default("processing")
-  mode              String    @default("sync")
+  status            String           @default("processing")
+  mode              String           @default("sync")
   externalTaskId    String?
   inputFingerprint  String?
-  promptSnapshot    String    @db.Text
+  promptSnapshot    String           @db.Text
   aspectRatio       String?
   resolution        String?
-  requestedCount    Int       @default(1)
-  usedStaleInput    Boolean   @default(false)
+  requestedCount    Int              @default(1)
+  usedStaleInput    Boolean          @default(false)
+  checkAttempts     Int              @default(0)
+  lastCheckedAt     DateTime?
+  expiresAt         DateTime?
   errorCode         String?
-  errorMessage      String?   @db.Text
+  errorMessage      String?          @db.Text
   durationMs        Int?
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
   completedAt       DateTime?
-  project           Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  imagePlan         ImagePlan @relation(fields: [imagePlanId], references: [id], onDelete: Cascade)
+  project           Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  imagePlan         ImagePlan        @relation(fields: [imagePlanId], references: [id], onDelete: Cascade)
   generatedImages   GeneratedImage[]
 
   @@index([projectId])
@@ -242,22 +245,24 @@ model ImageGenerationRun {
 }
 
 model GeneratedImage {
-  id                String             @id @default(cuid())
-  projectId         String
-  imagePlanId       String
-  generationRunId   String
-  storageKey        String             @db.Text
-  mimeType          String
-  width             Int?
-  height            Int?
-  byteSize          Int
-  sha256            String
-  sourceType        String
-  createdAt         DateTime           @default(now())
-  project           Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  imagePlan         ImagePlan          @relation(fields: [imagePlanId], references: [id], onDelete: Cascade)
-  generationRun     ImageGenerationRun @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
+  id              String             @id @default(cuid())
+  projectId       String
+  imagePlanId     String
+  generationRunId String
+  outputIndex     Int                @default(0)
+  storageKey      String             @db.Text
+  mimeType        String
+  width           Int?
+  height          Int?
+  byteSize        Int
+  sha256          String
+  sourceType      String
+  createdAt       DateTime           @default(now())
+  project         Project            @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  imagePlan       ImagePlan          @relation(fields: [imagePlanId], references: [id], onDelete: Cascade)
+  generationRun   ImageGenerationRun @relation(fields: [generationRunId], references: [id], onDelete: Cascade)
 
+  @@unique([generationRunId, outputIndex])
   @@index([projectId])
   @@index([imagePlanId])
   @@index([generationRunId])
@@ -265,28 +270,28 @@ model GeneratedImage {
 }
 
 model ProviderProfile {
-  id                       String                @id @default(cuid())
-  userId                   String
-  name                     String
-  provider                 String
-  baseUrl                  String?
-  encryptedApiKey          String?               @db.Text
-  apiKeyIv                 String?
-  apiKeyAuthTag            String?
-  apiKeyLast4              String?
-  modelId                  String
-  protocol                 String                @default("openai-compatible")
-  capabilitiesJson         String                @db.Text
-  timeoutMs                Int                   @default(30000)
-  maxRetries               Int                   @default(0)
-  enabled                  Boolean               @default(true)
-  lastTestOk               Boolean?
-  lastTestMessage          String?               @db.Text
-  lastTestedAt             DateTime?
-  createdAt                DateTime              @default(now())
-  updatedAt                DateTime              @updatedAt
-  User                     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  modelRoleAssignments     ModelRoleAssignment[]
+  id                   String                @id @default(cuid())
+  userId               String
+  name                 String
+  provider             String
+  baseUrl              String?
+  encryptedApiKey      String?               @db.Text
+  apiKeyIv             String?
+  apiKeyAuthTag        String?
+  apiKeyLast4          String?
+  modelId              String
+  protocol             String                @default("openai-compatible")
+  capabilitiesJson     String                @db.Text
+  timeoutMs            Int                   @default(30000)
+  maxRetries           Int                   @default(0)
+  enabled              Boolean               @default(true)
+  lastTestOk           Boolean?
+  lastTestMessage      String?               @db.Text
+  lastTestedAt         DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  User                 User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  modelRoleAssignments ModelRoleAssignment[]
 
   @@index([userId])
 }

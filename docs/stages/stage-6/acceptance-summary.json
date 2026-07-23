@@ -1,9 +1,11 @@
 {
   "stage": 6,
   "branch": "codex/stage-6-image-generation",
+  "commit": "ef818d0fd063c94d3c1cf251ef4481dd05daaf9c",
   "tag": "stage-6-image-generation",
   "scope": "real single-image generation loop",
-  "repository": "SamurAIGPT/amazon-product-studio",
+  "repository": "su2517108202-blip/amazon-product-studio",
+  "upstreamRepository": "SamurAIGPT/amazon-product-studio",
   "localDatabaseName": "amazon_product_studio_stage1",
   "providerAcceptance": {
     "provider": "gemini",

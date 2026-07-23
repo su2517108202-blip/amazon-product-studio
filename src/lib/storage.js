@@ -129,11 +129,53 @@ export async function deleteProjectStorage(projectId) {
 }
 
 export function resolveStoragePath(parts) {
-  const target = path.resolve(storageRoot, ...parts);
-  if (!target.startsWith(storageRoot)) {
+  const safeParts = normalizeStorageParts(parts);
+  const root = path.resolve(storageRoot);
+  const target = path.resolve(root, ...safeParts);
+  const relative = path.relative(root, target);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new Error("Invalid storage path");
   }
   return target;
+}
+
+export async function deleteStoredFile(storageKey) {
+  const filePath = resolveStoragePath(String(storageKey || "").split("/"));
+  await fs.rm(filePath, { force: true });
+}
+
+function normalizeStorageParts(parts = []) {
+  if (!Array.isArray(parts) || parts.length === 0) {
+    throw new Error("Invalid storage path");
+  }
+
+  return parts.map((part) => {
+    const decoded = decodeStoragePart(part);
+    if (
+      !decoded ||
+      decoded === "." ||
+      decoded === ".." ||
+      decoded.includes("/") ||
+      decoded.includes("\\")
+    ) {
+      throw new Error("Invalid storage path");
+    }
+    return decoded;
+  });
+}
+
+function decodeStoragePart(part) {
+  let decoded = String(part || "");
+  for (let i = 0; i < 3; i += 1) {
+    try {
+      const next = decodeURIComponent(decoded);
+      if (next === decoded) return next;
+      decoded = next;
+    } catch {
+      throw new Error("Invalid storage path");
+    }
+  }
+  return decoded;
 }
 
 export function detectImageMime(buffer) {

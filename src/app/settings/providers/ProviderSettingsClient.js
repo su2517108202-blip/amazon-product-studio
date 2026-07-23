@@ -420,6 +420,9 @@ export default function ProviderSettingsClient() {
                         <p className="mt-1 truncate text-xs text-zinc-500">
                           {profile.provider} / {profile.modelId}
                         </p>
+                        <p className="mt-1 truncate text-xs text-zinc-500">
+                          协议：{formatProtocol(profile.protocol)}
+                        </p>
                       </div>
                       <span
                         className={`border px-2 py-1 text-[10px] font-bold ${
@@ -443,6 +446,9 @@ export default function ProviderSettingsClient() {
                     </div>
                     <p className="mb-3 truncate text-xs text-zinc-500">
                       Key: {profile.maskedApiKey || "未保存"}
+                    </p>
+                    <p className="mb-3 text-xs text-zinc-500">
+                      参考图：{profile.supportsReferenceImages ? "真实参与生成" : "纯文生图/未实现"}
                     </p>
                     {profile.lastTestMessage && (
                       <p
@@ -515,7 +521,7 @@ export default function ProviderSettingsClient() {
             <div className="grid gap-3 lg:grid-cols-3">
               {Object.entries(MODEL_ROLES).map(([role, config]) => {
                 const eligible = profiles.filter((profile) =>
-                  config.accepts(profile.capabilities),
+                  config.accepts(profile.capabilities, profile),
                 );
                 const current = assignmentMap[role];
                 return (
@@ -566,4 +572,8 @@ function Field({ label, children }) {
       {children}
     </label>
   );
+}
+
+function formatProtocol(protocol) {
+  return protocol === "generic-async-image" ? "generic-async-image（约定协议）" : protocol;
 }

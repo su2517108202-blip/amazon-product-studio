@@ -1,9 +1,13 @@
 import crypto from "crypto";
 import { promises as fs } from "fs";
 import { prisma } from "@/lib/prisma";
-import { parseCapabilities } from "@/lib/provider-profiles";
+import {
+  parseCapabilities,
+  supportsReferenceImagesProfile,
+} from "@/lib/provider-profiles";
 import { parseStoredArray } from "@/lib/product-identity";
 import {
+  deleteStoredFile,
   downloadImageToBuffer,
   getPublicStorageUrl,
   saveGeneratedImage,
@@ -22,6 +26,16 @@ export const IMAGE_GENERATION_RESOLUTIONS = ["1K", "2K"];
 export const MAX_GENERATION_REFERENCES = 4;
 export const MAX_REFERENCE_BYTES = 12 * 1024 * 1024;
 export const MAX_REFERENCE_TOTAL_BYTES = 32 * 1024 * 1024;
+export const ASYNC_GENERATION_EXPIRES_MS = 30 * 60 * 1000;
+export const MAX_ASYNC_CHECK_ATTEMPTS = 60;
+export const TERMINAL_ASYNC_ERROR_CODES = new Set([
+  "INVALID_API_KEY",
+  "MODEL_NOT_FOUND",
+  "INSUFFICIENT_QUOTA",
+  "ASYNC_TASK_FAILED",
+  "ASYNC_TASK_EXPIRED",
+  "INVALID_IMAGE_RESPONSE",
+]);
 
 const REFERENCE_PRIORITY = {
   front: 1,
@@ -60,6 +74,16 @@ export function validateImageGenerationProtocol(profile) {
   if (profile.provider === "deepseek") {
     throw new ProviderError("UNSUPPORTED_PROTOCOL", "DeepSeek does not support image generation");
   }
+  if (!supportsReferenceImagesProfile(profile)) {
+    throw new ProviderError(
+      "REFERENCE_IMAGES_UNSUPPORTED",
+      "This image generation protocol does not truly transmit reference images",
+    );
+  }
+}
+
+export function getAsyncGenerationExpiresAt(now = new Date()) {
+  return new Date(now.getTime() + ASYNC_GENERATION_EXPIRES_MS);
 }
 
 export function buildPromptSnapshot({ project, productIdentity, imagePlan, referenceImages, output }) {
@@ -197,6 +221,9 @@ export function imageGenerationRunToResponse(run) {
     resolution: run.resolution || "",
     requestedCount: run.requestedCount,
     usedStaleInput: run.usedStaleInput,
+    checkAttempts: run.checkAttempts || 0,
+    lastCheckedAt: run.lastCheckedAt || null,
+    expiresAt: run.expiresAt || null,
     errorCode: run.errorCode || "",
     errorMessage: run.errorMessage || "",
     durationMs: run.durationMs,
@@ -214,6 +241,7 @@ export function generatedImageToResponse(image) {
     projectId: image.projectId,
     imagePlanId: image.imagePlanId,
     generationRunId: image.generationRunId,
+    outputIndex: image.outputIndex || 0,
     url: getPublicStorageUrl(image.storageKey),
     mimeType: image.mimeType,
     width: image.width,
@@ -226,30 +254,55 @@ export function generatedImageToResponse(image) {
 }
 
 export async function persistGeneratedImages({ projectId, imagePlanId, generationRunId, images }) {
-  const existing = await prisma.generatedImage.findMany({ where: { generationRunId } });
-  if (existing.length) return existing;
+  const requested = images.slice(0, 1);
+  if (!requested.length) {
+    throw new ProviderError("INVALID_IMAGE_RESPONSE", "Provider returned no image");
+  }
 
   const saved = [];
-  for (const image of images.slice(0, 1)) {
+  for (const [outputIndex, image] of requested.entries()) {
+    const existing = await prisma.generatedImage.findUnique({
+      where: { generationRunId_outputIndex: { generationRunId, outputIndex } },
+    });
+    if (existing) {
+      saved.push(existing);
+      continue;
+    }
+
     const buffer = await imageSourceToBuffer(image);
     const rowId = crypto.randomUUID();
     const stored = await saveGeneratedImage(projectId, generationRunId, rowId, buffer, image.url ? "remote_url" : "base64");
-    const row = await prisma.generatedImage.create({
-      data: {
-        id: rowId,
-        projectId,
-        imagePlanId,
-        generationRunId,
-        storageKey: stored.storageKey,
-        mimeType: stored.mimeType,
-        width: stored.width,
-        height: stored.height,
-        byteSize: stored.byteSize,
-        sha256: stored.sha256,
-        sourceType: stored.sourceType,
-      },
-    });
-    saved.push(row);
+    try {
+      const row = await prisma.generatedImage.create({
+        data: {
+          id: rowId,
+          projectId,
+          imagePlanId,
+          generationRunId,
+          outputIndex,
+          storageKey: stored.storageKey,
+          mimeType: stored.mimeType,
+          width: stored.width,
+          height: stored.height,
+          byteSize: stored.byteSize,
+          sha256: stored.sha256,
+          sourceType: stored.sourceType,
+        },
+      });
+      saved.push(row);
+    } catch (error) {
+      await deleteStoredFile(stored.storageKey).catch(() => {});
+      if (error?.code === "P2002") {
+        const row = await prisma.generatedImage.findUnique({
+          where: { generationRunId_outputIndex: { generationRunId, outputIndex } },
+        });
+        if (row) {
+          saved.push(row);
+          continue;
+        }
+      }
+      throw error;
+    }
   }
 
   if (!saved.length) {

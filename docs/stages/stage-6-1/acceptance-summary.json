@@ -1,0 +1,94 @@
+﻿{
+  "stage": "6.1",
+  "branch": "codex/stage-6-1-hardening",
+  "commit": "335e857c9507826985ea0c7f51541d4f45c4618c",
+  "tag": "stage-6-1-hardening",
+  "repository": "su2517108202-blip/amazon-product-studio",
+  "upstreamRepository": "SamurAIGPT/amazon-product-studio",
+  "scope": "image generation safety, async idempotency, storage authorization, and reference-image protocol hardening",
+  "migration": {
+    "name": "202607230006_stage6_1_generation_hardening",
+    "localMigration": "passed",
+    "emptyDatabaseMigrationChain": "passed",
+    "prismaGenerate": "passed"
+  },
+  "security": {
+    "geminiApiKeyInUrl": false,
+    "geminiUsesXGoogApiKeyHeader": true,
+    "storageRequiresCurrentUser": true,
+    "storageChecksProjectOwnership": true,
+    "storageChecksReferenceImageStorageKey": true,
+    "storageChecksGeneratedImageStorageKey": true,
+    "storageErrorsExposeAbsolutePaths": false,
+    "containsApiKey": false,
+    "containsDatabasePassword": false,
+    "containsAuthorizationHeader": false,
+    "containsImageBase64": false,
+    "containsLocalAbsolutePath": false
+  },
+  "storageTests": {
+    "normalGeneratedImageRead": "passed",
+    "otherProjectDenied": "passed",
+    "encodedTraversalDenied": "passed",
+    "siblingPrefixDenied": "passed",
+    "safeErrorMessages": "passed",
+    "unauthenticatedGuardPresent": true
+  },
+  "asyncTests": {
+    "concurrentChecksGeneratedImageCount": 1,
+    "concurrentChecksOutputIndex": 0,
+    "expiredRunStatus": "failed",
+    "expiredRunErrorCode": "ASYNC_TASK_EXPIRED",
+    "terminalErrorStatus": "failed",
+    "temporaryNetworkStatus": "processing",
+    "temporaryNetworkCreatesNewRun": false,
+    "terminalRunsSkipUpstream": true
+  },
+  "providerReferenceImageMatrix": {
+    "geminiNativeImage": true,
+    "openaiImageEdit": true,
+    "openaiImages": false,
+    "openaiCompatibleImageEdit": true,
+    "openaiCompatibleImages": false,
+    "genericAsyncImageCurrentImplementation": false,
+    "doubaoImageCurrentImplementation": false
+  },
+  "genericAsyncContract": {
+    "markedAsConventionProtocol": true,
+    "requiresExternalTaskId": true,
+    "completedWithoutImageRejected": true,
+    "unknownSuccessGuessingAllowed": false
+  },
+  "geminiRegression": {
+    "provider": "gemini",
+    "model": "gemini-3.1-flash-image",
+    "protocol": "gemini-native-image",
+    "realSingleImageGeneration": "passed",
+    "status": "completed",
+    "outputIndex": 0,
+    "mimeType": "image/jpeg",
+    "width": 1024,
+    "height": 1024
+  },
+  "qualityChecks": {
+    "stageAcceptanceScript": "passed",
+    "lint": {
+      "status": "passed",
+      "warnings": 6,
+      "warningType": "existing <img> warnings"
+    },
+    "build": "passed",
+    "githubActions": "configured_pending_push_result"
+  },
+  "outOfScope": [
+    "stage 7 candidate history",
+    "preferred image selection",
+    "download and zip export",
+    "history deletion management",
+    "batch five-image generation",
+    "Canva",
+    "ComfyUI",
+    "video",
+    "AI model generation"
+  ]
+}

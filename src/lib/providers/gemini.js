@@ -67,6 +67,13 @@ function readGeminiInteractionImages(data) {
     }));
 }
 
+function geminiHeaders(config, extra = {}) {
+  return {
+    "x-goog-api-key": config.apiKey,
+    ...extra,
+  };
+}
+
 export const geminiAdapter = {
   ...createBaseAdapter("gemini"),
   async testConnection(config) {
@@ -76,10 +83,11 @@ export const geminiAdapter = {
         throw new ProviderError("MISSING_API_KEY", "Missing API Key");
       }
 
-      const suffix = `${geminiModelPath(config.modelId)}?key=${encodeURIComponent(config.apiKey)}`;
+      const suffix = geminiModelPath(config.modelId);
       const response = await providerFetch(safeJoinUrl(config.baseUrl, suffix), {
         method: "GET",
         timeoutMs: config.timeoutMs,
+        headers: geminiHeaders(config),
       });
 
       if (!response.ok) {
@@ -106,13 +114,11 @@ export const geminiAdapter = {
         throw new ProviderError("MISSING_API_KEY", "Missing API Key");
       }
 
-      const response = await providerFetch(
-        safeJoinUrl(config.baseUrl, `models?key=${encodeURIComponent(config.apiKey)}`),
-        {
-          method: "GET",
-          timeoutMs: config.timeoutMs,
-        },
-      );
+      const response = await providerFetch(safeJoinUrl(config.baseUrl, "models"), {
+        method: "GET",
+        timeoutMs: config.timeoutMs,
+        headers: geminiHeaders(config),
+      });
 
       if (!response.ok) {
         throw new ProviderError(classifyHttpError(response.status), "Unable to read models", {
@@ -162,13 +168,13 @@ export const geminiAdapter = {
         })),
       ];
 
-      const suffix = `${geminiModelPath(config.modelId)}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
+      const suffix = `${geminiModelPath(config.modelId)}:generateContent`;
       const response = await providerFetch(safeJoinUrl(config.baseUrl, suffix), {
         method: "POST",
         timeoutMs: config.timeoutMs,
-        headers: {
+        headers: geminiHeaders(config, {
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           contents: [{ role: "user", parts }],
           generationConfig: {
@@ -206,13 +212,13 @@ export const geminiAdapter = {
         throw new ProviderError("CAPABILITY_MISMATCH", "Model is not marked as text capable");
       }
 
-      const suffix = `${geminiModelPath(config.modelId)}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
+      const suffix = `${geminiModelPath(config.modelId)}:generateContent`;
       const response = await providerFetch(safeJoinUrl(config.baseUrl, suffix), {
         method: "POST",
         timeoutMs: config.timeoutMs,
-        headers: {
+        headers: geminiHeaders(config, {
           "Content-Type": "application/json",
-        },
+        }),
         body: JSON.stringify({
           contents: [
             {
