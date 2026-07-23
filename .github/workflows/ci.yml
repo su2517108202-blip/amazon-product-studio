@@ -3,7 +3,8 @@ name: CI
 on:
   push:
     branches:
-      - codex/stage-6-1-hardening
+      - "codex/**"
+      - main
   pull_request:
 
 jobs:
@@ -63,6 +64,9 @@ jobs:
 
       - name: Stage 6.1 acceptance checks
         run: npm run test:stage-6-1
+
+      - name: Stage 6.2 async auth checks
+        run: npm run test:stage-6-2
 
       - name: Lint
         run: npm run lint

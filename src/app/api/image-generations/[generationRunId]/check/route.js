@@ -13,22 +13,25 @@ import {
 
 export async function POST(_req, context) {
   const startedAt = Date.now();
+  let ownedRunId = "";
+  let ownerUserId = "";
+
   try {
     const { generationRunId } = await context.params;
     const user = await requireCurrentUser();
-    const run = await prisma.imageGenerationRun.findFirst({
-      where: { id: generationRunId, project: { userId: user.id } },
-      include: { generatedImages: true },
-    });
+    ownerUserId = user.id;
+    const run = await loadOwnedRun(generationRunId, user.id);
 
     if (!run) {
       return NextResponse.json({ code: "RUN_NOT_FOUND", error: "Generation run not found" }, { status: 404 });
     }
+    ownedRunId = run.id;
+
     if (run.status !== "processing" || run.mode !== "async") {
       return NextResponse.json(imageGenerationRunToResponse(run));
     }
     if (run.expiresAt && run.expiresAt.getTime() <= Date.now()) {
-      const expired = await markRunFailed(run.id, {
+      const expired = await markOwnedRunFailed(run.id, user.id, {
         code: "ASYNC_TASK_EXPIRED",
         message: "Async image generation expired",
         durationMs: Date.now() - startedAt,
@@ -47,16 +50,18 @@ export async function POST(_req, context) {
       );
     }
 
-    const checked = await prisma.imageGenerationRun.update({
-      where: { id: run.id },
+    const checked = await updateOwnedRun(run.id, user.id, {
       data: {
         checkAttempts: { increment: 1 },
         lastCheckedAt: new Date(),
       },
-      include: { generatedImages: true },
     });
+    if (!checked) {
+      return NextResponse.json({ code: "RUN_NOT_FOUND", error: "Generation run not found" }, { status: 404 });
+    }
+
     if (checked.checkAttempts >= MAX_ASYNC_CHECK_ATTEMPTS) {
-      const failed = await markRunFailed(run.id, {
+      const failed = await markOwnedRunFailed(run.id, user.id, {
         code: "ASYNC_TASK_FAILED",
         message: "Async image generation exceeded max check attempts",
         durationMs: Date.now() - startedAt,
@@ -71,20 +76,21 @@ export async function POST(_req, context) {
     });
 
     if (result.status === "processing") {
-      const updated = await prisma.imageGenerationRun.update({
-        where: { id: run.id },
+      const updated = await updateOwnedRun(run.id, user.id, {
         data: {
           durationMs: Date.now() - startedAt,
           errorCode: null,
           errorMessage: null,
         },
-        include: { generatedImages: true },
       });
+      if (!updated) {
+        return NextResponse.json({ code: "RUN_NOT_FOUND", error: "Generation run not found" }, { status: 404 });
+      }
       return NextResponse.json(imageGenerationRunToResponse(updated));
     }
 
     if (result.status === "failed") {
-      const failed = await markRunFailed(run.id, {
+      const failed = await markOwnedRunFailed(run.id, user.id, {
         code: result.error?.code || "ASYNC_TASK_FAILED",
         message: result.error?.message || "Async image generation failed",
         durationMs: Date.now() - startedAt,
@@ -92,14 +98,18 @@ export async function POST(_req, context) {
       return NextResponse.json(imageGenerationRunToResponse(failed));
     }
 
+    const ownedForPersist = await loadOwnedRun(run.id, user.id);
+    if (!ownedForPersist) {
+      return NextResponse.json({ code: "RUN_NOT_FOUND", error: "Generation run not found" }, { status: 404 });
+    }
+
     await persistGeneratedImages({
-      projectId: run.projectId,
-      imagePlanId: run.imagePlanId,
-      generationRunId: run.id,
+      projectId: ownedForPersist.projectId,
+      imagePlanId: ownedForPersist.imagePlanId,
+      generationRunId: ownedForPersist.id,
       images: result.images || [],
     });
-    const completed = await prisma.imageGenerationRun.update({
-      where: { id: run.id },
+    const completed = await updateOwnedRun(run.id, user.id, {
       data: {
         status: "completed",
         durationMs: Date.now() - startedAt,
@@ -107,35 +117,42 @@ export async function POST(_req, context) {
       },
       include: { generatedImages: { orderBy: { createdAt: "desc" } } },
     });
+    if (!completed) {
+      return NextResponse.json({ code: "RUN_NOT_FOUND", error: "Generation run not found" }, { status: 404 });
+    }
 
     return NextResponse.json(imageGenerationRunToResponse(completed));
   } catch (error) {
+    if (error?.status === 401) {
+      return NextResponse.json({ code: "UNAUTHORIZED", error: "Unauthorized" }, { status: 401 });
+    }
+
     const normalized = normalizedGenerationError(error);
-    const { generationRunId } = await context.params;
-    const run = await prisma.imageGenerationRun.findUnique({
-      where: { id: generationRunId },
-      include: { generatedImages: true },
-    }).catch(() => null);
+    const run = ownedRunId && ownerUserId
+      ? await loadOwnedRun(ownedRunId, ownerUserId).catch(() => null)
+      : null;
+
     if (run?.status === "processing" && run.mode === "async") {
       if (TERMINAL_ASYNC_ERROR_CODES.has(normalized.code)) {
-        const failed = await markRunFailed(run.id, {
+        const failed = await markOwnedRunFailed(run.id, ownerUserId, {
           code: normalized.code,
           message: normalized.message,
           durationMs: Date.now() - startedAt,
         });
         return NextResponse.json(imageGenerationRunToResponse(failed));
       }
-      const updated = await prisma.imageGenerationRun.update({
-        where: { id: run.id },
+      const updated = await updateOwnedRun(run.id, ownerUserId, {
         data: {
           errorCode: normalized.code,
           errorMessage: normalized.message.slice(0, 800),
           durationMs: Date.now() - startedAt,
         },
-        include: { generatedImages: true },
       });
-      return NextResponse.json(imageGenerationRunToResponse(updated));
+      if (updated) {
+        return NextResponse.json(imageGenerationRunToResponse(updated));
+      }
     }
+
     return NextResponse.json(
       { code: normalized.code, error: normalized.message },
       { status: error.httpStatus || normalized.httpStatus || 400 },
@@ -143,9 +160,26 @@ export async function POST(_req, context) {
   }
 }
 
-async function markRunFailed(runId, { code, message, durationMs, touch = false }) {
-  return prisma.imageGenerationRun.update({
-    where: { id: runId },
+async function loadOwnedRun(runId, userId, include = { generatedImages: true }) {
+  if (!runId || !userId) return null;
+  return prisma.imageGenerationRun.findFirst({
+    where: { id: runId, project: { userId } },
+    include,
+  });
+}
+
+async function updateOwnedRun(runId, userId, { data, include = { generatedImages: true } }) {
+  if (!runId || !userId) return null;
+  const result = await prisma.imageGenerationRun.updateMany({
+    where: { id: runId, project: { userId } },
+    data,
+  });
+  if (result.count !== 1) return null;
+  return loadOwnedRun(runId, userId, include);
+}
+
+async function markOwnedRunFailed(runId, userId, { code, message, durationMs, touch = false }) {
+  return updateOwnedRun(runId, userId, {
     data: {
       status: "failed",
       ...(touch
