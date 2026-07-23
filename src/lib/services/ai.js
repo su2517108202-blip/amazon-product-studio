@@ -4,7 +4,7 @@ import config from "@/lib/config";
 import { isLocalMode } from "@/lib/app-mode";
 
 /**
- * Service to manage Amazon Product Studio creations using nano-banana-2-edit API
+ * Service to manage legacy SaaS image creations using nano-banana-2-edit API.
  */
 export const AIService = {
   /**
@@ -89,7 +89,7 @@ export const AIService = {
   async processResult(requestId, result) {
     console.log("[AI_SERVICE_PROCESS_RESULT] RequestId:", requestId);
     console.log("[AI_SERVICE_PROCESS_RESULT] Payload:", JSON.stringify(result));
-    
+
     const creation = await prisma.amazonProductCreation.findUnique({
       where: { requestId }
     });
@@ -110,7 +110,7 @@ export const AIService = {
     if (status === "completed" || status === "succeeded") {
       const outputs = result.outputs || [];
       const outputUrl = outputs[0] || (typeof result.output === 'string' ? result.output : result.output?.urls?.get);
-      
+
       if (outputUrl) {
         const updated = await prisma.amazonProductCreation.update({
           where: { id: creation.id },

@@ -44,7 +44,7 @@ export default function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full glass-panel border-b border-divider/50 shadow-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
-        
+
         {/* Logo and Brand Title (Visible at all times) */}
         <Link href="/" className="flex items-center gap-2 transition-transform hover:scale-[1.02] active:scale-95">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-white font-semibold text-lg shadow-md shadow-primary/30">
@@ -78,17 +78,18 @@ export default function Navbar() {
 
         {/* Desktop Actions Section */}
         <div className="hidden md:flex items-center gap-4">
-          
-          {/* Vercel Deploy Button */}
-          <a
-            href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FSamurAIGPT%2Fcommon-saas-template"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 rounded-full border border-divider px-4 py-1.5 text-sm font-semibold text-secondary-text hover:text-primary-text hover:bg-bg-card transition-colors shadow-sm"
-          >
-            <SiVercel className="text-sm text-white" />
-            <span>发布</span>
-          </a>
+
+          {!isLocalApp && (
+            <a
+              href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FSamurAIGPT%2Fcommon-saas-template"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 rounded-full border border-divider px-4 py-1.5 text-sm font-semibold text-secondary-text hover:text-primary-text hover:bg-bg-card transition-colors shadow-sm"
+            >
+              <SiVercel className="text-sm text-white" />
+              <span>发布</span>
+            </a>
+          )}
 
           {isLocalApp ? (
             <span className="rounded-full border border-divider px-4 py-1.5 text-sm font-semibold text-secondary-text">
@@ -159,7 +160,7 @@ export default function Navbar() {
         <div className="flex md:hidden items-center gap-2">
           {isLocalApp ? (
             <div className="flex items-center h-8 border border-divider rounded bg-bg-page/30 px-2.5 text-sm font-semibold text-primary-text">
-              Local
+              本地模式
             </div>
           ) : status === "authenticated" && (
             <div className="flex items-center h-8 border border-divider rounded bg-bg-page/30 px-2.5 text-sm font-semibold text-primary-text gap-0.5">
@@ -167,7 +168,7 @@ export default function Navbar() {
               {session.user.credits !== undefined ? session.user.credits : 0}
             </div>
           )}
-          
+
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="hover:bg-bg-card p-2 rounded cursor-pointer transition-colors text-primary-text border border-divider/50"
@@ -198,16 +199,17 @@ export default function Navbar() {
 
             <div className="h-px bg-divider/50 my-2" />
 
-            {/* Vercel Deploy in Mobile menu */}
-            <a
-              href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FSamurAIGPT%2Fcommon-saas-template"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex w-full items-center justify-center gap-2 rounded-full border border-divider py-3 text-sm font-semibold text-secondary-text hover:text-primary-text hover:bg-bg-card transition-all"
-            >
-              <SiVercel className="text-sm text-white" />
-              <span>复制并发布模板</span>
-            </a>
+            {!isLocalApp && (
+              <a
+                href="https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FSamurAIGPT%2Fcommon-saas-template"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex w-full items-center justify-center gap-2 rounded-full border border-divider py-3 text-sm font-semibold text-secondary-text hover:text-primary-text hover:bg-bg-card transition-all"
+              >
+                <SiVercel className="text-sm text-white" />
+                <span>复制并发布模板</span>
+              </a>
+            )}
 
             {isLocalApp ? (
               <span className="flex w-full items-center justify-center rounded border border-divider py-3 text-sm font-semibold text-secondary-text">

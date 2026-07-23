@@ -118,10 +118,10 @@ export default function ProjectsHomePage() {
           <div className="mb-5 flex items-center justify-between">
             <div>
               <h1 className="text-lg font-semibold text-white">灵图电商工作室</h1>
-              <p className="mt-1 text-sm text-zinc-500">Lingtu E-commerce Studio</p>
+              <p className="mt-1 text-sm text-zinc-500">本地 BYOK 商品图片工作台</p>
             </div>
             <span className="rounded border border-emerald-900/60 px-2 py-1 text-[13px] font-semibold uppercase text-emerald-400">
-              Local
+              本地模式
             </span>
           </div>
 

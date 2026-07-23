@@ -1,11 +1,11 @@
 /**
- * Centralized configuration for the Amazon Product Studio SaaS application.
+ * Centralized configuration for the local BYOK product studio.
  */
 
 const config = {
-  appName: "Amazon Product Studio",
+  appName: "灵图电商工作室",
   app: {
-    mode: process.env.NEXT_PUBLIC_APP_MODE || process.env.APP_MODE || "production",
+    mode: process.env.APP_MODE || process.env.NEXT_PUBLIC_APP_MODE || "production",
     defaultLocalUserId: process.env.DEFAULT_LOCAL_USER_ID || "local-user",
   },
   auth: {

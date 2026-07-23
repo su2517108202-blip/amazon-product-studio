@@ -18,22 +18,22 @@ import {
 } from "react-icons/fa";
 
 const ROLES = [
-  { value: "front", label: "����" },
-  { value: "back", label: "����" },
-  { value: "side", label: "����" },
-  { value: "inside", label: "�ڲ�" },
-  { value: "detail", label: "ϸ��" },
-  { value: "packaging", label: "��װ" },
-  { value: "scene", label: "����" },
-  { value: "other", label: "����" },
+  { value: "front", label: "正面" },
+  { value: "back", label: "背面" },
+  { value: "side", label: "侧面" },
+  { value: "inside", label: "内部" },
+  { value: "detail", label: "细节" },
+  { value: "packaging", label: "包装" },
+  { value: "scene", label: "场景" },
+  { value: "other", label: "其他" },
 ];
 
 const PLAN_TABS = [
-  { index: 1, taskType: "hero", label: "ͼ1 �����ͼ" },
-  { index: 2, taskType: "structure", label: "ͼ2 ���Ľṹ" },
-  { index: 3, taskType: "function", label: "ͼ3 ���Ĺ���" },
-  { index: 4, taskType: "scenario", label: "ͼ4 ʹ�ó���" },
-  { index: 5, taskType: "detail", label: "ͼ5 ϸ������" },
+  { index: 1, taskType: "hero", label: "图1 点击首图" },
+  { index: 2, taskType: "structure", label: "图2 核心结构" },
+  { index: 3, taskType: "function", label: "图3 核心功能" },
+  { index: 4, taskType: "scenario", label: "图4 使用场景" },
+  { index: 5, taskType: "detail", label: "图5 细节理由" },
 ];
 
 const EMPTY_IDENTITY_FORM = {
@@ -71,6 +71,7 @@ export default function ProjectStudioClient({ projectId }) {
   const [planInfo, setPlanInfo] = useState(null);
   const [generationInfo, setGenerationInfo] = useState(null);
   const [candidateInfo, setCandidateInfo] = useState(null);
+  const [loadingMoreCandidates, setLoadingMoreCandidates] = useState(false);
   const [generationSummary, setGenerationSummary] = useState(null);
   const [planningRuns, setPlanningRuns] = useState([]);
   const [planForm, setPlanForm] = useState(EMPTY_PLAN_FORM);
@@ -111,19 +112,19 @@ export default function ProjectStudioClient({ projectId }) {
     const planningRunsData = await planningRunsRes.json();
     const summaryData = await summaryRes.json();
 
-    if (!projectRes.ok) throw new Error(projectData.error || "�޷���ȡ��Ŀ");
-    if (!identityRes.ok) throw new Error(identityData.error || "�޷���ȡ��Ʒ����֤");
-    if (!assignmentsRes.ok) throw new Error(assignmentsData.error || "�޷���ȡģ������");
-    if (!runsRes.ok) throw new Error(runsData.error || "�޷���ȡʶ���¼");
-    if (!plansRes.ok) throw new Error(plansData.error || "�޷���ȡ��ͼ�߻�");
-    if (!planningRunsRes.ok) throw new Error(planningRunsData.error || "�޷���ȡ�߻���¼");
-    if (!summaryRes.ok) throw new Error(summaryData.error || "�޷���ȡ����ժҪ");
+    if (!projectRes.ok) throw new Error(projectData.error || "无法读取项目");
+    if (!identityRes.ok) throw new Error(identityData.error || "无法读取产品身份证");
+    if (!assignmentsRes.ok) throw new Error(assignmentsData.error || "无法读取模型配置");
+    if (!runsRes.ok) throw new Error(runsData.error || "无法读取识别记录");
+    if (!plansRes.ok) throw new Error(plansData.error || "无法读取主图策划");
+    if (!planningRunsRes.ok) throw new Error(planningRunsData.error || "无法读取策划记录");
+    if (!summaryRes.ok) throw new Error(summaryData.error || "无法读取生成摘要");
 
     setProject(projectData);
     setDraft({
       name: projectData.name || "",
       productName: projectData.productName || "",
-      platform: projectData.platform || "ͨ�õ���",
+      platform: projectData.platform || "通用电商",
       aspectRatio: projectData.aspectRatio || "1:1",
       notes: projectData.notes || "",
     });
@@ -157,10 +158,10 @@ export default function ProjectStudioClient({ projectId }) {
       const generationData = await generationRes.json();
       const candidatesData = await candidatesRes.json();
       if (!generationRes.ok) {
-        throw new Error(generationData.error || "�޷���ȡͼƬ���ɼ�¼");
+        throw new Error(generationData.error || "无法读取图片生成记录");
       }
       if (!candidatesRes.ok) {
-        throw new Error(candidatesData.error || "�޷���ȡ��ѡͼ��ʷ");
+        throw new Error(candidatesData.error || "无法读取候选图历史");
       }
       setGenerationInfo(generationData);
       setCandidateInfo(candidatesData);
@@ -206,7 +207,7 @@ export default function ProjectStudioClient({ projectId }) {
       try {
         const res = await fetch(`/api/image-generations/${processingRun.id}/check`, { method: "POST" });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "���ʧ��");
+        if (!res.ok) throw new Error(data.error || "检查失败");
         if (data.status === "completed" || data.status === "failed") {
           await fetchProject();
         }
@@ -229,13 +230,42 @@ export default function ProjectStudioClient({ projectId }) {
   }
 
   function selectPlan(index) {
-    if (planDirty && !window.confirm("��ǰ�߻���δ�����޸ģ��л���ᶪʧ���Ƿ������")) {
+    if (planDirty && !window.confirm("当前策划有未保存修改，切换后会丢失。是否继续？")) {
       return;
     }
     const next = plans.find((plan) => plan.planIndex === index);
     setActivePlanIndex(index);
     setPlanForm(next ? toPlanForm(next) : EMPTY_PLAN_FORM);
+    setGenerationInfo(null);
+    setCandidateInfo(null);
     setPlanDirty(false);
+  }
+
+  async function loadMoreCandidates() {
+    if (!selectedPlan || !candidateInfo?.nextCursor || loadingMoreCandidates) return;
+    setLoadingMoreCandidates(true);
+    setError("");
+    try {
+      const res = await fetch(
+        `/api/projects/${projectId}/image-plans/${selectedPlan.id}/generated-images?cursor=${encodeURIComponent(
+          candidateInfo.nextCursor,
+        )}`,
+      );
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "无法读取更多候选图");
+      setCandidateInfo((current) => {
+        const existingIds = new Set((current?.items || []).map((item) => item.id));
+        const appended = (data.items || []).filter((item) => !existingIds.has(item.id));
+        return {
+          ...data,
+          items: [...(current?.items || []), ...appended],
+        };
+      });
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoadingMoreCandidates(false);
+    }
   }
 
   async function saveProject(event) {
@@ -249,9 +279,9 @@ export default function ProjectStudioClient({ projectId }) {
         body: JSON.stringify(draft),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "����ʧ��");
+      if (!res.ok) throw new Error(data.error || "保存失败");
       await fetchProject();
-      setMessage("��Ŀ�ѱ���");
+      setMessage("项目已保存");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -274,9 +304,9 @@ export default function ProjectStudioClient({ projectId }) {
         body: formData,
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "�ϴ�ʧ��");
+      if (!res.ok) throw new Error(data.error || "上传失败");
       await fetchProject();
-      setMessage("�ο�ͼ���ϴ�����Ʒ����֤������Ҫ����ʶ��");
+      setMessage("参考图已上传，产品身份证可能需要重新识别");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -290,12 +320,12 @@ export default function ProjectStudioClient({ projectId }) {
     setMessage("");
     const isChecking = payload.includeInAnalysis === true;
     if (isChecking && selectedCount >= 8) {
-      setError("����ʶ���ͼƬ��� 8 ��");
+      setError("参与识别的图片最多 8 张");
       return;
     }
     const isGenerationChecking = payload.includeInGeneration === true;
     if (isGenerationChecking && generationReferenceCount >= 4) {
-      setError("�������ɵĲο�ͼ��� 4 ��");
+      setError("参与生成的参考图最多 4 张");
       return;
     }
     const res = await fetch(`/api/reference-images/${imageId}`, {
@@ -305,7 +335,7 @@ export default function ProjectStudioClient({ projectId }) {
     });
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error || "����ͼƬʧ��");
+      setError(data.error || "更新图片失败");
       return;
     }
     await fetchProject();
@@ -319,7 +349,7 @@ export default function ProjectStudioClient({ projectId }) {
     });
     const data = await res.json();
     if (!res.ok) {
-      setError(data.error || "ɾ��ͼƬʧ��");
+      setError(data.error || "删除图片失败");
       return;
     }
     await fetchProject();
@@ -327,25 +357,25 @@ export default function ProjectStudioClient({ projectId }) {
 
   async function analyzeProduct({ force = false } = {}) {
     if (!visionAssignment?.providerProfile) {
-      setError("���ȵ� API ���ð���Ʒʶͼģ��");
+      setError("请先到 API 设置绑定商品识图模型");
       return;
     }
     if (!project.referenceImages.some((image) => image.isPrimary)) {
-      setError("�����������ο�ͼ");
+      setError("请先设置主参考图");
       return;
     }
     if (selectedCount > 8) {
-      setError("����ʶ���ͼƬ��� 8 ��");
+      setError("参与识别的图片最多 8 张");
       return;
     }
     if (identity && force) {
-      const ok = window.confirm("����ʶ��Ḳ�ǵ�ǰ��Ʒ����֤���Ƿ������");
+      const ok = window.confirm("重新识别会覆盖当前产品身份证，是否继续？");
       if (!ok) return;
     }
 
     setAnalyzing(true);
     setError("");
-    setMessage(`���ڶ�ȡ ${selectedCount} �Ųο�ͼ`);
+    setMessage(`正在读取 ${selectedCount} 张参考图`);
     try {
       const res = await fetch(`/api/projects/${projectId}/analyze`, {
         method: "POST",
@@ -354,10 +384,10 @@ export default function ProjectStudioClient({ projectId }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(`${data.code || "ERROR"}��${data.message || "ʶ��ʧ��"}`);
+        throw new Error(`${data.code || "ERROR"}：${data.message || "识别失败"}`);
       }
       await fetchProject();
-      setMessage(data.reused ? "�Ѹ����ϴ�ʶ����" : "ʶ��ɹ�");
+      setMessage(data.reused ? "已复用上次识别结果" : "识别成功");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -367,11 +397,11 @@ export default function ProjectStudioClient({ projectId }) {
 
   async function generatePlans({ force = false } = {}) {
     if (!planningAssignment?.providerProfile) {
-      setError("���ȵ� API ���ð󶨲߻�ģ��");
+      setError("请先到 API 设置绑定策划模型");
       return;
     }
     if (!identity) {
-      setError("���������Ʒʶ�����ɲ�Ʒ����֤");
+      setError("请先完成商品识别，生成产品身份证");
       return;
     }
 
@@ -379,19 +409,19 @@ export default function ProjectStudioClient({ projectId }) {
     if (hasPlans && force) {
       const manual = plans.some((plan) => plan.isManuallyEdited);
       const ok = window.confirm(
-        `�������ɻḲ�ǵ�ǰ 5 �Ų߻�������Ӱ��ο�ͼ�Ͳ�Ʒ����֤��${manual ? "��ǰ�����ֶ��޸����ݡ�" : ""}�Ƿ������`,
+        `重新生成会覆盖当前 5 张策划，但不影响参考图和产品身份证。${manual ? "当前包含手动修改内容。" : ""}是否继续？`,
       );
       if (!ok) return;
     }
 
     const allowStaleIdentity =
       identity.isStale &&
-      window.confirm("��Ʒ����֤�����ѹ��ڣ��Ƿ���ʹ�õ�ǰ����֤���ɲ߻���");
+      window.confirm("产品身份证可能已过期，是否仍使用当前身份证生成策划？");
     if (identity.isStale && !allowStaleIdentity) return;
 
     setPlanning(true);
     setError("");
-    setMessage("�������� 5 ����ͼ�߻�");
+    setMessage("正在生成 5 张主图策划");
     try {
       const res = await fetch(`/api/projects/${projectId}/image-plans/generate`, {
         method: "POST",
@@ -400,10 +430,10 @@ export default function ProjectStudioClient({ projectId }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(`${data.code || "ERROR"}��${data.message || "����ʧ��"}`);
+        throw new Error(`${data.code || "ERROR"}：${data.message || "生成失败"}`);
       }
       await fetchProject();
-      setMessage(data.reused ? "��ʹ������ 5 �Ų߻�" : "5 ����ͼ�߻�������");
+      setMessage(data.reused ? "已使用现有 5 张策划" : "5 张主图策划已生成");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -423,9 +453,9 @@ export default function ProjectStudioClient({ projectId }) {
         body: JSON.stringify(fromIdentityForm(identityForm)),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "�����Ʒ����֤ʧ��");
+      if (!res.ok) throw new Error(data.error || "保存产品身份证失败");
       await fetchProject();
-      setMessage("��Ʒ����֤�ѱ��棬���в߻��ѱ��Ϊ���ܹ���");
+      setMessage("产品身份证已保存，现有策划已标记为可能过期");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -449,12 +479,12 @@ export default function ProjectStudioClient({ projectId }) {
         },
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "����߻�ʧ��");
+      if (!res.ok) throw new Error(data.error || "保存策划失败");
       await fetchProject();
       setActivePlanIndex(data.planIndex);
       setPlanForm(toPlanForm(data));
       setPlanDirty(false);
-      setMessage(`ͼ${data.planIndex} �߻��ѱ���`);
+      setMessage(`图${data.planIndex} 策划已保存`);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -464,40 +494,40 @@ export default function ProjectStudioClient({ projectId }) {
 
 	  async function generateCurrentImage({ force = false } = {}) {
 	    if (!selectedPlan) {
-	      setError("����ѡ��һ����ͼ�߻�");
+	      setError("请先选择一条主图策划");
 	      return;
 	    }
 	    if (!generationAssignment?.providerProfile) {
-	      setError("���ȵ� API ���ð�ͼƬ����ģ��");
+	      setError("请先到 API 设置绑定图片生成模型");
 	      return;
 	    }
 	    if (!generationAssignment.providerProfile.supportsReferenceImages) {
-	      setError("��ǰͼƬ����Э��δ��ʵ֧�ֲο�ͼ����������Ĭ�ϵ�����Ʒͼ����");
+	      setError("当前图片生成协议未真实支持参考图，不能用于默认电商商品图生成");
 	      return;
 	    }
 	    if (!identity) {
-	      setError("���������Ʒʶ��");
+	      setError("请先完成商品识别");
 	      return;
 	    }
 	    if (!project.referenceImages.some((image) => image.isPrimary)) {
-	      setError("�����������ο�ͼ");
+	      setError("请先设置主参考图");
 	      return;
 	    }
 	    if (generationReferenceCount > 4) {
-	      setError("�������ɵĲο�ͼ��� 4 ��");
+	      setError("参与生成的参考图最多 4 张");
 	      return;
 	    }
 	    const stale = identity.isStale || selectedPlan.isStale;
 	    const allowStaleInput =
-	      stale && window.confirm("��ǰ��Ʒ����֤��߻����ܹ��ڣ��Ƿ���Ȼ���ɣ�");
+	      stale && window.confirm("当前产品身份证或策划可能过期，是否仍然生成？");
     if (stale && !allowStaleInput) return;
 
-    const confirmed = window.confirm("���ν�������ʵͼƬ���� API �����ܲ������ã��Ƿ������");
+    const confirmed = window.confirm("本次将调用真实图片生成 API 并可能产生费用，是否继续？");
     if (!confirmed) return;
 
     setGeneratingImage(true);
     setError("");
-	    setMessage("�������ɵ�ǰͼƬ");
+	    setMessage("正在生成当前图片");
     try {
       const referenceImageIds = project.referenceImages
         .filter((image) => image.includeInGeneration || image.isPrimary)
@@ -517,9 +547,9 @@ export default function ProjectStudioClient({ projectId }) {
         },
       );
       const data = await res.json();
-	      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "����ʧ��"}`);
+	      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "生成失败"}`);
 	      await fetchProject();
-	      setMessage(data.reused ? "��ʹ����������ͼ" : "��ǰͼƬ������");
+	      setMessage(data.reused ? "已使用现有生成图" : "当前图片已生成");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -535,9 +565,9 @@ export default function ProjectStudioClient({ projectId }) {
     try {
       const res = await fetch(`/api/image-generations/${runId}/check`, { method: "POST" });
       const data = await res.json();
-	      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "���ʧ��"}`);
+	      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "检查失败"}`);
 	      await fetchProject();
-	      setMessage(data.status === "completed" ? "ͼƬ���������" : "ͼƬ���ڴ�����");
+	      setMessage(data.status === "completed" ? "图片生成已完成" : "图片仍在处理中");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -560,25 +590,25 @@ export default function ProjectStudioClient({ projectId }) {
         },
       );
       const data = await res.json();
-      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "����ʧ��"}`);
+      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "设置失败"}`);
       await fetchProject();
-      setMessage(nextId ? `ͼ${selectedPlan.planIndex} ��ѡͼ�ѱ���` : `ͼ${selectedPlan.planIndex} ��ѡͼ��ȡ��`);
+      setMessage(nextId ? `图${selectedPlan.planIndex} 首选图已保存` : `图${selectedPlan.planIndex} 首选图已取消`);
     } catch (err) {
       setError(err.message);
     }
   }
 
   async function deleteCandidate(candidate) {
-    const ok = window.confirm(`ȷ��ɾ����ѡͼ ${candidate.candidateNumber}�����ɼ�¼�ᱣ����`);
+    const ok = window.confirm(`确认删除候选图 ${candidate.candidateNumber}？生成记录会保留。`);
     if (!ok) return;
     setError("");
     setMessage("");
     try {
       const res = await fetch(`/api/generated-images/${candidate.id}`, { method: "DELETE" });
       const data = await res.json();
-      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "ɾ��ʧ��"}`);
+      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "删除失败"}`);
       await fetchProject();
-      setMessage(`��ѡͼ ${candidate.candidateNumber} ��ɾ��`);
+      setMessage(`候选图 ${candidate.candidateNumber} 已删除`);
     } catch (err) {
       setError(err.message);
     }
@@ -599,7 +629,7 @@ export default function ProjectStudioClient({ projectId }) {
         {error || (
           <>
             <FaSpinner className="mr-2 animate-spin" />
-            ���ڶ�ȡ
+            正在读取
           </>
         )}
       </main>
@@ -612,21 +642,21 @@ export default function ProjectStudioClient({ projectId }) {
         <aside className="border border-zinc-800 bg-zinc-900/45 p-4">
           <Link
             href="/"
-            className="mb-4 inline-flex items-center gap-2 text-sm font-semibold text-zinc-400 hover:text-white"
+            className="mb-4 inline-flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-white"
           >
             <FaArrowLeft />
-            ������Ŀ
+            返回项目
           </Link>
 
           <form onSubmit={saveProject} className="space-y-4">
-            <Field label="��Ŀ����">
+            <Field label="项目名称">
               <input
                 value={draft.name}
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
                 className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
               />
             </Field>
-            <Field label="��Ʒ����">
+            <Field label="商品名称">
               <input
                 value={draft.productName}
                 onChange={(event) =>
@@ -636,7 +666,7 @@ export default function ProjectStudioClient({ projectId }) {
               />
             </Field>
             <div className="grid grid-cols-2 gap-3">
-              <Field label="ƽ̨">
+              <Field label="平台">
                 <input
                   value={draft.platform}
                   onChange={(event) =>
@@ -645,7 +675,7 @@ export default function ProjectStudioClient({ projectId }) {
                   className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
                 />
               </Field>
-              <Field label="����">
+              <Field label="比例">
                 <input
                   value={draft.aspectRatio}
                   onChange={(event) =>
@@ -655,7 +685,7 @@ export default function ProjectStudioClient({ projectId }) {
                 />
               </Field>
             </div>
-            <Field label="��ע">
+            <Field label="备注">
               <textarea
                 value={draft.notes}
                 onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
@@ -664,10 +694,10 @@ export default function ProjectStudioClient({ projectId }) {
             </Field>
             <button
               disabled={saving}
-              className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:bg-zinc-800"
+              className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700 disabled:bg-zinc-800"
             >
               {saving ? <FaSpinner className="animate-spin" /> : <FaCheck />}
-              ������Ŀ
+              保存项目
             </button>
           </form>
 
@@ -687,7 +717,7 @@ export default function ProjectStudioClient({ projectId }) {
 
           {(message || error) && (
             <p
-              className={`mt-4 border px-3 py-2 text-sm ${
+              className={`mt-4 border px-3 py-2 text-xs ${
                 error
                   ? "border-red-900/60 bg-red-950/40 text-red-200"
                   : "border-emerald-900/60 bg-emerald-950/40 text-emerald-200"
@@ -738,6 +768,8 @@ export default function ProjectStudioClient({ projectId }) {
             onDeleteCandidate={deleteCandidate}
             onDownloadCandidate={downloadCandidate}
             onDownloadPreferredZip={downloadPreferredZip}
+            onLoadMoreCandidates={loadMoreCandidates}
+            loadingMoreCandidates={loadingMoreCandidates}
           />
 
           <IdentitySection
@@ -750,29 +782,29 @@ export default function ProjectStudioClient({ projectId }) {
         </section>
 
         <aside className="border border-zinc-800 bg-zinc-900/45 p-4 xl:sticky xl:top-24 xl:self-start">
-          <h2 className="text-sm font-semibold text-white">����ͳ��</h2>
-          <dl className="mt-4 space-y-3 text-sm">
-            <Info label="ʶ��ɹ�" value={`${successfulRuns.length}`} />
-            <Info label="ʶ��ʧ��" value={`${failedRuns.length}`} />
-            <Info label="�ϴ�ʶ��ģ��" value={lastRun?.model || "��"} />
-            <Info label="�߻��ɹ�" value={`${planInfo.stats?.successCount || 0}`} />
-            <Info label="�߻�ʧ��" value={`${planInfo.stats?.failureCount || 0}`} />
-            <Info label="�ϴβ߻���Ӧ��" value={lastPlanningRun?.provider || "��"} />
-            <Info label="�ϴβ߻�ģ��" value={lastPlanningRun?.model || "��"} />
+          <h2 className="text-sm font-black text-white">调用统计</h2>
+          <dl className="mt-4 space-y-3 text-xs">
+            <Info label="识别成功" value={`${successfulRuns.length}`} />
+            <Info label="识别失败" value={`${failedRuns.length}`} />
+            <Info label="上次识别模型" value={lastRun?.model || "无"} />
+            <Info label="策划成功" value={`${planInfo.stats?.successCount || 0}`} />
+            <Info label="策划失败" value={`${planInfo.stats?.failureCount || 0}`} />
+            <Info label="上次策划供应商" value={lastPlanningRun?.provider || "无"} />
+            <Info label="上次策划模型" value={lastPlanningRun?.model || "无"} />
             <Info
-              label="�ϴβ߻���ʱ"
+              label="上次策划耗时"
               value={
                 lastPlanningRun?.durationMs == null
-                  ? "��"
+                  ? "无"
                   : `${lastPlanningRun.durationMs}ms`
               }
             />
           </dl>
           <div className="mt-5 space-y-2">
-            <h3 className="text-sm font-semibold text-zinc-400">����߻���¼</h3>
+            <h3 className="text-xs font-black text-zinc-400">最近策划记录</h3>
             {planningRuns.slice(0, 5).map((run) => (
-              <div key={run.id} className="border border-zinc-800 bg-zinc-950 p-2 text-sm">
-                <p className="font-semibold text-zinc-200">{formatRunStatus(run.status)}</p>
+              <div key={run.id} className="border border-zinc-800 bg-zinc-950 p-2 text-xs">
+                <p className="font-bold text-zinc-200">{run.status}</p>
                 <p className="mt-1 truncate text-zinc-500">
                   {run.provider || "unknown"} / {run.model || "unknown"}
                 </p>
@@ -803,67 +835,67 @@ function WorkflowPanel({
   return (
     <div className="mt-5 space-y-5 border-t border-zinc-800 pt-4">
       <section>
-        <h2 className="text-sm font-semibold text-white">��Ʒʶ��</h2>
-        <p className="mt-2 text-sm text-zinc-500">
-          ��ǰ�Ӿ�ģ�ͣ�
+        <h2 className="text-sm font-black text-white">商品识别</h2>
+        <p className="mt-2 text-xs text-zinc-500">
+          当前视觉模型：
           {visionAssignment?.providerProfile
             ? `${visionAssignment.providerProfile.name} / ${visionAssignment.providerProfile.modelId}`
-            : "δ����"}
+            : "未配置"}
         </p>
-        <p className="mt-2 text-sm text-zinc-500">��ѡ {selectedCount}/8 ��</p>
+        <p className="mt-2 text-xs text-zinc-500">已选 {selectedCount}/8 张</p>
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             onClick={() => onAnalyze({ force: false })}
             disabled={analyzing || !visionAssignment?.providerProfile}
-            className="flex items-center justify-center gap-2 bg-zinc-100 px-3 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white disabled:bg-zinc-800 disabled:text-zinc-500"
+            className="flex items-center justify-center gap-2 bg-zinc-100 px-3 py-2.5 text-xs font-black text-zinc-950 hover:bg-white disabled:bg-zinc-800 disabled:text-zinc-500"
           >
             {analyzing ? <FaSpinner className="animate-spin" /> : <FaEye />}
-            ʶ����Ʒ
+            识别商品
           </button>
           <button
             onClick={() => onAnalyze({ force: true })}
             disabled={analyzing || !identity}
-            className="border border-zinc-800 px-3 py-2.5 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600"
+            className="border border-zinc-800 px-3 py-2.5 text-xs font-black text-zinc-300 hover:text-white disabled:text-zinc-600"
           >
-            ����ʶ��
+            重新识别
           </button>
         </div>
-        <p className="mt-3 text-sm text-zinc-500">
-          ״̬��{analysisStatus(identity, visionAssignment, analyzing)}
+        <p className="mt-3 text-xs text-zinc-500">
+          状态：{analysisStatus(identity, visionAssignment, analyzing)}
         </p>
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-white">5 ����ͼ�߻�</h2>
-        <p className="mt-2 text-sm text-zinc-500">
-          ��ǰ�߻�ģ�ͣ�
+        <h2 className="text-sm font-black text-white">5 张主图策划</h2>
+        <p className="mt-2 text-xs text-zinc-500">
+          当前策划模型：
           {planningAssignment?.providerProfile
             ? `${planningAssignment.providerProfile.name} / ${planningAssignment.providerProfile.modelId}`
-            : "δ����"}
+            : "未配置"}
         </p>
-        <p className="mt-2 text-sm text-zinc-500">
-          ״̬��{planningStatus(identity, planningAssignment, planning, planInfo)}
+        <p className="mt-2 text-xs text-zinc-500">
+          状态：{planningStatus(identity, planningAssignment, planning, planInfo)}
         </p>
         <button
           onClick={() => onGenerate({ force: hasPlans })}
           disabled={planning || !planningAssignment?.providerProfile || !identity}
-          className="mt-3 flex w-full items-center justify-center gap-2 bg-emerald-500 px-3 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-500"
+          className="mt-3 flex w-full items-center justify-center gap-2 bg-emerald-500 px-3 py-2.5 text-xs font-black text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-500"
         >
           {planning ? <FaSpinner className="animate-spin" /> : <FaLightbulb />}
-          {hasPlans ? "�������� 5 �Ų߻�" : "���� 5 ����ͼ�߻�"}
+          {hasPlans ? "重新生成 5 张策划" : "生成 5 张主图策划"}
         </button>
       </section>
 
       <section>
-        <h2 className="text-sm font-semibold text-white">����ͼƬ����</h2>
-        <p className="mt-2 text-sm text-zinc-500">
-          ��ǰͼƬģ�ͣ�
+        <h2 className="text-sm font-black text-white">单张图片生成</h2>
+        <p className="mt-2 text-xs text-zinc-500">
+          当前图片模型：
           {generationAssignment?.providerProfile
             ? `${generationAssignment.providerProfile.name} / ${generationAssignment.providerProfile.modelId}`
-            : "δ����"}
+            : "未配置"}
         </p>
-        <p className="mt-2 text-sm text-zinc-500">
-          ״̬��{generationAssignment?.providerProfile ? (generatingImage ? "��������" : "׼������") : "�ȴ�����ͼƬģ��"}
+        <p className="mt-2 text-xs text-zinc-500">
+          状态：{generationAssignment?.providerProfile ? (generatingImage ? "正在生成" : "准备生成") : "等待配置图片模型"}
         </p>
       </section>
     </div>
@@ -884,16 +916,16 @@ function ReferenceImages({
     <section className="border border-zinc-800 bg-zinc-900/35 p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h1 className="truncate text-xl font-semibold text-white">{project.name}</h1>
-          <p className="mt-1 text-sm text-zinc-500">{project.referenceImages.length}/14</p>
+          <h1 className="truncate text-xl font-black text-white">{project.name}</h1>
+          <p className="mt-1 text-xs text-zinc-500">{project.referenceImages.length}/14</p>
         </div>
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={uploading}
-          className="flex items-center gap-2 bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white disabled:bg-zinc-700 disabled:text-zinc-400"
+          className="flex items-center gap-2 bg-zinc-100 px-4 py-2.5 text-xs font-black text-zinc-950 hover:bg-white disabled:bg-zinc-700 disabled:text-zinc-400"
         >
           {uploading ? <FaSpinner className="animate-spin" /> : <FaUpload />}
-          �ϴ��ο�ͼ
+          上传参考图
         </button>
       </div>
 
@@ -912,7 +944,7 @@ function ReferenceImages({
           className="flex min-h-[320px] w-full flex-col items-center justify-center border border-dashed border-zinc-800 bg-zinc-950/50 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
         >
           <FaImage className="mb-3 text-3xl" />
-          <span className="text-sm font-semibold">������Ʒ�ο�ͼ</span>
+          <span className="text-sm font-bold">添加商品参考图</span>
         </button>
       ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -926,8 +958,8 @@ function ReferenceImages({
                 />
               </div>
               <div className="space-y-3 p-3">
-                <p className="truncate text-sm font-semibold text-zinc-300">{image.fileName}</p>
-                <label className="flex items-center gap-2 text-sm text-zinc-400">
+                <p className="truncate text-xs font-bold text-zinc-300">{image.fileName}</p>
+                <label className="flex items-center gap-2 text-xs text-zinc-400">
                   <input
                     checked={image.includeInAnalysis || image.isPrimary}
                     disabled={image.isPrimary}
@@ -936,9 +968,9 @@ function ReferenceImages({
                     }
                     type="checkbox"
                   />
-                  ����ʶ��
+                  参与识别
                 </label>
-                <label className="flex items-center gap-2 text-sm text-zinc-400">
+                <label className="flex items-center gap-2 text-xs text-zinc-400">
                   <input
                     checked={image.includeInGeneration || image.isPrimary}
                     disabled={image.isPrimary}
@@ -947,12 +979,12 @@ function ReferenceImages({
                     }
                     type="checkbox"
                   />
-                  ��������
+                  参与生成
                 </label>
                 <select
                   value={image.imageRole}
                   onChange={(event) => onUpdate(image.id, { imageRole: event.target.value })}
-                  className="w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-sm outline-none"
+                  className="w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-xs outline-none"
                 >
                   {ROLES.map((role) => (
                     <option key={role.value} value={role.value}>
@@ -963,21 +995,21 @@ function ReferenceImages({
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => onUpdate(image.id, { isPrimary: true })}
-                    className={`flex items-center justify-center gap-2 border px-3 py-2 text-sm font-semibold ${
+                    className={`flex items-center justify-center gap-2 border px-3 py-2 text-xs font-bold ${
                       image.isPrimary
                         ? "border-amber-600 text-amber-300"
                         : "border-zinc-800 text-zinc-400 hover:text-white"
                     }`}
                   >
                     <FaStar />
-                    ��ͼ
+                    主图
                   </button>
                   <button
                     onClick={() => onDelete(image.id)}
-                    className="flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-400 hover:border-red-700 hover:text-red-300"
+                    className="flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-xs font-bold text-zinc-400 hover:border-red-700 hover:text-red-300"
                   >
                     <FaTrash />
-                    ɾ��
+                    删除
                   </button>
                 </div>
               </div>
@@ -986,10 +1018,10 @@ function ReferenceImages({
         </div>
       )}
       {selectedCount > 8 && (
-        <p className="mt-3 text-sm text-red-300">����ʶ��ͼƬ���� 8 ��</p>
+        <p className="mt-3 text-xs text-red-300">参与识别图片超过 8 张</p>
       )}
       {generationReferenceCount > 4 && (
-        <p className="mt-3 text-sm text-red-300">�������ɲο�ͼ���� 4 ��</p>
+        <p className="mt-3 text-xs text-red-300">参与生成参考图超过 4 张</p>
       )}
     </section>
   );
@@ -1023,23 +1055,25 @@ function PlanningSection({
   onDeleteCandidate,
   onDownloadCandidate,
   onDownloadPreferredZip,
+  onLoadMoreCandidates,
+  loadingMoreCandidates,
 }) {
   return (
     <section className="border border-zinc-800 bg-zinc-900/35 p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold text-white">5 ����ͼ�߻�</h2>
-          <p className="mt-1 text-sm text-zinc-500">
-            {plans.length}/5 {plans.some((plan) => plan.isStale) ? "�����ܹ���" : ""}
+          <h2 className="text-sm font-black text-white">5 张主图策划</h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            {plans.length}/5 {plans.some((plan) => plan.isStale) ? "，可能过期" : ""}
           </p>
         </div>
         <button
           onClick={() => onGenerate({ force: plans.length === 5 })}
           disabled={planning}
-          className="flex items-center gap-2 bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-400"
+          className="flex items-center gap-2 bg-emerald-500 px-4 py-2.5 text-xs font-black text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-400"
         >
           {planning ? <FaSpinner className="animate-spin" /> : <FaLightbulb />}
-          {plans.length === 5 ? "��������" : "���� 5 ��"}
+          {plans.length === 5 ? "重新生成" : "生成 5 张"}
         </button>
       </div>
 
@@ -1059,25 +1093,25 @@ function PlanningSection({
             <button
               key={tab.index}
               onClick={() => onSelectPlan(tab.index)}
-              className={`min-h-20 border px-3 py-2 text-left text-sm ${
+              className={`min-h-20 border px-3 py-2 text-left text-xs ${
                 active
                   ? "border-emerald-500 bg-emerald-950/30 text-emerald-100"
                   : "border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-white"
               }`}
             >
-              <p className="font-semibold">{tab.label}</p>
-              <p className="mt-1">{plan ? plan.status : "δ����"}</p>
+              <p className="font-black">{tab.label}</p>
+              <p className="mt-1">{plan ? plan.status : "未生成"}</p>
               {planSummary && (
                 <p className="mt-1">
-                  ��ѡ {planSummary.candidateCount} �� {planSummary.hasPreferred ? "����ѡ" : "δ��ѡ"}
+                  候选 {planSummary.candidateCount} · {planSummary.hasPreferred ? "已首选" : "未首选"}
                 </p>
               )}
-              {planSummary?.processingRun && <p className="mt-1 text-sky-300">������</p>}
+              {planSummary?.processingRun && <p className="mt-1 text-sky-300">处理中</p>}
               {planSummary?.failedRunCount > 0 && (
-                <p className="mt-1 text-red-300">ʧ�� {planSummary.failedRunCount}</p>
+                <p className="mt-1 text-red-300">失败 {planSummary.failedRunCount}</p>
               )}
-              {plan?.isManuallyEdited && <p className="mt-1 text-amber-300">�ֶ��޸�</p>}
-              {plan?.isStale && <p className="mt-1 text-red-300">���ܹ���</p>}
+              {plan?.isManuallyEdited && <p className="mt-1 text-amber-300">手动修改</p>}
+              {plan?.isStale && <p className="mt-1 text-red-300">可能过期</p>}
             </button>
           );
         })}
@@ -1085,67 +1119,67 @@ function PlanningSection({
 
       {!selectedPlan ? (
         <div className="border border-dashed border-zinc-800 bg-zinc-950/50 p-8 text-center text-sm text-zinc-500">
-          ��δ���ɲ߻�
+          尚未生成策划
         </div>
       ) : (
         <form onSubmit={onSavePlan} className="grid gap-3 lg:grid-cols-2">
-          <Field label="��������">
+          <Field label="核心卖点">
             <input
               value={planForm.coreSellingPoint}
               onChange={(event) => onUpdatePlanForm({ coreSellingPoint: event.target.value })}
               className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
             />
           </Field>
-          <Field label="������">
+          <Field label="主标题">
             <input
               value={planForm.mainTitle}
               onChange={(event) => onUpdatePlanForm({ mainTitle: event.target.value })}
               className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
             />
           </Field>
-          <Field label="������">
+          <Field label="副标题">
             <input
               value={planForm.subTitle}
               onChange={(event) => onUpdatePlanForm({ subTitle: event.target.value })}
               className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
             />
           </Field>
-          <Field label="����">
+          <Field label="场景">
             <textarea
               value={planForm.scene}
               onChange={(event) => onUpdatePlanForm({ scene: event.target.value })}
               className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
             />
           </Field>
-          <Field label="��ͼ">
+          <Field label="构图">
             <textarea
               value={planForm.composition}
               onChange={(event) => onUpdatePlanForm({ composition: event.target.value })}
               className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
             />
           </Field>
-          <Field label="����Ҫ�㣨���У�">
+          <Field label="补充要点（逐行）">
             <textarea
               value={planForm.keyNotes}
               onChange={(event) => onUpdatePlanForm({ keyNotes: event.target.value })}
               className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
             />
           </Field>
-          <Field label="���뱣�֣����У�">
+          <Field label="必须保持（逐行）">
             <textarea
               value={planForm.mustKeep}
               onChange={(event) => onUpdatePlanForm({ mustKeep: event.target.value })}
               className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
             />
           </Field>
-          <Field label="��ֹ�ı䣨���У�">
+          <Field label="禁止改变（逐行）">
             <textarea
               value={planForm.avoid}
               onChange={(event) => onUpdatePlanForm({ avoid: event.target.value })}
               className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
             />
           </Field>
-          <Field label="������ʾ��">
+          <Field label="最终提示词">
             <textarea
               value={planForm.finalPrompt}
               onChange={(event) => onUpdatePlanForm({ finalPrompt: event.target.value })}
@@ -1153,13 +1187,13 @@ function PlanningSection({
             />
           </Field>
           <div className="lg:col-span-2">
-            {planDirty && <p className="mb-2 text-sm text-amber-300">��δ�����޸�</p>}
+            {planDirty && <p className="mb-2 text-xs text-amber-300">有未保存修改</p>}
             <button
               disabled={savingPlan}
-              className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:bg-zinc-800"
+              className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700 disabled:bg-zinc-800"
 	            >
 	              {savingPlan ? <FaSpinner className="animate-spin" /> : <FaSave />}
-	              ���浱ǰ�߻�
+	              保存当前策划
 	            </button>
 	            <GenerationPanel
 	              identity={identity}
@@ -1177,6 +1211,8 @@ function PlanningSection({
 	              onSetPreferredCandidate={onSetPreferredCandidate}
 	              onDeleteCandidate={onDeleteCandidate}
 	              onDownloadCandidate={onDownloadCandidate}
+	              onLoadMoreCandidates={onLoadMoreCandidates}
+	              loadingMoreCandidates={loadingMoreCandidates}
 	            />
 	          </div>
 	        </form>
@@ -1188,25 +1224,25 @@ function PlanningSection({
 function GenerationSummaryBar({ summary, onDownloadPreferredZip }) {
   const missing = summary?.missingPreferredPlans || [];
   const missingText = missing
-    .map((plan) => `ͼ${plan.planIndex} ${planTaskLabel(plan.taskType)}`)
-    .join("��");
+    .map((plan) => `图${plan.planIndex} ${planTaskLabel(plan.taskType)}`)
+    .join("、");
 
   return (
-    <div className="mb-4 grid gap-3 border border-zinc-800 bg-zinc-950 p-3 text-sm md:grid-cols-[1fr_1fr_auto]">
-      <Info label="��ͼ����" value={`${summary?.generatedPlanCount || 0}/5`} />
-      <Info label="��ѡͼ" value={`${summary?.preferredCount || 0}/5`} />
+    <div className="mb-4 grid gap-3 border border-zinc-800 bg-zinc-950 p-3 text-xs md:grid-cols-[1fr_1fr_auto]">
+      <Info label="主图生成" value={`${summary?.generatedPlanCount || 0}/5`} />
+      <Info label="首选图" value={`${summary?.preferredCount || 0}/5`} />
       <div className="flex min-w-0 flex-col gap-2">
         <button
           type="button"
           onClick={onDownloadPreferredZip}
           disabled={!summary?.zipReady}
-          className="flex items-center justify-center gap-2 border border-emerald-800 px-3 py-2 font-semibold text-emerald-200 hover:border-emerald-500 disabled:border-zinc-800 disabled:text-zinc-600"
+          className="flex items-center justify-center gap-2 border border-emerald-800 px-3 py-2 font-black text-emerald-200 hover:border-emerald-500 disabled:border-zinc-800 disabled:text-zinc-600"
         >
           <FaDownload />
-          ����������ѡͼ
+          下载整套首选图
         </button>
         {!summary?.zipReady && missingText && (
-          <p className="truncate text-zinc-500">��ȱ��{missingText}</p>
+          <p className="truncate text-zinc-500">还缺：{missingText}</p>
         )}
       </div>
     </div>
@@ -1229,6 +1265,8 @@ function GenerationPanel({
   onSetPreferredCandidate,
   onDeleteCandidate,
   onDownloadCandidate,
+  onLoadMoreCandidates,
+  loadingMoreCandidates,
 }) {
   const provider = generationAssignment?.providerProfile;
   const latestRun = generationInfo?.latestRun;
@@ -1246,26 +1284,26 @@ function GenerationPanel({
     <div className="mt-5 border-t border-zinc-800 pt-4">
       <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-300">
-            ����ͼƬ����
+          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-300">
+            单张图片生成
           </h3>
-          <p className="mt-1 text-sm text-zinc-500">��ǰ�߻���ѡ {candidateInfo?.stats?.candidateCount || 0} ��</p>
+          <p className="mt-1 text-xs text-zinc-500">当前策划候选 {candidateInfo?.stats?.candidateCount || 0} 张</p>
         </div>
-        <span className="border border-zinc-800 px-2 py-1 text-[13px] text-zinc-400">
+        <span className="border border-zinc-800 px-2 py-1 text-[10px] text-zinc-400">
           {generationStatus(identity, selectedPlan, provider, latestRun)}
         </span>
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <Info label="ͼƬģ��" value={provider ? `${provider.name} / ${provider.modelId}` : "δ����"} />
-        <Info label="Э��" value={formatProtocol(provider?.protocol || "δ����")} />
-        <Info label="�ο�ͼЭ��" value={provider?.supportsReferenceImages ? "��ʵ����" : "δ֧��"} />
-        <Info label="����" value={project.aspectRatio || "1:1"} />
-        <Info label="�ο�ͼ" value={`${generationReferenceCount}/4`} />
+        <Info label="图片模型" value={provider ? `${provider.name} / ${provider.modelId}` : "未配置"} />
+        <Info label="协议" value={formatProtocol(provider?.protocol || "未配置")} />
+        <Info label="参考图能力" value={formatReferenceSupport(provider)} />
+        <Info label="比例" value={project.aspectRatio || "1:1"} />
+        <Info label="参考图" value={`${generationReferenceCount}/4`} />
       </div>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr_1fr]">
-        <Field label="�ֱ���">
+        <Field label="分辨率">
           <select
             value={generationResolution}
             onChange={(event) => onResolutionChange(event.target.value)}
@@ -1279,18 +1317,18 @@ function GenerationPanel({
           type="button"
           onClick={() => onGenerateImage({ force: false })}
           disabled={!canGenerate}
-          className="flex items-center justify-center gap-2 bg-sky-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-sky-400 disabled:bg-zinc-800 disabled:text-zinc-500"
+          className="flex items-center justify-center gap-2 bg-sky-500 px-4 py-2.5 text-xs font-black text-zinc-950 hover:bg-sky-400 disabled:bg-zinc-800 disabled:text-zinc-500"
         >
           {generatingImage ? <FaSpinner className="animate-spin" /> : <FaImage />}
-          ���ɵ�ǰͼƬ
+          生成当前图片
         </button>
         <button
           type="button"
           onClick={() => onGenerateImage({ force: true })}
           disabled={!canGenerate || !latestImage}
-          className="border border-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600"
+          className="border border-zinc-800 px-4 py-2.5 text-xs font-black text-zinc-300 hover:text-white disabled:text-zinc-600"
         >
-          ǿ����������
+          强制重新生成
         </button>
       </div>
 
@@ -1299,9 +1337,9 @@ function GenerationPanel({
           type="button"
           onClick={onCheckGeneration}
           disabled={generatingImage}
-          className="mt-3 w-full border border-sky-900 px-4 py-2.5 text-sm font-semibold text-sky-200 hover:border-sky-700"
+          className="mt-3 w-full border border-sky-900 px-4 py-2.5 text-xs font-black text-sky-200 hover:border-sky-700"
         >
-          ����첽����״̬
+          检查异步生成状态
         </button>
       )}
 
@@ -1310,25 +1348,25 @@ function GenerationPanel({
           <div className="relative aspect-square bg-black">
             <Image
               src={latestImage.url}
-              alt="Generated ecommerce result"
+              alt="生成的电商图片"
               fill
               sizes="(max-width: 1024px) 100vw, 640px"
               className="object-contain"
               unoptimized
             />
           </div>
-          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-            <Info label="״̬" value={formatRunStatus(latestRun?.status || "completed")} />
-            <Info label="ģ��" value={latestRun?.model || "δ֪"} />
-            <Info label="����ʱ��" value={formatDate(latestImage.createdAt)} />
-            <Info label="�ߴ�" value={latestImage.width ? `${latestImage.width}x${latestImage.height}` : "δ֪"} />
-            <Info label="��С" value={`${Math.round((latestImage.byteSize || 0) / 1024)} KB`} />
-            <Info label="��Դ" value={latestImage.sourceType || "provider"} />
+          <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+            <Info label="状态" value={formatRunStatus(latestRun?.status || "completed")} />
+            <Info label="模型" value={latestRun?.model || "未知"} />
+            <Info label="生成时间" value={formatDate(latestImage.createdAt)} />
+            <Info label="尺寸" value={latestImage.width ? `${latestImage.width}x${latestImage.height}` : "未知"} />
+            <Info label="大小" value={`${Math.round((latestImage.byteSize || 0) / 1024)} KB`} />
+            <Info label="来源" value={latestImage.sourceType || "provider"} />
           </div>
         </div>
       ) : (
-        <div className="mt-4 border border-dashed border-zinc-800 bg-zinc-950/50 p-6 text-center text-sm text-zinc-500">
-          ��ǰ�߻���δ����ͼƬ
+        <div className="mt-4 border border-dashed border-zinc-800 bg-zinc-950/50 p-6 text-center text-xs text-zinc-500">
+          当前策划尚未生成图片
         </div>
       )}
 
@@ -1337,6 +1375,8 @@ function GenerationPanel({
         onSetPreferredCandidate={onSetPreferredCandidate}
         onDeleteCandidate={onDeleteCandidate}
         onDownloadCandidate={onDownloadCandidate}
+        onLoadMoreCandidates={onLoadMoreCandidates}
+        loadingMoreCandidates={loadingMoreCandidates}
       />
     </div>
   );
@@ -1347,22 +1387,24 @@ function CandidateHistory({
   onSetPreferredCandidate,
   onDeleteCandidate,
   onDownloadCandidate,
+  onLoadMoreCandidates,
+  loadingMoreCandidates,
 }) {
   const candidates = candidateInfo?.items || [];
   return (
     <div className="mt-5 border-t border-zinc-800 pt-4">
       <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-300">
-          ��ѡͼ��ʷ
+        <h3 className="text-xs font-black uppercase tracking-widest text-zinc-300">
+          候选图历史
         </h3>
-        <span className="border border-zinc-800 px-2 py-1 text-[13px] text-zinc-400">
-          {candidateInfo?.stats?.candidateCount || 0} ��
+        <span className="border border-zinc-800 px-2 py-1 text-[10px] text-zinc-400">
+          {candidateInfo?.stats?.candidateCount || 0} 张
         </span>
       </div>
 
       {!candidates.length ? (
-        <div className="border border-dashed border-zinc-800 bg-zinc-950/50 p-6 text-center text-sm text-zinc-500">
-          ���޺�ѡͼ
+        <div className="border border-dashed border-zinc-800 bg-zinc-950/50 p-6 text-center text-xs text-zinc-500">
+          暂无候选图
         </div>
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
@@ -1371,71 +1413,83 @@ function CandidateHistory({
               <div className="relative aspect-square bg-black">
                 <Image
                   src={candidate.url}
-              alt={`��ѡͼ ${candidate.candidateNumber}`}
+                  alt={`候选图 ${candidate.candidateNumber}`}
                   fill
                   sizes="(max-width: 1024px) 100vw, 320px"
                   className="object-contain"
                   unoptimized
                 />
                 <div className="absolute left-2 top-2 flex gap-2">
-                  <span className="bg-zinc-950/90 px-2 py-1 text-[13px] font-semibold text-zinc-100">
-                    ��ѡ {candidate.candidateNumber}
+                  <span className="bg-zinc-950/90 px-2 py-1 text-[10px] font-black text-zinc-100">
+                    候选 {candidate.candidateNumber}
                   </span>
                   {candidate.isPreferred && (
-                    <span className="bg-emerald-500 px-2 py-1 text-[13px] font-semibold text-zinc-950">
-                      ��ѡ
+                    <span className="bg-emerald-500 px-2 py-1 text-[10px] font-black text-zinc-950">
+                      首选
                     </span>
                   )}
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
-                <Info label="����ʱ��" value={formatDate(candidate.createdAt)} />
-                <Info label="״̬" value={formatRunStatus(candidate.run?.status || "completed")} />
-                <Info label="������" value={candidate.run?.provider || "δ֪"} />
-                <Info label="ģ��" value={candidate.run?.model || "δ֪"} />
-                <Info label="�ӿ�Э��" value={formatProtocol(candidate.run?.protocol || "δ֪")} />
-                <Info label="�ߴ�" value={candidate.width ? `${candidate.width}x${candidate.height}` : "δ֪"} />
-                <Info label="��С" value={formatBytes(candidate.byteSize)} />
-                <Info label="�����Ƿ����" value={candidate.run?.usedStaleInput ? "��" : "��"} />
-                <Info label="ǿ�ư汾" value={candidate.isForcedVersion ? "��" : "��"} />
-                <Info label="�°汾" value={candidate.isNewVersion ? "��" : "��"} />
+              <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                <Info label="生成时间" value={formatDate(candidate.createdAt)} />
+                <Info label="状态" value={formatRunStatus(candidate.run?.status || "completed")} />
+                <Info label="服务商" value={candidate.run?.provider || "未知"} />
+                <Info label="模型" value={candidate.run?.model || "未知"} />
+                <Info label="接口协议" value={formatProtocol(candidate.run?.protocol || "未知")} />
+                <Info label="尺寸" value={candidate.width ? `${candidate.width}x${candidate.height}` : "未知"} />
+                <Info label="大小" value={formatBytes(candidate.byteSize)} />
+                <Info label="输入是否过期" value={candidate.run?.usedStaleInput ? "是" : "否"} />
+                <Info label="强制版本" value={candidate.isForcedVersion ? "是" : "否"} />
+                <Info label="新版本" value={candidate.isNewVersion ? "是" : "否"} />
               </div>
 
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => onDownloadCandidate(candidate)}
-                  className="flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-200 hover:text-white"
+                  className="flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-xs font-black text-zinc-200 hover:text-white"
                 >
                   <FaDownload />
-                  ����
+                  下载
                 </button>
                 <button
                   type="button"
                   onClick={() => onSetPreferredCandidate(candidate)}
-                  className={`flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold ${
+                  className={`flex items-center justify-center gap-2 px-3 py-2 text-xs font-black ${
                     candidate.isPreferred
                       ? "border border-emerald-700 text-emerald-200 hover:border-emerald-500"
                       : "bg-emerald-500 text-zinc-950 hover:bg-emerald-400"
                   }`}
                 >
                   <FaStar />
-                  {candidate.isPreferred ? "ȡ����ѡ" : "��Ϊ��ѡ"}
+                  {candidate.isPreferred ? "取消首选" : "设为首选"}
                 </button>
                 <button
                   type="button"
                   onClick={() => onDeleteCandidate(candidate)}
                   disabled={candidate.isPreferred}
-                  className="flex items-center justify-center gap-2 border border-red-900 px-3 py-2 text-sm font-semibold text-red-200 hover:border-red-600 disabled:border-zinc-800 disabled:text-zinc-600"
+                  className="flex items-center justify-center gap-2 border border-red-900 px-3 py-2 text-xs font-black text-red-200 hover:border-red-600 disabled:border-zinc-800 disabled:text-zinc-600"
                 >
                   <FaTrash />
-                  ɾ��
+                  删除
                 </button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {candidateInfo?.nextCursor && (
+        <button
+          type="button"
+          onClick={onLoadMoreCandidates}
+          disabled={loadingMoreCandidates}
+          className="mt-3 flex w-full items-center justify-center gap-2 border border-zinc-800 px-3 py-2.5 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600"
+        >
+          {loadingMoreCandidates && <FaSpinner className="animate-spin" />}
+          加载更多候选图
+        </button>
       )}
     </div>
   );
@@ -1445,9 +1499,9 @@ function IdentitySection({ identity, identityForm, savingIdentity, onChange, onS
   return (
     <section className="border border-zinc-800 bg-zinc-900/35 p-4">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-white">��Ʒ����֤ժҪ</h2>
+        <h2 className="text-sm font-black text-white">产品身份证摘要</h2>
         <span
-          className={`border px-2 py-1 text-[13px] font-semibold ${
+          className={`border px-2 py-1 text-[10px] font-bold ${
             identity?.isStale
               ? "border-amber-900 text-amber-300"
               : identity
@@ -1455,26 +1509,26 @@ function IdentitySection({ identity, identityForm, savingIdentity, onChange, onS
                 : "border-zinc-800 text-zinc-500"
           }`}
         >
-          {identity?.isStale ? "���ܹ���" : identity ? "��Ч" : "δʶ��"}
+          {identity?.isStale ? "可能过期" : identity ? "有效" : "未识别"}
         </span>
       </div>
-      <div className="grid gap-3 text-sm sm:grid-cols-3">
-        <Info label="��Ʒ����" value={identity?.productName || "δ��д"} />
-        <Info label="��Ŀ" value={identity?.category || "δ��д"} />
-        <Info label="��ɫ" value={identity?.color || "δ��д"} />
-        <Info label="����" value={identity?.material || "δ��д"} />
-        <Info label="�ṹ" value={identity?.structure || "δ��д"} />
-        <Info label="��������" value={`${identity?.sellingPoints?.length || 0} ��`} />
+      <div className="grid gap-3 text-xs sm:grid-cols-3">
+        <Info label="商品名称" value={identity?.productName || "未填写"} />
+        <Info label="类目" value={identity?.category || "未填写"} />
+        <Info label="颜色" value={identity?.color || "未填写"} />
+        <Info label="材质" value={identity?.material || "未填写"} />
+        <Info label="结构" value={identity?.structure || "未填写"} />
+        <Info label="核心卖点" value={`${identity?.sellingPoints?.length || 0} 条`} />
       </div>
 
       <form onSubmit={onSave} className="mt-5 grid gap-3 lg:grid-cols-2">
         {[
-          ["productName", "��Ʒ����", "input"],
-          ["category", "��Ŀ", "input"],
-          ["color", "��ɫ", "input"],
-          ["material", "����", "input"],
-          ["structure", "�ṹ", "textarea"],
-          ["primaryReferenceDescription", "���ο�ͼ����", "textarea"],
+          ["productName", "商品名称", "input"],
+          ["category", "类目", "input"],
+          ["color", "颜色", "input"],
+          ["material", "材质", "input"],
+          ["structure", "结构", "textarea"],
+          ["primaryReferenceDescription", "主参考图描述", "textarea"],
         ].map(([field, label, type]) => (
           <Field key={field} label={label}>
             {type === "input" ? (
@@ -1493,14 +1547,14 @@ function IdentitySection({ identity, identityForm, savingIdentity, onChange, onS
           </Field>
         ))}
         {[
-          ["visibleFunctions", "�ɼ�����"],
-          ["sellingPoints", "��������"],
-          ["targetUsers", "Ŀ���û�"],
-          ["usageScenarios", "ʹ�ó���"],
-          ["mustKeep", "���뱣��"],
-          ["avoidChanges", "��ֹ�ı�"],
+          ["visibleFunctions", "可见功能"],
+          ["sellingPoints", "核心卖点"],
+          ["targetUsers", "目标用户"],
+          ["usageScenarios", "使用场景"],
+          ["mustKeep", "必须保持"],
+          ["avoidChanges", "禁止改变"],
         ].map(([field, label]) => (
-          <Field key={field} label={`${label}�����У�`}>
+          <Field key={field} label={`${label}（逐行）`}>
             <textarea
               value={identityForm[field]}
               onChange={(event) => onChange({ ...identityForm, [field]: event.target.value })}
@@ -1511,10 +1565,10 @@ function IdentitySection({ identity, identityForm, savingIdentity, onChange, onS
         <div className="lg:col-span-2">
           <button
             disabled={savingIdentity}
-            className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:bg-zinc-800"
+            className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700 disabled:bg-zinc-800"
           >
             {savingIdentity ? <FaSpinner className="animate-spin" /> : <FaCheck />}
-            �����Ʒ����֤
+            保存产品身份证
           </button>
         </div>
       </form>
@@ -1523,42 +1577,42 @@ function IdentitySection({ identity, identityForm, savingIdentity, onChange, onS
 }
 
 function analysisStatus(identity, visionAssignment, analyzing) {
-  if (analyzing) return "����ʶ����Ʒ";
-  if (!visionAssignment?.providerProfile) return "�ȴ������Ӿ�ģ��";
-  if (!identity) return "δʶ��";
-  if (identity.isStale) return "��Ʒ����֤���ܹ���";
-  return "ʶ��ɹ�";
+  if (analyzing) return "正在识别商品";
+  if (!visionAssignment?.providerProfile) return "等待配置视觉模型";
+  if (!identity) return "未识别";
+  if (identity.isStale) return "产品身份证可能过期";
+  return "识别成功";
 }
 
 function planningStatus(identity, planningAssignment, planning, planInfo) {
-  if (planning) return "�������� 5 �Ų߻�";
-  if (!identity) return "�ȴ���Ʒ����֤";
-  if (identity.isStale) return "��Ʒ����֤�ѹ���";
-  if (!planningAssignment?.providerProfile) return "�ȴ����ò߻�ģ��";
-  if (planInfo?.plans?.length === 5 && planInfo?.hasStalePlans) return "�߻������ѹ���";
-  if (planInfo?.plans?.length === 5) return "���ɳɹ�";
-  return "δ����";
+  if (planning) return "正在生成 5 张策划";
+  if (!identity) return "等待产品身份证";
+  if (identity.isStale) return "产品身份证已过期";
+  if (!planningAssignment?.providerProfile) return "等待配置策划模型";
+  if (planInfo?.plans?.length === 5 && planInfo?.hasStalePlans) return "策划可能已过期";
+  if (planInfo?.plans?.length === 5) return "生成成功";
+  return "未生成";
 }
 
 function generationStatus(identity, selectedPlan, provider, latestRun) {
-  if (!identity) return "�ȴ���Ʒ����֤";
-  if (identity.isStale) return "��Ʒ����֤�ѹ���";
-  if (!selectedPlan) return "�ȴ���ͼ�߻�";
-  if (selectedPlan.isStale) return "�߻��ѹ���";
-  if (!provider) return "�ȴ�����ͼƬģ��";
-  if (!provider.supportsReferenceImages) return "�ο�ͼЭ��δ֧��";
-  if (latestRun?.status === "processing") return "���ɴ�����";
-  if (latestRun?.status === "completed") return "���ɳɹ�";
-  if (latestRun?.status === "failed") return "����ʧ��";
-  return "׼������";
+  if (!identity) return "等待产品身份证";
+  if (identity.isStale) return "商品身份证已过期";
+  if (!selectedPlan) return "等待主图策划";
+  if (selectedPlan.isStale) return "策划已过期";
+  if (!provider) return "等待配置图片模型";
+  if (!provider.supportsReferenceImages) return "参考图协议未支持";
+  if (latestRun?.status === "processing") return "生成处理中";
+  if (latestRun?.status === "completed") return "生成成功";
+  if (latestRun?.status === "failed") return "生成失败";
+  return "准备生成";
 }
 
 function formatDate(value) {
-  if (!value) return "δ֪";
+  if (!value) return "未知";
   try {
     return new Date(value).toLocaleString();
   } catch {
-    return "δ֪";
+    return "未知";
   }
 }
 
@@ -1569,20 +1623,36 @@ function formatBytes(value) {
 }
 
 function formatProtocol(protocol) {
-  return protocol === "generic-async-image" ? "generic-async-image��Լ��Э�飩" : protocol;
+  if (!protocol) return "未知";
+  if (protocol === "openai-image-edit") return "openai-image-edit（图片编辑）";
+  if (protocol === "gemini-native-image") return "gemini-native-image（原生图片）";
+  if (protocol === "openai-images") return "openai-images（纯文生图）";
+  if (protocol === "doubao-image") return "doubao-image（未验证参考图）";
+  if (protocol === "generic-async-image") return "generic-async-image（约定协议）";
+  return protocol;
 }
 
 function formatRunStatus(status) {
-  if (status === "processing") return "������";
-  if (status === "completed") return "�����";
-  if (status === "failed") return "ʧ��";
-  if (status === "pending") return "�ȴ���";
-  return status || "δ֪";
+  if (status === "processing") return "处理中";
+  if (status === "completed") return "已完成";
+  if (status === "failed") return "失败";
+  if (status === "pending") return "等待中";
+  return status || "未知";
+}
+
+function formatReferenceSupport(provider) {
+  if (!provider) return "未配置";
+  if (provider.referenceImageSupportStatus === "verified" || provider.supportsReferenceImages) {
+    return "已验证支持参考图";
+  }
+  if (provider.referenceImageSupportStatus === "text_only") return "仅文字生图";
+  if (provider.referenceImageSupportStatus === "unverified") return "未验证参考图";
+  return "不支持参考图";
 }
 
 function planTaskLabel(taskType) {
   const tab = PLAN_TABS.find((item) => item.taskType === taskType);
-  return tab?.label.replace(/^ͼ\d+\s*/, "") || taskType || "δ����";
+  return tab?.label.replace(/^图\d+\s*/, "") || taskType || "未命名";
 }
 
 function toIdentityForm(identity) {
@@ -1663,7 +1733,7 @@ function textToList(value) {
 function Field({ label, children }) {
   return (
     <label className="block">
-      <span className="mb-2 block text-[13px] font-semibold uppercase tracking-widest text-zinc-500">
+      <span className="mb-2 block text-[10px] font-black uppercase tracking-widest text-zinc-500">
         {label}
       </span>
       {children}
@@ -1675,7 +1745,7 @@ function Info({ label, value }) {
   return (
     <div className="min-w-0 border-b border-zinc-800 pb-2">
       <dt className="text-zinc-500">{label}</dt>
-      <dd className="mt-1 truncate font-semibold text-zinc-200">{value}</dd>
+      <dd className="mt-1 truncate font-bold text-zinc-200">{value}</dd>
     </div>
   );
 }

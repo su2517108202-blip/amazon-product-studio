@@ -448,7 +448,7 @@ export default function ProviderSettingsClient() {
                       密钥：{profile.maskedApiKey || "未保存"}
                     </p>
                     <p className="mb-3 text-sm text-zinc-500">
-                      参考图：{profile.supportsReferenceImages ? "真实参与生成" : "纯文生图/未实现"}
+                      参考图：{formatReferenceSupport(profile)}
                     </p>
                     {profile.lastTestMessage && (
                       <p
@@ -572,6 +572,15 @@ function Field({ label, children }) {
       {children}
     </label>
   );
+}
+
+function formatReferenceSupport(profile) {
+  if (profile.referenceImageSupportStatus === "verified" || profile.supportsReferenceImages) {
+    return "已验证支持参考图";
+  }
+  if (profile.referenceImageSupportStatus === "text_only") return "仅文字生图";
+  if (profile.referenceImageSupportStatus === "unverified") return "未验证参考图";
+  return "不支持参考图";
 }
 
 function formatProtocol(protocol) {

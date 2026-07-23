@@ -1,29 +1,32 @@
 import { NextResponse } from "next/server";
-import { requireCurrentUser } from "@/lib/app-mode";
+import { isLocalMode, requireCurrentUser } from "@/lib/app-mode";
 import config from "@/lib/config";
 
 export async function POST(req) {
   try {
     await requireCurrentUser();
+    if (isLocalMode()) {
+      return NextResponse.json(
+        { code: "LEGACY_ROUTE_DISABLED", error: "本地模式已停用旧上传接口" },
+        { status: 410 },
+      );
+    }
 
     const formData = await req.formData();
     const file = formData.get("file");
 
     if (!file) {
-      return new NextResponse("No file provided", { status: 400 });
+      return NextResponse.json({ code: "NO_FILE", error: "请选择文件" }, { status: 400 });
     }
 
     const apiKey = config.ai.apiKey;
-    console.log("ENV KEYS:", Object.keys(process.env).filter(k => k.includes("API") || k.includes("KEY") || k.includes("SECRET")));
-    console.log("RESOLVED API KEY:", apiKey ? (apiKey.slice(0, 5) + '...') : 'undefined');
     if (!apiKey) {
-      return new NextResponse("API Key not configured", { status: 500 });
+      return NextResponse.json(
+        { code: "LEGACY_API_KEY_MISSING", error: "旧上传接口未配置" },
+        { status: 500 },
+      );
     }
 
-    console.log(`[UPLOAD_API] File details: name=${file.name}, size=${file.size}, type=${file.type}`);
-    console.log(`[UPLOAD_API] Using API Key: ${apiKey ? (apiKey.slice(0, 5) + '...') : 'undefined'}`);
-
-    // Prepare for MuAPI
     const muapiFormData = new FormData();
     muapiFormData.append("file", file);
 
@@ -36,16 +39,20 @@ export async function POST(req) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[UPLOAD_API] MuAPI returned error status ${response.status}: ${errorText}`);
-      throw new Error(`MuAPI Upload Failed: ${response.status} ${errorText}`);
+      console.error("[legacy-upload] upstream failed", { status: response.status });
+      return NextResponse.json(
+        { code: "LEGACY_UPLOAD_FAILED", error: "旧上传接口请求失败" },
+        { status: 502 },
+      );
     }
 
     const data = await response.json();
-    console.log(`[UPLOAD_API] MuAPI returned success data:`, data);
     return NextResponse.json(data);
   } catch (error) {
-    console.error("[UPLOAD_ERROR_DETAILED]", error);
-    return new NextResponse(error.message || "Internal Error", { status: 500 });
+    console.error("[legacy-upload] failed", { name: error?.name, code: error?.code });
+    return NextResponse.json(
+      { code: "LEGACY_UPLOAD_FAILED", error: "旧上传接口不可用" },
+      { status: 500 },
+    );
   }
 }

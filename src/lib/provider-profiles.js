@@ -1,4 +1,4 @@
-﻿import { hasCredentialKey, maskApiKey } from "@/lib/security";
+import { hasCredentialKey, maskApiKey } from "./security.js";
 
 export const PROVIDERS = [
   "openai",
@@ -84,6 +84,13 @@ export function supportsReferenceImagesProfile(profile = {}) {
   return protocolSupportsReferenceImages(profile.provider, profile.protocol);
 }
 
+export function referenceImageSupportStatus(profile = {}) {
+  if (protocolSupportsReferenceImages(profile.provider, profile.protocol)) return "verified";
+  if (profile.protocol === "openai-images") return "text_only";
+  if (["doubao-image", "generic-async-image"].includes(profile.protocol)) return "unverified";
+  return "unsupported";
+}
+
 export function protocolSupportsReferenceImages(provider, protocol) {
   if (provider === "gemini") return protocol === "gemini-native-image";
   if (provider === "openai") return protocol === "openai-image-edit";
@@ -104,6 +111,7 @@ export function sanitizeProviderProfile(profile) {
     protocol: profile.protocol,
     capabilities,
     supportsReferenceImages: supportsReferenceImagesProfile(profile),
+    referenceImageSupportStatus: referenceImageSupportStatus(profile),
     timeoutMs: profile.timeoutMs,
     maxRetries: profile.maxRetries,
     enabled: profile.enabled,

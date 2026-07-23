@@ -3,10 +3,12 @@ import crypto from "crypto";
 import dns from "dns/promises";
 import net from "net";
 import path from "path";
+import sharp from "sharp";
 import { ProviderError, providerFetch } from "@/lib/providers/errors";
 
 export const storageRoot = path.join(process.cwd(), "storage");
 export const MAX_REFERENCE_IMAGE_BYTES = 12 * 1024 * 1024;
+export const MAX_REFERENCE_IMAGE_PIXELS = 50_000_000;
 const MAX_GENERATED_IMAGE_BYTES = 20 * 1024 * 1024;
 
 export function sanitizeFileName(fileName) {
@@ -17,6 +19,10 @@ export function sanitizeFileName(fileName) {
     .replace(/^-+|-+$/g, "")
     .slice(0, 48);
   return `${base || "image"}-${Date.now()}${ext || ".png"}`;
+}
+
+export function createReferenceFileName(mimeType) {
+  return `${crypto.randomUUID()}${imageExtension(mimeType)}`;
 }
 
 export function getProjectReferenceDir(projectId) {
@@ -43,11 +49,11 @@ export function getPublicStorageUrl(storageKey) {
   return `/api/storage/${storageKey}`;
 }
 
-export async function saveProjectReference(projectId, file, buffer, mimeType) {
+export async function saveProjectReference(projectId, buffer, mimeType) {
   const dir = getProjectReferenceDir(projectId);
   await fs.mkdir(dir, { recursive: true });
 
-  const fileName = sanitizeFileName(file.name);
+  const fileName = createReferenceFileName(mimeType);
   const localPath = path.join(dir, fileName);
   await fs.writeFile(localPath, buffer);
 
@@ -58,6 +64,39 @@ export async function saveProjectReference(projectId, file, buffer, mimeType) {
     storageKey,
     mimeType,
     url: getPublicStorageUrl(storageKey),
+  };
+}
+
+export async function validateReferenceImageContent(buffer, mimeType) {
+  let metadata;
+  try {
+    metadata = await sharp(buffer, {
+      failOn: "warning",
+      limitInputPixels: MAX_REFERENCE_IMAGE_PIXELS,
+    }).metadata();
+  } catch {
+    throw new ProviderError("INVALID_IMAGE_CONTENT", "图片文件无法完整解码");
+  }
+
+  const formatToMime = {
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+  };
+  if (formatToMime[metadata.format] !== mimeType) {
+    throw new ProviderError("INVALID_IMAGE_CONTENT", "图片内容与格式不一致");
+  }
+  if (!metadata.width || !metadata.height || metadata.width <= 0 || metadata.height <= 0) {
+    throw new ProviderError("INVALID_IMAGE_CONTENT", "图片宽高无效");
+  }
+  if (metadata.width * metadata.height > MAX_REFERENCE_IMAGE_PIXELS) {
+    throw new ProviderError("INVALID_IMAGE_CONTENT", "图片像素尺寸过大");
+  }
+
+  return {
+    width: metadata.width,
+    height: metadata.height,
+    format: metadata.format,
   };
 }
 

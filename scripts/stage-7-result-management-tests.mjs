@@ -125,6 +125,7 @@ try {
   app = await startNextApp({ appMode: "local", defaultUserId: ownerUserId });
   activeApp = app.child;
   const restartedList = await jsonRequest(app.baseUrl, `/api/projects/${ownerProjectId}/image-plans/${planIds[0]}/generated-images`);
+  assert.equal(restartedList.status, 200, `candidate list must load after restart: ${restartedList.text}`);
   assert.equal(restartedList.data.preferredGeneratedImageId, preferredImageId, "preferred image survives service restart");
 
   const download = await binaryRequest(app.baseUrl, `/api/generated-images/${preferredImageId}/download`);
