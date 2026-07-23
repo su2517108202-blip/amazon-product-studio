@@ -1,6 +1,8 @@
 import {
   analyzeOpenAICompatibleProduct,
+  checkGenericAsyncImage,
   createOpenAICompatibleImagePlan,
+  generateOpenAIImage,
   listOpenAICompatibleModels,
   testOpenAICompatible,
 } from "./openai";
@@ -13,5 +15,7 @@ export const openAICompatibleAdapter = {
   listModels: listOpenAICompatibleModels,
   analyzeProduct: analyzeOpenAICompatibleProduct,
   createImagePlan: createOpenAICompatibleImagePlan,
+  generateImage: generateOpenAIImage,
+  checkGeneration: checkGenericAsyncImage,
   normalizeError: normalizeProviderError,
 };

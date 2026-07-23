@@ -33,14 +33,19 @@ export async function PATCH(req, context) {
       });
     }
 
+    const data = {};
+    if (typeof body.imageRole === "string") data.imageRole = body.imageRole;
+    if (typeof body.isPrimary === "boolean") data.isPrimary = body.isPrimary;
+    if (typeof body.includeInAnalysis === "boolean" || body.isPrimary === true) {
+      data.includeInAnalysis = body.isPrimary === true ? true : body.includeInAnalysis;
+    }
+    if (typeof body.includeInGeneration === "boolean" || body.isPrimary === true) {
+      data.includeInGeneration = body.isPrimary === true ? true : body.includeInGeneration;
+    }
+
     const updated = await prisma.referenceImage.update({
       where: { id: imageId },
-      data: {
-        imageRole: body.imageRole,
-        isPrimary: body.isPrimary,
-        includeInAnalysis:
-          body.isPrimary === true ? true : body.includeInAnalysis,
-      },
+      data,
     });
 
     if (body.isPrimary === true) {

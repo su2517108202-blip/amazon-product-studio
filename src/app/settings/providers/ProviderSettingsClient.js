@@ -10,6 +10,7 @@ import {
 } from "react-icons/fa";
 import {
   CAPABILITIES,
+  IMAGE_GENERATION_PROTOCOLS,
   MODEL_ROLES,
   PROVIDER_DEFAULTS,
 } from "@/lib/provider-profiles";
@@ -296,13 +297,21 @@ export default function ProviderSettingsClient() {
                 />
               </Field>
               <Field label="协议">
-                <input
-                  value={form.protocol}
+	                <input
+	                  list="provider-protocol-options"
+	                  value={form.protocol}
                   onChange={(event) =>
                     setForm({ ...form, protocol: event.target.value })
                   }
                   className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
-                />
+	                />
+	                <datalist id="provider-protocol-options">
+	                  <option value="openai" />
+	                  <option value="openai-compatible" />
+	                  {IMAGE_GENERATION_PROTOCOLS.map((protocol) => (
+	                    <option key={protocol} value={protocol} />
+	                  ))}
+	                </datalist>
               </Field>
             </div>
 

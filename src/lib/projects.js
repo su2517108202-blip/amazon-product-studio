@@ -9,6 +9,7 @@ export function sanitizeReferenceImage(image) {
     sortOrder: image.sortOrder,
     isPrimary: image.isPrimary,
     includeInAnalysis: image.includeInAnalysis,
+    includeInGeneration: image.includeInGeneration,
     imageRole: image.imageRole,
     createdAt: image.createdAt,
   };

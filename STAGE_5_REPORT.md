@@ -3,7 +3,7 @@
 ## 1. Baseline
 
 - Branch: `codex/stage-5-image-planning`
-- Stage 5 commit SHA: resolved by tag `stage-5-image-planning` after sealing.
+- Stage 5 commit SHA: `61549a5`
 - Stage 5 Git tag: `stage-5-image-planning`
 - Project path: `F:\codex\amazon-product-studio`
 - Local URL: `http://localhost:3000`

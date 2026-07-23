@@ -1,4 +1,4 @@
-import { hasCredentialKey, maskApiKey } from "@/lib/security";
+﻿import { hasCredentialKey, maskApiKey } from "@/lib/security";
 
 export const PROVIDERS = [
   "openai",
@@ -9,6 +9,14 @@ export const PROVIDERS = [
 ];
 
 export const CAPABILITIES = ["text", "reasoning", "vision", "image", "asyncImage"];
+
+export const IMAGE_GENERATION_PROTOCOLS = [
+  "openai-images",
+  "openai-image-edit",
+  "gemini-native-image",
+  "doubao-image",
+  "generic-async-image",
+];
 
 export const MODEL_ROLES = {
   product_vision: {
@@ -21,8 +29,9 @@ export const MODEL_ROLES = {
   },
   image_generation: {
     label: "图片生成",
-    accepts: (capabilities) =>
-      capabilities.includes("image") || capabilities.includes("asyncImage"),
+    accepts: (capabilities, profile = {}) =>
+      profile.provider !== "deepseek" &&
+      (capabilities.includes("image") || capabilities.includes("asyncImage")),
   },
 };
 
@@ -30,13 +39,13 @@ export const PROVIDER_DEFAULTS = {
   openai: {
     name: "OpenAI",
     baseUrl: "https://api.openai.com/v1",
-    protocol: "openai",
+    protocol: "openai-images",
     capabilities: ["text", "reasoning", "vision", "image"],
   },
   gemini: {
     name: "Google Gemini",
     baseUrl: "https://generativelanguage.googleapis.com/v1beta",
-    protocol: "gemini",
+    protocol: "gemini-native-image",
     capabilities: ["text", "reasoning", "vision", "image"],
   },
   deepseek: {
@@ -48,7 +57,7 @@ export const PROVIDER_DEFAULTS = {
   doubao: {
     name: "豆包 / 火山方舟",
     baseUrl: "https://ark.cn-beijing.volces.com/api/v3",
-    protocol: "openai-compatible",
+    protocol: "doubao-image",
     capabilities: ["text"],
   },
   "openai-compatible": {
@@ -124,6 +133,9 @@ export function validateProviderInput(input, { requireApiKey = false } = {}) {
   const maxRetries = Number(input.maxRetries ?? 0);
 
   if (!PROVIDERS.includes(provider)) errors.push("供应商不受支持");
+  if (provider === "deepseek" && (capabilities.includes("image") || capabilities.includes("asyncImage"))) {
+    errors.push("DeepSeek 不支持图片生成");
+  }
   if (!(input.name || "").trim()) errors.push("请填写配置名称");
   if (!modelId) errors.push("请填写 Model ID");
   if (provider !== "openai-compatible" && !baseUrl) errors.push("请填写 Base URL");
@@ -144,6 +156,12 @@ export function validateProviderInput(input, { requireApiKey = false } = {}) {
     errors.push("重试次数必须在 0 到 5 之间");
   }
   if (capabilities.length === 0) errors.push("至少选择一个能力标签");
+  if (
+    (capabilities.includes("image") || capabilities.includes("asyncImage")) &&
+    !IMAGE_GENERATION_PROTOCOLS.includes((input.protocol || "").trim())
+  ) {
+    errors.push("请选择支持的图片生成协议");
+  }
   if (requireApiKey && !input.apiKey) errors.push("请填写 API Key");
   if ((input.apiKey || "").trim() && !hasCredentialKey()) {
     errors.push("缺少 CREDENTIAL_ENCRYPTION_KEY，无法安全保存 API Key");

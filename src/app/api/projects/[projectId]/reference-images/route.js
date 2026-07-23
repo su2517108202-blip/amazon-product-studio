@@ -56,6 +56,7 @@ export async function POST(req, context) {
           sortOrder,
           isPrimary,
           includeInAnalysis: nextIndex < 8,
+          includeInGeneration: isPrimary,
           imageRole,
         },
       });

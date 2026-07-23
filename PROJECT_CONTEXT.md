@@ -16,7 +16,8 @@
 | 2 local projects | `codex/stage-2-local-projects` | `040b11c` | `stage-2-local-projects` |
 | 3 BYOK provider center | `codex/stage-3-provider-center` | `7a942cd` | `stage-3-provider-center` |
 | 4 product analysis | `codex/stage-4-product-analysis` | `7b18db6` | `stage-4-product-analysis` |
-| 5 image planning | `codex/stage-5-image-planning` | resolved by `stage-5-image-planning` | `stage-5-image-planning` |
+| 5 image planning | `codex/stage-5-image-planning` | `61549a5` | `stage-5-image-planning` |
+| 6 image generation | `codex/stage-6-image-generation` | sealed by `stage-6-image-generation` | `stage-6-image-generation` |
 
 ## Current Prisma Models
 
@@ -33,6 +34,8 @@
 - `ModelRoleAssignment`
 - `ImagePlan`
 - `ImagePlanningRun`
+- `ImageGenerationRun`
+- `GeneratedImage`
 
 ## Current Provider Support
 
@@ -53,6 +56,7 @@ Current model roles:
 - `image_generation`
 
 Stage 5 uses `image_planning` and requires `text` capability.
+Stage 6 uses `image_generation` and requires `image` or `asyncImage` capability.
 
 ## Stage 5 Completion
 
@@ -75,12 +79,36 @@ Real planning validation:
 - Product: `Matte black stainless steel travel tumbler`
 - Result: 5 saved plans and completed `ImagePlanningRun`
 
+## Stage 6 Completion
+
+Stage 6 adds the real single-image generation loop:
+
+- One selected `ImagePlan` generates one real image.
+- Image generation uses the `image_generation` role.
+- `ImageGenerationRun` records success and failure attempts.
+- `GeneratedImage` stores the local persisted result metadata.
+- Generated images are saved under project storage and served through `/api/storage/...`.
+- Same fingerprint reuses existing successful images without a new provider call.
+- Force regeneration creates a new run and preserves old images.
+- Failed generation does not delete old images or change `ImagePlan.finalPrompt`.
+- Studio shows the current plan's latest successful generated image.
+- Stage 7 candidate history, preferred image, downloads, and version management are not implemented.
+
+Real image validation:
+
+- Provider: `gemini`
+- Model: `gemini-3.1-flash-image`
+- Protocol: `gemini-native-image`
+- Project: `Stage 4 Gemini Acceptance`
+- Plan: image plan 1 / `hero`
+- Result: 1K `1024x1024` JPEG saved locally and restored after service restart.
+
 ## Known Issues
 
 - Existing 6 `<img>` lint warnings remain by instruction.
 - Existing npm audit risks remain out of scope.
-- Stage 6 image generation, candidates, downloads, webhooks, async polling, ComfyUI, and external editors are not implemented.
+- Stage 7 candidate history, downloads, webhooks, ComfyUI, and external editors are not implemented.
 
 ## Next Stage Direction
 
-Stage 6 should start from saved `ImagePlan` rows and implement image generation through the `image_generation` provider role. It should preserve stage 5 plans, record generation attempts separately, and never let failed image generation overwrite a plan.
+Stage 7 should start from saved `GeneratedImage` records and implement candidate history, preferred image selection, downloads/exports, and image version management. It should preserve Stage 6 run/image records and never let failed generation delete successful images.

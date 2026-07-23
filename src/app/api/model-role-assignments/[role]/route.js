@@ -31,7 +31,7 @@ export async function PUT(req, context) {
     }
 
     const capabilities = parseCapabilities(profile);
-    if (!roleConfig.accepts(capabilities)) {
+    if (!roleConfig.accepts(capabilities, profile)) {
       return NextResponse.json(
         { error: "该配置能力不符合角色要求" },
         { status: 400 },

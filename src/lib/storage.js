@@ -1,7 +1,12 @@
 import { promises as fs } from "fs";
+import crypto from "crypto";
+import dns from "dns/promises";
+import net from "net";
 import path from "path";
+import { ProviderError, providerFetch } from "@/lib/providers/errors";
 
 export const storageRoot = path.join(process.cwd(), "storage");
+const MAX_GENERATED_IMAGE_BYTES = 20 * 1024 * 1024;
 
 export function sanitizeFileName(fileName) {
   const ext = path.extname(fileName || "").toLowerCase();
@@ -17,12 +22,20 @@ export function getProjectReferenceDir(projectId) {
   return path.join(storageRoot, "projects", projectId, "references");
 }
 
+export function getProjectGenerationDir(projectId, generationRunId) {
+  return path.join(storageRoot, "projects", projectId, "generations", generationRunId);
+}
+
 export function getProjectDir(projectId) {
   return path.join(storageRoot, "projects", projectId);
 }
 
 export function getStorageKey(projectId, fileName) {
   return `projects/${projectId}/references/${fileName}`;
+}
+
+export function getGeneratedStorageKey(projectId, generationRunId, fileName) {
+  return `projects/${projectId}/generations/${generationRunId}/${fileName}`;
 }
 
 export function getPublicStorageUrl(storageKey) {
@@ -47,6 +60,70 @@ export async function saveProjectReference(projectId, file) {
   };
 }
 
+export async function saveGeneratedImage(projectId, generationRunId, imageId, buffer, sourceType) {
+  const mimeType = detectImageMime(buffer);
+  if (!mimeType) {
+    throw new ProviderError("INVALID_IMAGE_RESPONSE", "Provider did not return a valid image");
+  }
+  if (buffer.length > MAX_GENERATED_IMAGE_BYTES) {
+    throw new ProviderError("IMAGE_TOO_LARGE", "Generated image is too large");
+  }
+
+  const dir = getProjectGenerationDir(projectId, generationRunId);
+  await fs.mkdir(dir, { recursive: true });
+
+  const ext = imageExtension(mimeType);
+  const fileName = `${imageId}${ext}`;
+  const localPath = path.join(dir, fileName);
+  await fs.writeFile(localPath, buffer);
+
+  const dimensions = readImageDimensions(buffer, mimeType);
+  return {
+    storageKey: getGeneratedStorageKey(projectId, generationRunId, fileName),
+    mimeType,
+    width: dimensions.width,
+    height: dimensions.height,
+    byteSize: buffer.length,
+    sha256: crypto.createHash("sha256").update(buffer).digest("hex"),
+    sourceType,
+    url: getPublicStorageUrl(getGeneratedStorageKey(projectId, generationRunId, fileName)),
+  };
+}
+
+export async function downloadImageToBuffer(url, { timeoutMs = 30000 } = {}) {
+  await assertSafeRemoteUrl(url);
+
+  const response = await providerFetch(url, {
+    method: "GET",
+    timeoutMs,
+    redirect: "manual",
+  });
+
+  if (response.status >= 300 && response.status < 400) {
+    throw new ProviderError("IMAGE_DOWNLOAD_FAILED", "Image download redirect was blocked");
+  }
+  if (!response.ok) {
+    throw new ProviderError("IMAGE_DOWNLOAD_FAILED", "Unable to download generated image", {
+      httpStatus: response.status,
+    });
+  }
+
+  const contentLength = Number(response.headers.get("content-length") || 0);
+  if (contentLength > MAX_GENERATED_IMAGE_BYTES) {
+    throw new ProviderError("IMAGE_TOO_LARGE", "Generated image is too large");
+  }
+
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.length > MAX_GENERATED_IMAGE_BYTES) {
+    throw new ProviderError("IMAGE_TOO_LARGE", "Generated image is too large");
+  }
+  if (!detectImageMime(buffer)) {
+    throw new ProviderError("INVALID_IMAGE_RESPONSE", "Downloaded content is not an image");
+  }
+
+  return buffer;
+}
+
 export async function deleteProjectStorage(projectId) {
   await fs.rm(getProjectDir(projectId), { recursive: true, force: true });
 }
@@ -57,4 +134,105 @@ export function resolveStoragePath(parts) {
     throw new Error("Invalid storage path");
   }
   return target;
+}
+
+export function detectImageMime(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 12) return "";
+  if (buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) {
+    return "image/png";
+  }
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
+    return "image/jpeg";
+  }
+  if (
+    buffer.subarray(0, 4).toString("ascii") === "RIFF" &&
+    buffer.subarray(8, 12).toString("ascii") === "WEBP"
+  ) {
+    return "image/webp";
+  }
+  if (buffer.subarray(0, 6).toString("ascii") === "GIF87a" || buffer.subarray(0, 6).toString("ascii") === "GIF89a") {
+    return "image/gif";
+  }
+  return "";
+}
+
+function imageExtension(mimeType) {
+  if (mimeType === "image/jpeg") return ".jpg";
+  if (mimeType === "image/webp") return ".webp";
+  if (mimeType === "image/gif") return ".gif";
+  return ".png";
+}
+
+function readImageDimensions(buffer, mimeType) {
+  try {
+    if (mimeType === "image/png" && buffer.length >= 24) {
+      return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+    }
+    if (mimeType === "image/webp") return readWebpDimensions(buffer);
+    if (mimeType === "image/jpeg") return readJpegDimensions(buffer);
+  } catch {}
+  return { width: null, height: null };
+}
+
+function readJpegDimensions(buffer) {
+  let offset = 2;
+  while (offset + 9 < buffer.length) {
+    if (buffer[offset] !== 0xff) break;
+    const marker = buffer[offset + 1];
+    const length = buffer.readUInt16BE(offset + 2);
+    if (marker >= 0xc0 && marker <= 0xc3) {
+      return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) };
+    }
+    offset += 2 + length;
+  }
+  return { width: null, height: null };
+}
+
+function readWebpDimensions(buffer) {
+  const kind = buffer.subarray(12, 16).toString("ascii");
+  if (kind === "VP8X" && buffer.length >= 30) {
+    const width = 1 + buffer.readUIntLE(24, 3);
+    const height = 1 + buffer.readUIntLE(27, 3);
+    return { width, height };
+  }
+  return { width: null, height: null };
+}
+
+async function assertSafeRemoteUrl(value) {
+  let parsed;
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw new ProviderError("UNSAFE_REMOTE_URL", "Generated image URL is invalid");
+  }
+
+  if (!["http:", "https:"].includes(parsed.protocol)) {
+    throw new ProviderError("UNSAFE_REMOTE_URL", "Generated image URL protocol is not allowed");
+  }
+
+  const addresses = net.isIP(parsed.hostname)
+    ? [{ address: parsed.hostname }]
+    : await dns.lookup(parsed.hostname, { all: true });
+
+  if (!addresses.length || addresses.some((item) => isPrivateAddress(item.address))) {
+    throw new ProviderError("UNSAFE_REMOTE_URL", "Generated image URL points to a private address");
+  }
+}
+
+function isPrivateAddress(address) {
+  if (address === "::1" || address.toLowerCase().startsWith("fe80:")) return true;
+  if (address.startsWith("fc") || address.startsWith("fd")) return true;
+  if (address.startsWith("::ffff:")) return isPrivateAddress(address.slice(7));
+
+  const parts = address.split(".").map((item) => Number(item));
+  if (parts.length !== 4 || parts.some((item) => Number.isNaN(item))) return false;
+  const [a, b] = parts;
+  return (
+    a === 10 ||
+    a === 127 ||
+    (a === 169 && b === 254) ||
+    (a === 172 && b >= 16 && b <= 31) ||
+    (a === 192 && b === 168) ||
+    a === 0
+  );
 }

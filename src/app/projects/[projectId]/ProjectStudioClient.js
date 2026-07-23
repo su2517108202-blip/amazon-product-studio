@@ -1,5 +1,6 @@
-"use client";
+﻿"use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -67,6 +68,7 @@ export default function ProjectStudioClient({ projectId }) {
   const [identityInfo, setIdentityInfo] = useState(null);
   const [identityForm, setIdentityForm] = useState(EMPTY_IDENTITY_FORM);
   const [planInfo, setPlanInfo] = useState(null);
+  const [generationInfo, setGenerationInfo] = useState(null);
   const [planningRuns, setPlanningRuns] = useState([]);
   const [planForm, setPlanForm] = useState(EMPTY_PLAN_FORM);
   const [activePlanIndex, setActivePlanIndex] = useState(1);
@@ -78,6 +80,8 @@ export default function ProjectStudioClient({ projectId }) {
   const [savingPlan, setSavingPlan] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [planning, setPlanning] = useState(false);
+  const [generatingImage, setGeneratingImage] = useState(false);
+  const [generationResolution, setGenerationResolution] = useState("1K");
   const [planDirty, setPlanDirty] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -134,6 +138,22 @@ export default function ProjectStudioClient({ projectId }) {
       setPlanForm(EMPTY_PLAN_FORM);
     }
     setPlanDirty(false);
+    const nextPlan =
+      plansData.plans?.find((plan) => plan.planIndex === activePlanIndex) ||
+      plansData.plans?.[0] ||
+      null;
+    if (nextPlan) {
+      const generationRes = await fetch(
+        `/api/projects/${projectId}/image-plans/${nextPlan.id}/generations`,
+      );
+      const generationData = await generationRes.json();
+      if (!generationRes.ok) {
+        throw new Error(generationData.error || "鏃犳硶璇诲彇鍥剧墖鐢熸垚璁板綍");
+      }
+      setGenerationInfo(generationData);
+    } else {
+      setGenerationInfo(null);
+    }
   }, [activePlanIndex, projectId]);
 
   useEffect(() => {
@@ -145,11 +165,15 @@ export default function ProjectStudioClient({ projectId }) {
 
   const visionAssignment = assignments.find((item) => item.role === "product_vision");
   const planningAssignment = assignments.find((item) => item.role === "image_planning");
+  const generationAssignment = assignments.find((item) => item.role === "image_generation");
   const identity = identityInfo?.identity;
   const plans = planInfo?.plans || [];
   const selectedPlan = plans.find((plan) => plan.planIndex === activePlanIndex);
   const selectedCount =
     project?.referenceImages.filter((image) => image.includeInAnalysis || image.isPrimary)
+      .length || 0;
+  const generationReferenceCount =
+    project?.referenceImages.filter((image) => image.includeInGeneration || image.isPrimary)
       .length || 0;
   const successfulRuns = runs.filter((run) => run.status === "completed");
   const failedRuns = runs.filter((run) => run.status === "failed");
@@ -224,6 +248,11 @@ export default function ProjectStudioClient({ projectId }) {
     const isChecking = payload.includeInAnalysis === true;
     if (isChecking && selectedCount >= 8) {
       setError("参与识别的图片最多 8 张");
+      return;
+    }
+    const isGenerationChecking = payload.includeInGeneration === true;
+    if (isGenerationChecking && generationReferenceCount >= 4) {
+      setError("参与生成的参考图最多 4 张");
       return;
     }
     const res = await fetch(`/api/reference-images/${imageId}`, {
@@ -390,6 +419,85 @@ export default function ProjectStudioClient({ projectId }) {
     }
   }
 
+	  async function generateCurrentImage({ force = false } = {}) {
+	    if (!selectedPlan) {
+	      setError("请先选择一条主图策划");
+	      return;
+	    }
+	    if (!generationAssignment?.providerProfile) {
+	      setError("请先到 API 设置绑定图片生成模型");
+	      return;
+	    }
+	    if (!identity) {
+	      setError("请先完成商品识别");
+	      return;
+	    }
+	    if (!project.referenceImages.some((image) => image.isPrimary)) {
+	      setError("请先设置主参考图");
+	      return;
+	    }
+	    if (generationReferenceCount > 4) {
+	      setError("参与生成的参考图最多 4 张");
+	      return;
+	    }
+	    const stale = identity.isStale || selectedPlan.isStale;
+	    const allowStaleInput =
+	      stale && window.confirm("当前产品身份证或策划可能过期，是否仍然生成？");
+    if (stale && !allowStaleInput) return;
+
+    const confirmed = window.confirm("本次将调用真实图片生成 API 并可能产生费用，是否继续？");
+    if (!confirmed) return;
+
+    setGeneratingImage(true);
+    setError("");
+	    setMessage("正在生成当前图片");
+    try {
+      const referenceImageIds = project.referenceImages
+        .filter((image) => image.includeInGeneration || image.isPrimary)
+        .map((image) => image.id);
+      const res = await fetch(
+        `/api/projects/${projectId}/image-plans/${selectedPlan.id}/generations`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            force,
+            allowStaleInput,
+            referenceImageIds,
+            resolution: generationResolution,
+            aspectRatio: project.aspectRatio,
+          }),
+        },
+      );
+      const data = await res.json();
+	      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "生成失败"}`);
+	      await fetchProject();
+	      setMessage(data.reused ? "已使用现有生成图" : "当前图片已生成");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGeneratingImage(false);
+    }
+  }
+
+  async function checkCurrentGeneration() {
+    const runId = generationInfo?.latestRun?.id;
+    if (!runId) return;
+    setGeneratingImage(true);
+    setError("");
+    try {
+      const res = await fetch(`/api/image-generations/${runId}/check`, { method: "POST" });
+      const data = await res.json();
+	      if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "检查失败"}`);
+	      await fetchProject();
+	      setMessage(data.status === "completed" ? "图片生成已完成" : "图片仍在处理中");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setGeneratingImage(false);
+    }
+  }
+
   if (!project || !draft || !identityInfo || !planInfo) {
     return (
       <main className="flex flex-1 items-center justify-center bg-zinc-950 text-zinc-400">
@@ -473,8 +581,10 @@ export default function ProjectStudioClient({ projectId }) {
             selectedCount={selectedCount}
             visionAssignment={visionAssignment}
             planningAssignment={planningAssignment}
+            generationAssignment={generationAssignment}
             analyzing={analyzing}
             planning={planning}
+            generatingImage={generatingImage}
             planInfo={planInfo}
             onAnalyze={analyzeProduct}
             onGenerate={generatePlans}
@@ -499,6 +609,7 @@ export default function ProjectStudioClient({ projectId }) {
             project={project}
             uploading={uploading}
             selectedCount={selectedCount}
+            generationReferenceCount={generationReferenceCount}
             onUpload={uploadFiles}
             onUpdate={updateImage}
             onDelete={deleteImage}
@@ -512,10 +623,20 @@ export default function ProjectStudioClient({ projectId }) {
             planning={planning}
             savingPlan={savingPlan}
             selectedPlan={selectedPlan}
+            identity={identity}
+            project={project}
+            generationAssignment={generationAssignment}
+            generationInfo={generationInfo}
+            generationReferenceCount={generationReferenceCount}
+            generationResolution={generationResolution}
+            generatingImage={generatingImage}
             onGenerate={generatePlans}
             onSelectPlan={selectPlan}
             onUpdatePlanForm={updatePlanForm}
             onSavePlan={savePlan}
+            onResolutionChange={setGenerationResolution}
+            onGenerateImage={generateCurrentImage}
+            onCheckGeneration={checkCurrentGeneration}
           />
 
           <IdentitySection
@@ -569,8 +690,10 @@ function WorkflowPanel({
   selectedCount,
   visionAssignment,
   planningAssignment,
+  generationAssignment,
   analyzing,
   planning,
+  generatingImage,
   planInfo,
   onAnalyze,
   onGenerate,
@@ -629,6 +752,19 @@ function WorkflowPanel({
           {hasPlans ? "重新生成 5 张策划" : "生成 5 张主图策划"}
         </button>
       </section>
+
+      <section>
+        <h2 className="text-sm font-black text-white">单张图片生成</h2>
+        <p className="mt-2 text-xs text-zinc-500">
+          当前图片模型：
+          {generationAssignment?.providerProfile
+            ? `${generationAssignment.providerProfile.name} / ${generationAssignment.providerProfile.modelId}`
+            : "未配置"}
+        </p>
+        <p className="mt-2 text-xs text-zinc-500">
+          状态：{generationAssignment?.providerProfile ? (generatingImage ? "正在生成" : "准备生成") : "等待配置图片模型"}
+        </p>
+      </section>
     </div>
   );
 }
@@ -638,6 +774,7 @@ function ReferenceImages({
   project,
   uploading,
   selectedCount,
+  generationReferenceCount,
   onUpload,
   onUpdate,
   onDelete,
@@ -700,6 +837,17 @@ function ReferenceImages({
                   />
                   参与识别
                 </label>
+                <label className="flex items-center gap-2 text-xs text-zinc-400">
+                  <input
+                    checked={image.includeInGeneration || image.isPrimary}
+                    disabled={image.isPrimary}
+                    onChange={(event) =>
+                      onUpdate(image.id, { includeInGeneration: event.target.checked })
+                    }
+                    type="checkbox"
+                  />
+                  参与生成
+                </label>
                 <select
                   value={image.imageRole}
                   onChange={(event) => onUpdate(image.id, { imageRole: event.target.value })}
@@ -739,6 +887,9 @@ function ReferenceImages({
       {selectedCount > 8 && (
         <p className="mt-3 text-xs text-red-300">参与识别图片超过 8 张</p>
       )}
+      {generationReferenceCount > 4 && (
+        <p className="mt-3 text-xs text-red-300">参与生成参考图超过 4 张</p>
+      )}
     </section>
   );
 }
@@ -751,10 +902,20 @@ function PlanningSection({
   planning,
   savingPlan,
   selectedPlan,
+  identity,
+  project,
+  generationAssignment,
+  generationInfo,
+  generationReferenceCount,
+  generationResolution,
+  generatingImage,
   onGenerate,
   onSelectPlan,
   onUpdatePlanForm,
   onSavePlan,
+  onResolutionChange,
+  onGenerateImage,
+  onCheckGeneration,
 }) {
   return (
     <section className="border border-zinc-800 bg-zinc-900/35 p-4">
@@ -872,15 +1033,145 @@ function PlanningSection({
             <button
               disabled={savingPlan}
               className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-xs font-black text-white hover:bg-violet-700 disabled:bg-zinc-800"
-            >
-              {savingPlan ? <FaSpinner className="animate-spin" /> : <FaSave />}
-              保存当前策划
-            </button>
-            <p className="mt-2 text-xs text-zinc-600">图片生成将在阶段 6 开放</p>
-          </div>
-        </form>
+	            >
+	              {savingPlan ? <FaSpinner className="animate-spin" /> : <FaSave />}
+	              保存当前策划
+	            </button>
+	            <GenerationPanel
+	              identity={identity}
+	              project={project}
+	              selectedPlan={selectedPlan}
+	              generationAssignment={generationAssignment}
+	              generationInfo={generationInfo}
+	              generationReferenceCount={generationReferenceCount}
+	              generationResolution={generationResolution}
+	              generatingImage={generatingImage}
+	              onResolutionChange={onResolutionChange}
+	              onGenerateImage={onGenerateImage}
+	              onCheckGeneration={onCheckGeneration}
+	            />
+	          </div>
+	        </form>
       )}
     </section>
+  );
+}
+
+function GenerationPanel({
+  identity,
+  project,
+  selectedPlan,
+  generationAssignment,
+  generationInfo,
+  generationReferenceCount,
+  generationResolution,
+  generatingImage,
+  onResolutionChange,
+  onGenerateImage,
+  onCheckGeneration,
+}) {
+  const provider = generationAssignment?.providerProfile;
+  const latestRun = generationInfo?.latestRun;
+  const latestImage = generationInfo?.latestImage;
+  const canGenerate =
+    provider &&
+    identity &&
+    selectedPlan &&
+    !generatingImage &&
+    generationReferenceCount > 0 &&
+    generationReferenceCount <= 4;
+
+  return (
+    <div className="mt-5 border-t border-zinc-800 pt-4">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-xs font-black uppercase tracking-widest text-zinc-300">
+            单张图片生成
+          </h3>
+          <p className="mt-1 text-xs text-zinc-500">
+            候选图、首选图和下载将在阶段 7 开放
+          </p>
+        </div>
+        <span className="border border-zinc-800 px-2 py-1 text-[10px] text-zinc-400">
+          {generationStatus(identity, selectedPlan, provider, latestRun)}
+        </span>
+      </div>
+
+      <div className="grid gap-3 md:grid-cols-4">
+        <Info label="图片模型" value={provider ? `${provider.name} / ${provider.modelId}` : "未配置"} />
+        <Info label="协议" value={provider?.protocol || "未配置"} />
+        <Info label="比例" value={project.aspectRatio || "1:1"} />
+        <Info label="参考图" value={`${generationReferenceCount}/4`} />
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr_1fr]">
+        <Field label="分辨率">
+          <select
+            value={generationResolution}
+            onChange={(event) => onResolutionChange(event.target.value)}
+            className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
+          >
+            <option value="1K">1K</option>
+            <option value="2K">2K</option>
+          </select>
+        </Field>
+        <button
+          type="button"
+          onClick={() => onGenerateImage({ force: false })}
+          disabled={!canGenerate}
+          className="flex items-center justify-center gap-2 bg-sky-500 px-4 py-2.5 text-xs font-black text-zinc-950 hover:bg-sky-400 disabled:bg-zinc-800 disabled:text-zinc-500"
+        >
+          {generatingImage ? <FaSpinner className="animate-spin" /> : <FaImage />}
+          生成当前图片
+        </button>
+        <button
+          type="button"
+          onClick={() => onGenerateImage({ force: true })}
+          disabled={!canGenerate || !latestImage}
+          className="border border-zinc-800 px-4 py-2.5 text-xs font-black text-zinc-300 hover:text-white disabled:text-zinc-600"
+        >
+          强制重新生成
+        </button>
+      </div>
+
+      {latestRun?.status === "processing" && latestRun.mode === "async" && (
+        <button
+          type="button"
+          onClick={onCheckGeneration}
+          disabled={generatingImage}
+          className="mt-3 w-full border border-sky-900 px-4 py-2.5 text-xs font-black text-sky-200 hover:border-sky-700"
+        >
+          检查异步生成状态
+        </button>
+      )}
+
+      {latestImage ? (
+        <div className="mt-4 border border-zinc-800 bg-zinc-950 p-3">
+          <div className="relative aspect-square bg-black">
+            <Image
+              src={latestImage.url}
+              alt="Generated ecommerce result"
+              fill
+              sizes="(max-width: 1024px) 100vw, 640px"
+              className="object-contain"
+              unoptimized
+            />
+          </div>
+          <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+            <Info label="状态" value={latestRun?.status || "completed"} />
+            <Info label="模型" value={latestRun?.model || "未知"} />
+            <Info label="生成时间" value={formatDate(latestImage.createdAt)} />
+            <Info label="尺寸" value={latestImage.width ? `${latestImage.width}x${latestImage.height}` : "未知"} />
+            <Info label="大小" value={`${Math.round((latestImage.byteSize || 0) / 1024)} KB`} />
+            <Info label="来源" value={latestImage.sourceType || "provider"} />
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 border border-dashed border-zinc-800 bg-zinc-950/50 p-6 text-center text-xs text-zinc-500">
+          当前策划尚未生成图片
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -981,6 +1272,27 @@ function planningStatus(identity, planningAssignment, planning, planInfo) {
   if (planInfo?.plans?.length === 5 && planInfo?.hasStalePlans) return "策划可能已过期";
   if (planInfo?.plans?.length === 5) return "生成成功";
   return "未生成";
+}
+
+function generationStatus(identity, selectedPlan, provider, latestRun) {
+  if (!identity) return "等待产品身份证";
+  if (identity.isStale) return "商品身份证已过期";
+  if (!selectedPlan) return "等待主图策划";
+  if (selectedPlan.isStale) return "策划已过期";
+  if (!provider) return "等待配置图片模型";
+  if (latestRun?.status === "processing") return "生成处理中";
+  if (latestRun?.status === "completed") return "生成成功";
+  if (latestRun?.status === "failed") return "生成失败";
+  return "准备生成";
+}
+
+function formatDate(value) {
+  if (!value) return "未知";
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return "未知";
+  }
 }
 
 function toIdentityForm(identity) {

@@ -28,6 +28,45 @@ function readGeminiText(data) {
     .trim();
 }
 
+async function classifyGeminiError(response) {
+  try {
+    const data = await response.clone().json();
+    const errors = Array.isArray(data) ? data : [data];
+    const text = errors
+      .map((item) => `${item?.error?.status || ""} ${item?.error?.message || ""} ${JSON.stringify(item?.error?.details || [])}`)
+      .join(" ");
+    if (/api.?key|credential|unauthenticated|permission/i.test(text)) return "INVALID_API_KEY";
+    if (/model/i.test(text)) return "MODEL_NOT_FOUND";
+  } catch {}
+  return classifyHttpError(response.status);
+}
+
+function readGeminiInteractionImages(data) {
+  const outputImage = data?.output_image || data?.outputImage;
+  if (outputImage?.data) {
+    return [
+      {
+        data: Buffer.from(outputImage.data, "base64"),
+        url: null,
+        mimeType: outputImage.mime_type || outputImage.mimeType || "image/png",
+      },
+    ];
+  }
+
+  const candidates = [
+    ...(Array.isArray(data?.output) ? data.output : []),
+    ...(Array.isArray(data?.steps) ? data.steps.flatMap((step) => step.output || []) : []),
+    ...(Array.isArray(data?.steps) ? data.steps.flatMap((step) => step.content || []) : []),
+  ];
+  return candidates
+    .filter((item) => item?.type === "image" && item?.data)
+    .map((item) => ({
+      data: Buffer.from(item.data, "base64"),
+      url: null,
+      mimeType: item.mime_type || item.mimeType || "image/png",
+    }));
+}
+
 export const geminiAdapter = {
   ...createBaseAdapter("gemini"),
   async testConnection(config) {
@@ -209,6 +248,74 @@ export const geminiAdapter = {
         httpStatus: normalized.httpStatus,
       });
     }
+  },
+  async generateImage(config, input) {
+    try {
+      if (!config.apiKey) {
+        throw new ProviderError("MISSING_API_KEY", "Missing API Key");
+      }
+      if (!config.capabilities?.includes("image")) {
+        throw new ProviderError("CAPABILITY_MISMATCH", "Model is not marked as image capable");
+      }
+      if (config.protocol !== "gemini-native-image") {
+        throw new ProviderError("UNSUPPORTED_PROTOCOL", "Gemini image generation requires gemini-native-image");
+      }
+
+      const promptInput = [
+        { type: "text", text: input.prompt },
+        ...input.referenceImages.map((image) => ({
+          type: "image",
+          mime_type: image.mimeType,
+          data: image.data.toString("base64"),
+        })),
+      ];
+
+      const response = await providerFetch(safeJoinUrl(config.baseUrl, "interactions"), {
+        method: "POST",
+        timeoutMs: config.timeoutMs,
+        headers: {
+          "x-goog-api-key": config.apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: config.modelId,
+          input: promptInput,
+          response_format: {
+            type: "image",
+            aspect_ratio: input.output.aspectRatio || "1:1",
+            image_size: input.output.resolution || "1K",
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        throw new ProviderError(await classifyGeminiError(response), "Image generation request failed", {
+          httpStatus: response.status,
+        });
+      }
+
+      const images = readGeminiInteractionImages(await response.json());
+      if (!images.length) {
+        throw new ProviderError("INVALID_IMAGE_RESPONSE", "Provider returned no image");
+      }
+
+      return {
+        mode: "sync",
+        status: "completed",
+        externalTaskId: null,
+        images: images.slice(0, 1),
+        error: null,
+        rawMetadata: {},
+      };
+    } catch (error) {
+      const normalized = normalizeProviderError(error);
+      throw new ProviderError(normalized.code, normalized.message, {
+        httpStatus: normalized.httpStatus,
+      });
+    }
+  },
+  async checkGeneration() {
+    throw new ProviderError("UNSUPPORTED_PROTOCOL", "Gemini native image generation is synchronous");
   },
   normalizeError: normalizeProviderError,
 };

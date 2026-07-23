@@ -1,0 +1,108 @@
+{
+  "stage": 6,
+  "branch": "codex/stage-6-image-generation",
+  "tag": "stage-6-image-generation",
+  "scope": "real single-image generation loop",
+  "repository": "SamurAIGPT/amazon-product-studio",
+  "localDatabaseName": "amazon_product_studio_stage1",
+  "providerAcceptance": {
+    "provider": "gemini",
+    "model": "gemini-3.1-flash-image",
+    "protocol": "gemini-native-image",
+    "capability": "image",
+    "connectionTest": "passed",
+    "realGeneration": "passed",
+    "mode": "sync",
+    "outputCountPerRequest": 1,
+    "output": {
+      "mimeType": "image/jpeg",
+      "width": 1024,
+      "height": 1024,
+      "storage": "local storage via /api/storage"
+    }
+  },
+  "validationProject": {
+    "projectId": "cmrwl7jxk0000ogpgkfjbah7g",
+    "projectName": "Stage 4 Gemini Acceptance",
+    "planId": "cmrx9gnek0002oopgdqqpz6xa",
+    "planIndex": 1,
+    "taskType": "hero",
+    "referenceImagesUsed": 1,
+    "productIdentityStale": false,
+    "imagePlanStale": false
+  },
+  "databaseResults": {
+    "imageGenerationRun": {
+      "completed": 2,
+      "failed": 5,
+      "latestSuccessfulRunStatus": "completed"
+    },
+    "generatedImage": {
+      "count": 2,
+      "latestImageRestoredAfterRestart": true,
+      "servedThroughStorageApi": true
+    }
+  },
+  "reuseAndFailureProtection": {
+    "sameFingerprintReusedExistingResult": true,
+    "reuseCreatedNewRun": false,
+    "forceRegenerateCreatedNewRun": true,
+    "forceRegeneratePreservedOldImage": true,
+    "wrongKeyFailedWithoutDeletingSuccess": true,
+    "wrongKeyCode": "INVALID_API_KEY",
+    "wrongModelFailedWithoutDeletingSuccess": true,
+    "wrongModelCode": "MODEL_NOT_FOUND",
+    "invalidInitialProviderParserFailureCreatedNoGeneratedImage": true
+  },
+  "guardrailTests": {
+    "missingImageGenerationProvider": "MISSING_IMAGE_GENERATION_PROVIDER",
+    "noImageCapabilityBindingRejected": true,
+    "deepseekImageGenerationBindingRejected": true,
+    "staleProductIdentity": "STALE_PRODUCT_IDENTITY",
+    "staleImagePlan": "STALE_IMAGE_PLAN",
+    "emptyPrompt": "INVALID_PROMPT",
+    "missingPrimaryReference": "MISSING_PRIMARY_REFERENCE",
+    "tooManyReferenceImages": "TOO_MANY_REFERENCE_IMAGES",
+    "missingReferenceFile": "REFERENCE_FILE_NOT_FOUND"
+  },
+  "migrationValidation": {
+    "mainDatabaseMigrateDev": "passed",
+    "emptyDatabaseFullMigrationChain": "passed",
+    "temporaryDatabaseDropped": true,
+    "stage6TablesCreated": [
+      "ImageGenerationRun",
+      "GeneratedImage"
+    ]
+  },
+  "qualityChecks": {
+    "prismaGenerate": "passed",
+    "lint": {
+      "status": "passed",
+      "warnings": 6,
+      "warningType": "existing <img> warnings"
+    },
+    "build": "passed",
+    "githubActions": "not_configured"
+  },
+  "securityChecks": {
+    "apiResponsesContainFullApiKey": false,
+    "apiResponsesContainEncryptedKeyFields": false,
+    "apiResponsesContainAuthorizationHeader": false,
+    "apiResponsesContainImageBase64": false,
+    "apiResponsesContainLocalAbsolutePath": false,
+    "generatedAssetsCommitted": false,
+    "envCommitted": false
+  },
+  "outOfScope": [
+    "stage 7 candidate history",
+    "preferred image selection",
+    "downloads and zip export",
+    "image deletion/history management",
+    "webhook-dependent completion",
+    "ComfyUI",
+    "Canva",
+    "video",
+    "AI model generation",
+    "batch products"
+  ]
+}

@@ -65,6 +65,7 @@ export async function POST(_req, context) {
           sortOrder: image.sortOrder,
           isPrimary: image.isPrimary,
           includeInAnalysis: image.includeInAnalysis,
+          includeInGeneration: image.includeInGeneration,
           imageRole: image.imageRole,
         },
       });
