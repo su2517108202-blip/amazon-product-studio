@@ -1,0 +1,168 @@
+{
+  "stage": "7",
+  "name": "result-management",
+  "repository": "su2517108202-blip/amazon-product-studio",
+  "branch": "codex/stage-7-result-management",
+  "baseCommit": "46026762c4364dc7af5fbd81637d9bce6c64e640",
+  "implementationCommit": "0ff10b893309bffa6e3c3688838fb7bdf43f33d1",
+  "tag": "stage-7-result-management",
+  "sanitized": true,
+  "containsSecrets": false,
+  "containsImageBase64": false,
+  "containsLocalAbsolutePaths": false,
+  "routesVisited": [
+    "http://localhost:3000",
+    "http://localhost:3000/settings/providers",
+    "http://localhost:3000/projects/cmrwl7jxk0000ogpgkfjbah7g"
+  ],
+  "viewports": [
+    {
+      "name": "desktop",
+      "width": 1440,
+      "height": 900,
+      "result": "passed"
+    },
+    {
+      "name": "mobile",
+      "width": 390,
+      "height": 844,
+      "result": "passed"
+    }
+  ],
+  "uiChecks": {
+    "projectListVisible": true,
+    "providerSettingsVisible": true,
+    "apiKeyFullyExposed": false,
+    "projectStudioVisible": true,
+    "referenceImagesVisible": true,
+    "primaryReferenceVisible": true,
+    "identityVisible": true,
+    "fivePlanTabsSwitch": true,
+    "planEditSave": true,
+    "candidateHistoryVisible": true,
+    "preferredSetReplaceClear": true,
+    "preferredPersistsAfterRefresh": true,
+    "preferredPersistsAfterRestart": true,
+    "singleDownloadUsable": true,
+    "preferredZipUsableAtFiveOfFive": true,
+    "zipDisabledBelowFiveOfFive": true,
+    "blockingConsoleErrors": 0,
+    "severeMobileHorizontalOverflow": false
+  },
+  "providerCalls": {
+    "newPaidImageGenerationCallsDuringUiAcceptance": 0,
+    "geminiImageGenerationRunCountBefore": 10,
+    "geminiImageGenerationRunCountAfter": 10,
+    "latestGeminiRunIdUnchanged": "cmrxiyjl40000v4pg65ptet5l"
+  },
+  "realProviderHistoricalImages": [
+    {
+      "planIndex": 1,
+      "imageId": "a081aee6-0880-4f5b-92c0-9e09f3a298d7",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image",
+      "protocol": "gemini-native-image",
+      "mimeType": "image/jpeg",
+      "dimensions": "1024x1024"
+    },
+    {
+      "planIndex": 1,
+      "imageId": "ca923359-8ae0-457f-b2d9-473f9cf62d38",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image",
+      "protocol": "gemini-native-image",
+      "mimeType": "image/jpeg",
+      "dimensions": "1024x1024"
+    },
+    {
+      "planIndex": 1,
+      "imageId": "d50ca300-8179-4f7b-adbf-cdadc3d93e5e",
+      "provider": "gemini",
+      "model": "gemini-3.1-flash-image",
+      "protocol": "gemini-native-image",
+      "mimeType": "image/jpeg",
+      "dimensions": "1024x1024",
+      "preferred": true
+    }
+  ],
+  "controlledLocalCandidates": [
+    {
+      "planIndex": 1,
+      "imageId": "stage7-ui-delete-candidate-image",
+      "purpose": "non-preferred delete confirmation",
+      "finalState": "soft-deleted"
+    },
+    {
+      "planIndex": 2,
+      "imageId": "stage7-ui-zip-structure-image",
+      "purpose": "zip and preferred completion",
+      "preferred": true
+    },
+    {
+      "planIndex": 3,
+      "imageId": "stage7-ui-zip-function-image",
+      "purpose": "zip and preferred completion",
+      "preferred": true
+    },
+    {
+      "planIndex": 4,
+      "imageId": "stage7-ui-zip-scenario-image",
+      "purpose": "zip and preferred completion",
+      "preferred": true
+    },
+    {
+      "planIndex": 5,
+      "imageId": "stage7-ui-zip-detail-image",
+      "purpose": "zip and preferred completion",
+      "preferred": true
+    }
+  ],
+  "downloads": {
+    "singleImage": {
+      "candidateId": "stage7-ui-zip-structure-image",
+      "status": 200,
+      "mimeType": "image/png",
+      "fileName": "02-structure-candidate-01.png",
+      "signature": "png",
+      "opensSuccessfully": true
+    },
+    "preferredZip": {
+      "status": 200,
+      "mimeType": "application/zip",
+      "fileName": "Stage-4-Gemini-Acceptance-preferred-images.zip",
+      "entryCount": 5,
+      "entries": [
+        "01-hero.jpg",
+        "02-structure.png",
+        "03-function.png",
+        "04-scenario.png",
+        "05-detail.png"
+      ]
+    }
+  },
+  "validation": {
+    "prismaFormat": "passed",
+    "prismaGenerate": "passed",
+    "migrationDev": "passed",
+    "migrationDeploySmoke": "passed",
+    "stage61Tests": "passed",
+    "stage62Tests": "passed",
+    "stage7Tests": "passed",
+    "lint": "passed",
+    "build": "passed"
+  },
+  "screenshots": [
+    "docs/stages/stage-7/ui-acceptance/01-project-list.png",
+    "docs/stages/stage-7/ui-acceptance/02-provider-settings.png",
+    "docs/stages/stage-7/ui-acceptance/03-reference-images.png",
+    "docs/stages/stage-7/ui-acceptance/04-product-identity.png",
+    "docs/stages/stage-7/ui-acceptance/05-five-image-plans.png",
+    "docs/stages/stage-7/ui-acceptance/06-candidate-history.png",
+    "docs/stages/stage-7/ui-acceptance/07-preferred-image.png",
+    "docs/stages/stage-7/ui-acceptance/08-single-download.png",
+    "docs/stages/stage-7/ui-acceptance/09-five-of-five-progress.png",
+    "docs/stages/stage-7/ui-acceptance/10-zip-export.png",
+    "docs/stages/stage-7/ui-acceptance/11-mobile-project.png",
+    "docs/stages/stage-7/ui-acceptance/12-mobile-candidate-history.png"
+  ]
+}

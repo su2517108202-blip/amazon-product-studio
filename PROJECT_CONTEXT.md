@@ -21,6 +21,7 @@
 | 6 image generation | `codex/stage-6-image-generation` | `ef818d0fd063c94d3c1cf251ef4481dd05daaf9c` | `stage-6-image-generation` | `ef818d0fd063c94d3c1cf251ef4481dd05daaf9c` |
 | 6.1 generation hardening | `codex/stage-6-1-hardening` | `04bc277be6442578fd5d4c31e73349faecdb2c82` | `stage-6-1-hardening` | `3b1b119ff89dca74a68433fe85b9981745e5baa8` |
 | 6.2 async auth CI fix | `codex/stage-6-2-auth-ci-fix` | `c69a302bb6bd581e49c6f4e838fb81711e53943d` | `stage-6-2-auth-ci-fix` | Reported in final reply |
+| 7 result management | `codex/stage-7-result-management` | `0ff10b893309bffa6e3c3688838fb7bdf43f33d1` | `stage-7-result-management` | Reported in final reply |
 
 ## Current Prisma Models
 
@@ -60,6 +61,7 @@ Current model roles:
 
 Stage 5 uses `image_planning` and requires `text` capability.
 Stage 6 uses `image_generation` and requires `image` or `asyncImage` capability plus a protocol that truly transmits reference images.
+Stage 7 manages saved generated results and does not require new provider calls for history, preferred selection, downloads, or ZIP export.
 
 ## Stage 5 Completion
 
@@ -137,12 +139,45 @@ Stage 6.2 is a final Stage 6 hardening fix:
 
 Stage 6.2 did not add candidate history, preferred image selection, download, ZIP, batch generation, or other Stage 7 features.
 
+## Stage 7 Completion
+
+Stage 7 adds generated result management:
+
+- Each `ImagePlan` now has a visible generated-image candidate history.
+- A single preferred generated image can be set, replaced, cleared, and restored per plan.
+- Preferred state persists after refresh and service restart.
+- Non-preferred generated images can be soft-deleted with confirmation.
+- Preferred generated images cannot be directly deleted.
+- Single-image download returns a safe filename and correct MIME.
+- A five-image preferred ZIP export is enabled only at `5/5` preferred completion.
+- The ZIP export contains exactly 5 preferred images in plan order.
+- Deleted generated images are excluded from history, storage serving, reuse, and async check responses.
+- Forced generation attempts are tracked with `ImageGenerationRun.isForcedVersion`.
+
+Stage 7 database additions:
+
+- `ImagePlan.preferredGeneratedImageId`
+- `GeneratedImage.deletedAt`
+- `ImageGenerationRun.isForcedVersion`
+- Preferred-image relation between `ImagePlan` and `GeneratedImage`
+
+Stage 7 real UI acceptance:
+
+- Project list, provider settings, and project studio were opened in browser.
+- Desktop `1440x900` and mobile `390x844` were checked.
+- Screenshots are stored under `docs/stages/stage-7/ui-acceptance/`.
+- UI acceptance details are stored in `docs/stages/stage-7/UI_ACCEPTANCE.md`.
+- Sanitized machine-readable acceptance is stored in `docs/stages/stage-7/acceptance-summary.json`.
+- No new paid upstream image generation calls occurred during UI acceptance.
+
+Stage 7 did not add Stage 8 features, external editors, webhooks, ComfyUI, or automatic paid batch generation.
+
 ## Known Issues
 
 - Existing 6 `<img>` lint warnings remain by instruction.
 - Existing npm audit risks remain out of scope.
-- Stage 7 candidate history, downloads, webhooks, ComfyUI, and external editors are not implemented.
+- Webhooks, ComfyUI, external editors, and Stage 8 workflows are not implemented.
 
 ## Next Stage Direction
 
-Stage 7 should start from saved `GeneratedImage` records and implement candidate history, preferred image selection, downloads/exports, and image version management. It should preserve Stage 6 run/image records and never let failed generation delete successful images.
+Stage 8 should build on Stage 7 saved result management. Candidate history, preferred selection, single download, preferred ZIP export, and safe version management are now implemented and should be preserved.
