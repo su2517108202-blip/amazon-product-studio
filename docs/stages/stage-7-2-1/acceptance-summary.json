@@ -1,0 +1,55 @@
+{
+  "stage": "7.2.1",
+  "branch": "codex/stage-7-2-1-final-closure",
+  "baselineTag": "stage-7-2-pre-stage-8-remediation",
+  "baselineCommit": "5cd997bc31b9b78504d1596f73cc4c85be9851ac",
+  "implementationCommit": "fecb3bd1ee0f63657b18d38c008079504ea55ebc",
+  "tag": "stage-7-2-1-final-closure",
+  "stage8Started": false,
+  "paidImageGenerationCalls": 0,
+  "results": {
+    "ciIncludesStage72Tests": true,
+    "ciIncludesUiTextTests": true,
+    "fullPixelDecode": true,
+    "playwrightFileInputUpload": true,
+    "typographyReadability": true,
+    "gifSelectorRemoved": true,
+    "candidatePaginationTerminalPage": true,
+    "primarySwitchAtomic": true,
+    "productionAuditCritical": 0,
+    "productionAuditHigh": 0,
+    "lint": true,
+    "build": true,
+    "emptyMigrationDeploy": true
+  },
+  "playwright": {
+    "browser": "chromium",
+    "desktopViewport": {
+      "width": 1440,
+      "height": 900
+    },
+    "mobileViewport": {
+      "width": 390,
+      "height": 844
+    },
+    "uploadedImages": 3,
+    "networkUploadPosts": 1,
+    "firstImagePrimary": true,
+    "selectorAccept": "image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+  },
+  "screenshots": [
+    "docs/stages/stage-7-2-1/ui-acceptance/01-upload-file-input.png",
+    "docs/stages/stage-7-2-1/ui-acceptance/02-upload-progress.png",
+    "docs/stages/stage-7-2-1/ui-acceptance/03-upload-thumbnails.png",
+    "docs/stages/stage-7-2-1/ui-acceptance/04-readable-candidates.png",
+    "docs/stages/stage-7-2-1/ui-acceptance/05-mobile-readable.png"
+  ],
+  "sanitization": {
+    "apiKeys": false,
+    "databasePasswords": false,
+    "proxyCredentials": false,
+    "authorizationHeaders": false,
+    "imageBase64": false,
+    "localAbsolutePaths": false
+  }
+}

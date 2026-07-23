@@ -226,6 +226,28 @@ Stage 7.2 evidence:
 - UI screenshots: `docs/stages/stage-7-2/ui-acceptance/`
 - Instruction source: `docs/stages/stage-7-2/Stage_7_2_Pre_Stage_8_Remediation_Codex.md`
 
+## Stage 7.2.1 Final Closure
+
+Stage 7.2.1 closes the remaining pre-Stage-8 verification gaps without starting Stage 8:
+
+- GitHub Actions now includes Stage 7.2 remediation tests, UI text checks, Stage 7.2.1 Playwright upload E2E, and production high-level audit.
+- Reference upload validation now forces full pixel decode with `sharp(...).rotate().raw().toBuffer()` after MIME and metadata checks.
+- The reference-image decode limit is capped at `25,000,000` pixels.
+- Real middle-corrupted PNG, JPEG, and WebP samples are rejected with `INVALID_IMAGE_CONTENT`.
+- Project studio typography no longer uses readable `text-[10px]` or excessive `font-black`.
+- The reference-image file selector no longer offers GIF and only lists JPG, PNG, and WebP.
+- Candidate pagination now uses `limit + 1` terminal-page detection.
+- Reference-image primary switching is protected by a project-scoped advisory lock and transaction.
+- Playwright verified real `<input type="file">` upload of JPG, PNG, and WebP, one upload POST, thumbnail display, first-primary behavior, refresh recovery, and mobile readability.
+
+Stage 7.2.1 evidence:
+
+- Stage report: `docs/stages/stage-7-2-1/STAGE_7_2_1_REPORT.md`
+- UI report: `docs/stages/stage-7-2-1/UI_ACCEPTANCE.md`
+- Acceptance summary: `docs/stages/stage-7-2-1/acceptance-summary.json`
+- UI screenshots: `docs/stages/stage-7-2-1/ui-acceptance/`
+- Instruction source: `docs/stages/stage-7-2-1/Stage_7_2_1_Final_Closure_Codex.md`
+
 ## Known Issues
 
 - Existing 6 `<img>` lint warnings remain by instruction.
