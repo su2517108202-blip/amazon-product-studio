@@ -79,7 +79,7 @@ export async function POST(req, context) {
       update: { ...identityToDbData(result), sourceProvider: profile.provider, sourceModel: effectiveModelId, sourceProfileId: profile.id, inputFingerprint, isStale: false },
     });
 
-    await prisma.productAnalysisRun.update({
+    const updatedRun = await prisma.productAnalysisRun.update({
       where: { id: run.id },
       data: { status: "completed", durationMs: Date.now() - startedAt, completedAt: new Date() },
     });
@@ -87,7 +87,8 @@ export async function POST(req, context) {
 
     return NextResponse.json({
       ok: true, reused: false,
-      identity: identityToResponse(saved), run: runToResponse(run),
+      identity: identityToResponse(saved),
+      run: runToResponse(updatedRun),
       selectedImages: selectedImages.map(sanitizeReferenceImage),
     });
   } catch (error) {

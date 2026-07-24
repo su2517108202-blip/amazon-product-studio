@@ -86,8 +86,14 @@ async function throwGeminiError(response, fallbackMessage) {
     summary.errorStatus = String(err?.status || err?.code || "");
     summary.errorMessage = String(err?.message || "").slice(0, 500);
   } catch {}
-  throw new ProviderError(code, `${fallbackMessage}（${summary.errorStatus || `HTTP ${summary.httpStatus}`}）`, {
-    httpStatus: response.status, cause: { summary },
+  // Only attach sanitized summary — no raw body, no secrets
+  const safeSummary = {
+    httpStatus: summary.httpStatus,
+    errorStatus: summary.errorStatus,
+    errorMessage: summary.errorMessage,
+  };
+  throw new ProviderError(code, `${fallbackMessage}（${safeSummary.errorStatus || `HTTP ${safeSummary.httpStatus}`}）`, {
+    httpStatus: response.status, cause: { summary: safeSummary },
   });
 }
 

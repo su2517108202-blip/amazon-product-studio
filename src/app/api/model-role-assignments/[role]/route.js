@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
-import { MODEL_ROLES, parseCapabilities, roleAcceptanceLevel, sanitizeRoleAssignment } from "@/lib/provider-profiles";
+import { MODEL_ROLES, parseCapabilities, inferModelCapabilities, roleAcceptanceLevel, sanitizeRoleAssignment } from "@/lib/provider-profiles";
 
 export async function PUT(req, context) {
   try {
@@ -19,12 +19,18 @@ export async function PUT(req, context) {
     if (!profile) return NextResponse.json({ error: "配置不存在或已停用" }, { status: 404 });
 
     const effectiveModelId = (modelId || profile.modelId || "").trim();
-    const capabilities = parseCapabilities(profile);
-    const level = roleAcceptanceLevel(role, { ...profile, modelId: effectiveModelId, capabilities });
 
+    // Re-infer capabilities based on effectiveModelId, not just profile defaults
+    const profileCapabilities = parseCapabilities(profile);
+    const effectiveCaps = effectiveModelId && effectiveModelId !== profile.modelId
+      ? inferModelCapabilities(profile.provider, effectiveModelId)
+      : profileCapabilities;
+    const effectiveProfile = { ...profile, modelId: effectiveModelId, capabilities: effectiveCaps };
+
+    const level = roleAcceptanceLevel(role, effectiveProfile);
     if (level === "unsupported") {
       return NextResponse.json(
-        { error: `该配置能力不符合 ${roleConfig.label} 角色要求`, code: "CAPABILITY_MISMATCH" },
+        { error: `该模型不具备 ${roleConfig.label} 所需能力`, code: "CAPABILITY_MISMATCH", capabilityStatus: level },
         { status: 400 },
       );
     }
