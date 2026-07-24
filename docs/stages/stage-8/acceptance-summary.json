@@ -1,0 +1,37 @@
+{
+  "stage": "8",
+  "branch": "codex/stage-8-final-release",
+  "playwrightChromium": true,
+  "realFileInputUpload": true,
+  "uploadedFormats": [
+    "jpg",
+    "png",
+    "webp"
+  ],
+  "analysisReceivedReferenceImages": 3,
+  "planningReceivedProductIdentity": "中文便携保温杯",
+  "generationRequests": 6,
+  "generatedImagesDecodable": true,
+  "zipEntries": [
+    "01-hero.png",
+    "02-structure.png",
+    "03-function.png",
+    "04-scenario.png",
+    "05-detail.png"
+  ],
+  "restartRestored": true,
+  "deleteCleanup": true,
+  "paidImageGenerationCallsAdded": 0,
+  "screenshots": [
+    "01-home-final.png",
+    "02-create-project.png",
+    "03-reference-upload.png",
+    "04-product-identity.png",
+    "05-five-plans.png",
+    "06-generation-candidate.png",
+    "07-five-preferred.png",
+    "08-zip-export.png",
+    "09-mobile-final.png",
+    "10-startup-doctor.png"
+  ]
+}

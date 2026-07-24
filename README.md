@@ -1,3 +1,33 @@
+# 灵图电商工作室 / Amazon Product Studio
+
+## Stage 8 Final Local Release
+
+This repository is now sealed as the Stage 8 final local ecommerce image studio release on branch `codex/stage-8-final-release`.
+
+For Windows local use, start here:
+
+- One-click startup: `start-lingtu.bat`
+- Chinese local guide: `README_LOCAL_ZH.md`
+- Final release report: `docs/stages/stage-8/STAGE_8_REPORT.md`
+- UI acceptance evidence: `docs/stages/stage-8/UI_ACCEPTANCE.md`
+
+Stage 8 completes the supported local workflow:
+
+```text
+创建项目
+→ 上传商品参考图
+→ 商品识别
+→ 产品身份证确认
+→ 生成五张主图策划
+→ 逐张生成图片
+→ 选择五张首选图
+→ 下载单图或整套 ZIP
+```
+
+Stage 8 added no paid image-generation calls and does not start a Stage 9.
+
+---
+
 # 📦 Amazon Product Studio — Open-Source AI Product Photography & Ad Creative SaaS (Free Flair AI / Booth AI Alternative)
 
 > **Generate studio-quality product photos and ad creatives from reference images in seconds.** A production-ready, self-hostable Next.js SaaS boilerplate with multi-image upload (up to 14 references), preset templates, aspect ratio control, webhook-backed async delivery, and built-in Stripe billing. A free open-source alternative to Flair AI, Booth AI, Photoroom, and Pebblely — powered by the MuAPI AI engine.

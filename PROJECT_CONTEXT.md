@@ -23,6 +23,7 @@
 | 6.2 async auth CI fix | `codex/stage-6-2-auth-ci-fix` | `c69a302bb6bd581e49c6f4e838fb81711e53943d` | `stage-6-2-auth-ci-fix` | Reported in final reply |
 | 7 result management | `codex/stage-7-result-management` | `0ff10b893309bffa6e3c3688838fb7bdf43f33d1` | `stage-7-result-management` | Reported in final reply |
 | 7.1 CN upload fix | `codex/stage-7-1-cn-upload-fix` | Reported in final reply | `stage-7-1-cn-upload-fix` | Reported in final reply |
+| 8 final local release | `codex/stage-8-final-release` | `ce853f08e6e3d39169df5a6af01d12c66119c943` | `stage-8-final-release` | Reported in final reply |
 
 ## Current Prisma Models
 
@@ -252,8 +253,32 @@ Stage 7.2.1 evidence:
 
 - Existing 6 `<img>` lint warnings remain by instruction.
 - `npm audit --omit=dev` still reports three moderate development-chain advisories through Prisma CLI dependencies; production critical and high counts are zero.
-- Webhooks, ComfyUI, external editors, and Stage 8 workflows are not implemented.
+- Webhooks, ComfyUI, external editors, and Stage 9 workflows are not implemented.
 
-## Next Stage Direction
+## Stage 8 Completion
 
-Stage 8 should build on Stage 7.2. Candidate history, preferred selection, single download, preferred ZIP export, safe version management, Chinese UX copy, upload validation, upload concurrency protection, Provider reference-image capability, candidate pagination, and readable typography are now implemented and should be preserved.
+Stage 8 is the final formal local release and does not start Stage 9.
+
+Stage 8 productizes the Chinese local ecommerce image studio:
+
+- Four-step workflow: reference images, product identity, five-image planning, image generation and export.
+- Ordinary workflow hides provider protocol, model, run and fingerprint details under advanced information.
+- Buttons expose concrete Chinese disabled reasons.
+- Windows local startup is available through `start-lingtu.bat`, `scripts/start-local.ps1`, `scripts/doctor-local.mjs`, and `README_LOCAL_ZH.md`.
+- Primary reference deletion is protected by a project lock and transaction.
+- Project deletion only reports success after storage cleanup succeeds.
+- Local mode keeps SaaS billing, login, Stripe, recharge and template-publishing surfaces out of the main local product.
+- Stage 8 full Playwright Chromium acceptance uses a controlled local fake Provider and makes zero paid image-generation calls.
+
+Stage 8 final acceptance:
+
+- Real file input upload for JPG, PNG and WebP.
+- Product recognition, five-image planning and image generation all go through role binding and Provider adapters.
+- Five plan-by-plan images are generated.
+- One forced regeneration preserves the old candidate.
+- Five preferred images are selected.
+- Single-image download and five-image ZIP export are validated.
+- Refresh and application restart restore state.
+- Test project database rows and storage directory are cleaned up after deletion.
+- Desktop `1440x900` and mobile `390x844` screenshots are stored under `docs/stages/stage-8/ui-acceptance/`.
+- Production audit critical and high counts are zero.
