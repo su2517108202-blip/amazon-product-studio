@@ -1,0 +1,11 @@
+{
+  "branch": "codex/stage-8-0-2-local-usability-fix",
+  "paidProviderCalls": 0,
+  "concurrentLocalUserCalls": 20,
+  "draftModelDiscovery": true,
+  "independentRoleAssignments": true,
+  "localGalleryWithoutLogin": true,
+  "customStorageWrite": true,
+  "storageMigration": true,
+  "mobileChecked": true
+}

@@ -30,7 +30,7 @@ export async function DELETE(_req, context) {
       );
     }
 
-    const file = await statStoredFile(image.storageKey).catch(() => null);
+    const file = await statStoredFile(image.storageKey, image.localPath).catch(() => null);
     if (!file?.stat?.isFile()) {
       return NextResponse.json(
         { code: "GENERATED_FILE_NOT_FOUND", error: "Generated image file is missing" },

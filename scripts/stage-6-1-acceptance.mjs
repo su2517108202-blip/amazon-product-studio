@@ -34,7 +34,7 @@ assert(/expiresAt\s+DateTime\?/.test(schema), "ImageGenerationRun.expiresAt must
 const imageGeneration = read("src/lib/image-generation.js");
 assert(imageGeneration.includes("REFERENCE_IMAGES_UNSUPPORTED"), "unsupported reference image protocols must be blocked");
 assert(imageGeneration.includes("P2002"), "GeneratedImage persistence must handle unique conflicts");
-assert(imageGeneration.includes("deleteStoredFile(stored.storageKey)"), "duplicate image files must be cleaned after conflicts");
+assert(imageGeneration.includes("deleteStoredFile(stored.storageKey, stored.localPath)"), "duplicate image files must be cleaned after conflicts");
 assert(imageGeneration.includes("ASYNC_TASK_EXPIRED"), "async expiration must be represented");
 assert(imageGeneration.includes("MAX_ASYNC_CHECK_ATTEMPTS"), "async checks must have a maximum attempt limit");
 

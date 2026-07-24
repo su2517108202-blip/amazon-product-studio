@@ -1,21 +1,19 @@
-import { promises as fs } from "fs";
 import { NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/app-mode";
 import { prisma } from "@/lib/prisma";
-import { resolveStoragePath } from "@/lib/storage";
+import { readStoredFile } from "@/lib/storage";
 
 export async function GET(_req, context) {
   try {
     const params = await context.params;
     const parts = params.path || [];
     const user = await requireCurrentUser();
-    await assertStorageAccess(parts, user.id);
-    const filePath = resolveStoragePath(parts);
-    const file = await fs.readFile(filePath);
+    const access = await assertStorageAccess(parts, user.id);
+    const stored = await readStoredFile(access.storageKey, access.localPath);
 
-    return new Response(file, {
+    return new Response(stored.buffer, {
       headers: {
-        "Content-Type": getContentType(filePath),
+        "Content-Type": getContentType(stored.filePath),
         "Cache-Control": "private, max-age=3600",
       },
     });
@@ -49,10 +47,10 @@ async function assertStorageAccess(parts, userId) {
   if (kind === "references" && parts.length === 4 && runIdOrFile) {
     const reference = await prisma.referenceImage.findFirst({
       where: { projectId, storageKey: key },
-      select: { id: true },
+      select: { id: true, storageKey: true, localPath: true },
     });
     if (!reference) throw new Error("Invalid storage path");
-    return;
+    return reference;
   }
 
   if (kind === "generations" && parts.length === 5 && runIdOrFile && maybeFile) {
@@ -63,10 +61,10 @@ async function assertStorageAccess(parts, userId) {
         storageKey: key,
         deletedAt: null,
       },
-      select: { id: true },
+      select: { id: true, storageKey: true, localPath: true },
     });
     if (!generated) throw new Error("Invalid storage path");
-    return;
+    return generated;
   }
 
   throw new Error("Invalid storage path");

@@ -4,12 +4,20 @@ import dns from "dns/promises";
 import net from "net";
 import path from "path";
 import sharp from "sharp";
+import {
+  defaultStorageRoot,
+  readLocalSettingsSync,
+} from "@/lib/local-settings";
 import { ProviderError, providerFetch } from "@/lib/providers/errors";
 
-export const storageRoot = path.join(process.cwd(), "storage");
+export const storageRoot = defaultStorageRoot;
 export const MAX_REFERENCE_IMAGE_BYTES = 12 * 1024 * 1024;
 export const MAX_REFERENCE_IMAGE_PIXELS = 25_000_000;
 const MAX_GENERATED_IMAGE_BYTES = 20 * 1024 * 1024;
+
+export function getActiveStorageRoot() {
+  return readLocalSettingsSync().storageRoot;
+}
 
 export function sanitizeFileName(fileName) {
   const ext = path.extname(fileName || "").toLowerCase();
@@ -26,15 +34,15 @@ export function createReferenceFileName(mimeType) {
 }
 
 export function getProjectReferenceDir(projectId) {
-  return path.join(storageRoot, "projects", projectId, "references");
+  return path.join(getActiveStorageRoot(), "projects", projectId, "references");
 }
 
 export function getProjectGenerationDir(projectId, generationRunId) {
-  return path.join(storageRoot, "projects", projectId, "generations", generationRunId);
+  return path.join(getActiveStorageRoot(), "projects", projectId, "generations", generationRunId);
 }
 
 export function getProjectDir(projectId) {
-  return path.join(storageRoot, "projects", projectId);
+  return path.join(getActiveStorageRoot(), "projects", projectId);
 }
 
 export function getStorageKey(projectId, fileName) {
@@ -121,6 +129,7 @@ export async function saveGeneratedImage(projectId, generationRunId, imageId, bu
 
   const dimensions = readImageDimensions(buffer, mimeType);
   return {
+    localPath,
     storageKey: getGeneratedStorageKey(projectId, generationRunId, fileName),
     mimeType,
     width: dimensions.width,
@@ -171,8 +180,12 @@ export async function deleteProjectStorage(projectId) {
 }
 
 export function resolveStoragePath(parts) {
+  return resolveStoragePathInRoot(parts, getActiveStorageRoot());
+}
+
+function resolveStoragePathInRoot(parts, rootValue) {
   const safeParts = normalizeStorageParts(parts);
-  const root = path.resolve(storageRoot);
+  const root = path.resolve(rootValue);
   const target = path.resolve(root, ...safeParts);
   const relative = path.relative(root, target);
   if (relative.startsWith("..") || path.isAbsolute(relative)) {
@@ -181,25 +194,50 @@ export function resolveStoragePath(parts) {
   return target;
 }
 
-export async function deleteStoredFile(storageKey) {
-  const filePath = resolveStoragePath(String(storageKey || "").split("/"));
+export async function resolveStoredFilePath(storageKey, localPath = "") {
+  const direct = await existingLocalPath(localPath);
+  if (direct) return direct;
+
+  const parts = String(storageKey || "").split("/");
+  const currentPath = resolveStoragePathInRoot(parts, getActiveStorageRoot());
+  if (await isFile(currentPath)) return currentPath;
+
+  const defaultPath = resolveStoragePathInRoot(parts, defaultStorageRoot);
+  if (await isFile(defaultPath)) return defaultPath;
+
+  return currentPath;
+}
+
+export async function deleteStoredFile(storageKey, localPath = "") {
+  const filePath = await resolveStoredFilePath(storageKey, localPath);
   await fs.rm(filePath, { force: true });
 }
 
-export async function readStoredFile(storageKey) {
-  const filePath = resolveStoragePath(String(storageKey || "").split("/"));
+export async function readStoredFile(storageKey, localPath = "") {
+  const filePath = await resolveStoredFilePath(storageKey, localPath);
   return {
     filePath,
     buffer: await fs.readFile(filePath),
   };
 }
 
-export async function statStoredFile(storageKey) {
-  const filePath = resolveStoragePath(String(storageKey || "").split("/"));
+export async function statStoredFile(storageKey, localPath = "") {
+  const filePath = await resolveStoredFilePath(storageKey, localPath);
   return {
     filePath,
     stat: await fs.stat(filePath),
   };
+}
+
+async function existingLocalPath(localPath) {
+  if (!localPath || !path.isAbsolute(localPath)) return null;
+  const resolved = path.resolve(localPath);
+  return (await isFile(resolved)) ? resolved : null;
+}
+
+async function isFile(filePath) {
+  const stat = await fs.stat(filePath).catch(() => null);
+  return Boolean(stat?.isFile());
 }
 
 function normalizeStorageParts(parts = []) {

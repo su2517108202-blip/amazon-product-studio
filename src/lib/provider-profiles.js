@@ -213,3 +213,53 @@ export function validateProviderInput(input, { requireApiKey = false } = {}) {
     },
   };
 }
+
+export function validateProviderDraftInput(input, { requireApiKey = true } = {}) {
+  const errors = [];
+  const provider = input.provider;
+  const baseUrl = (input.baseUrl || "").trim();
+  const protocol = (input.protocol || getProviderDefaults(provider).protocol).trim();
+  const capabilities = Array.isArray(input.capabilities)
+    ? input.capabilities.filter((capability) => CAPABILITIES.includes(capability))
+    : getProviderDefaults(provider).capabilities;
+  const timeoutMs = Number(input.timeoutMs ?? 30000);
+  const maxRetries = Number(input.maxRetries ?? 0);
+
+  if (!PROVIDERS.includes(provider)) errors.push("服务商不受支持");
+  if (provider !== "openai-compatible" && !baseUrl) errors.push("请填写 Base URL");
+  if (baseUrl) {
+    try {
+      const url = new URL(baseUrl);
+      if (!["http:", "https:"].includes(url.protocol)) {
+        errors.push("Base URL 必须使用 http 或 https");
+      }
+    } catch {
+      errors.push("Base URL 格式不正确");
+    }
+  }
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 180000) {
+    errors.push("超时时间必须在 1000 到 180000 毫秒之间");
+  }
+  if (!Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > 5) {
+    errors.push("重试次数必须在 0 到 5 之间");
+  }
+  if (requireApiKey && !(input.apiKey || "").trim()) errors.push("请填写 API Key");
+
+  return {
+    ok: errors.length === 0,
+    errors,
+    value: {
+      id: "draft-provider",
+      name: (input.name || getProviderDefaults(provider).name || "Draft Provider").trim(),
+      provider,
+      baseUrl: baseUrl || null,
+      apiKey: (input.apiKey || "").trim(),
+      modelId: (input.modelId || "").trim(),
+      protocol,
+      capabilities,
+      timeoutMs,
+      maxRetries,
+      enabled: true,
+    },
+  };
+}

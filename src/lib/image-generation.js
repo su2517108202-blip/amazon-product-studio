@@ -282,6 +282,7 @@ export async function persistGeneratedImages({ projectId, imagePlanId, generatio
           generationRunId,
           outputIndex,
           storageKey: stored.storageKey,
+          localPath: stored.localPath,
           mimeType: stored.mimeType,
           width: stored.width,
           height: stored.height,
@@ -292,7 +293,7 @@ export async function persistGeneratedImages({ projectId, imagePlanId, generatio
       });
       saved.push(row);
     } catch (error) {
-      await deleteStoredFile(stored.storageKey).catch(() => {});
+      await deleteStoredFile(stored.storageKey, stored.localPath).catch(() => {});
       if (error?.code === "P2002") {
         const row = await prisma.generatedImage.findUnique({
           where: { generationRunId_outputIndex: { generationRunId, outputIndex } },

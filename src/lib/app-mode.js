@@ -9,17 +9,30 @@ export function isLocalMode() {
 
 export async function ensureDefaultLocalUser() {
   const id = config.app.defaultLocalUserId;
+  const email = `${id}@local.lingtu`;
 
-  return prisma.user.upsert({
-    where: { id },
-    update: {},
-    create: {
-      id,
-      name: "Local User",
-      email: `${id}@local.lingtu`,
-      credits: 0,
-    },
-  });
+  try {
+    return await prisma.user.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        name: "Local User",
+        email,
+        credits: 0,
+      },
+    });
+  } catch (error) {
+    if (error?.code !== "P2002") {
+      throw error;
+    }
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (user?.id === id && user.email === email) {
+      return user;
+    }
+    throw error;
+  }
 }
 
 export async function getCurrentUser() {

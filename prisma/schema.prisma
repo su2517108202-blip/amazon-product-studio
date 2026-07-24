@@ -254,6 +254,7 @@ model GeneratedImage {
   generationRunId   String
   outputIndex       Int                @default(0)
   storageKey        String             @db.Text
+  localPath         String?            @db.Text
   mimeType          String
   width             Int?
   height            Int?

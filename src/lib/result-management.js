@@ -112,7 +112,7 @@ export async function loadPreferredZipEntries(project) {
     const image = plan.preferredGeneratedImage;
     let file;
     try {
-      file = await readStoredFile(image.storageKey);
+      file = await readStoredFile(image.storageKey, image.localPath);
     } catch {
       return {
         ok: false,
