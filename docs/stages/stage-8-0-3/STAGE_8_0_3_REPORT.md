@@ -21,3 +21,23 @@
 - 新增 `npm run test:stage-8-0-3`。
 - CI 中新增 `Stage 8.0.3 auto match drag drop checks`。
 - 失败时上传 `tmp/stage8-0-3-auto-match/diagnostics/**` 和 `docs/stages/stage-8-0-3/ui-acceptance/*.png`。
+
+## 本地验证记录
+
+- Implementation commit: `18bec408620e74b7518de78c36b909889cf324d0`
+- `npm ci`: 通过。第一次受 Windows 原生模块文件锁影响失败，未删除文件，重试后通过。
+- `npx prisma generate --config prisma.config.ts`: 通过。
+- `npx prisma migrate deploy --config prisma.config.ts`: 通过，无待执行迁移。
+- `npm run test:stage-6-1`: 通过。
+- `npm run test:stage-6-2`: 通过。
+- `npm run test:stage-7`: 通过。
+- `npm run test:stage-7-1`: 通过。
+- `npm run test:stage-7-2`: 通过。
+- `npm run test:ui-text`: 通过。
+- `npm run test:stage-7-2-1`: 通过。
+- `npm run test:stage-8`: 通过。
+- `npm run test:stage-8-0-2`: 通过。
+- `npm run test:stage-8-0-3`: 通过。
+- `npm audit --omit=dev --audit-level=high`: 通过，critical 0，high 0。
+- `npm run lint`: 通过，保留既有 `<img>` warning。
+- `npm run build`: 通过，保留 Turbopack tracing warning。
