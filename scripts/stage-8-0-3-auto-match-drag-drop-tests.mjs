@@ -191,8 +191,20 @@ async function testProviderAutoDetectAndRecommend(page, baseUrl) {
 
 async function testMobileWorkspace(page, baseUrl, projectId) {
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`${baseUrl}/projects/${projectId}`, { waitUntil: "networkidle" });
-  await page.getByTestId("reference-drop-zone").waitFor({ state: "visible" });
+  const projectResponsePromise = page.waitForResponse(
+    (response) => response.url().endsWith(`/api/projects/${projectId}`),
+    { timeout: 60000 },
+  ).catch(() => null);
+  await page.goto(`${baseUrl}/projects/${projectId}`, { waitUntil: "domcontentloaded" });
+  const projectResponse = await projectResponsePromise;
+  assert(projectResponse && projectResponse.status() === 200, "mobile workspace project API must load");
+  try {
+    await page.getByTestId("reference-drop-zone").waitFor({ state: "visible", timeout: 60000 });
+  } catch (error) {
+    await page.screenshot({ path: path.join(diagnosticsDir, "mobile-workspace-missing-drop-zone.png"), fullPage: true }).catch(() => {});
+    await fs.writeFile(path.join(diagnosticsDir, "mobile-workspace-body.txt"), await page.locator("body").innerText().catch(() => ""), "utf8").catch(() => {});
+    throw error;
+  }
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
   assert.equal(overflow, false, "workspace must not severely overflow on mobile");
   await page.screenshot({ path: path.join(screenshotDir, "04-workspace-mobile.png"), fullPage: true });
