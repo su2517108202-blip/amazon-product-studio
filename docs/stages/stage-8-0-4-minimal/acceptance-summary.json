@@ -1,0 +1,34 @@
+{
+  "stage": "8.0.4-minimal",
+  "branch": "codex/stage-8-0-4-minimal-model-discovery",
+  "baseline": "stage-8.0.3-auto-match-drag-drop (12ae3b1d)",
+  "implementationCommit": "f405db3",
+  "filesModified": 14,
+  "tests": {
+    "build": "pass",
+    "lint": "pass",
+    "product_vision_e2e": "not_tested (database offline)",
+    "model_discovery_e2e": "not_tested (database offline)"
+  },
+  "acceptance": {
+    "all_models_visible": "implemented",
+    "no_hardcoded_model_names": "implemented",
+    "official_api_model_discovery": "implemented",
+    "role_model_override": "implemented",
+    "gemini_error_diagnostics": "implemented",
+    "default_naming": "implemented",
+    "name_suggestions": "implemented",
+    "product_vision_e2e": "blocked_by_db"
+  },
+  "blockers": [
+    "PostgreSQL at localhost:55432 not running",
+    "Migration 202607250001 not applied",
+    "No real Gemini API key for acceptance test"
+  ],
+  "known_issues": [
+    "OpenAI adapter still uses generic classifyHttpError (not classifyGeminiError)",
+    "DeepSeek/doubao model discovery not tested",
+    "Image generation reference image gate still partially restrictive",
+    "No persistence for discovered models (in-memory only, lost on page refresh)"
+  ]
+}
