@@ -4,7 +4,9 @@ import { fetch as undiciFetch, ProxyAgent } from "undici";
 let proxyDispatcher = null;
 let proxyDispatcherUrl = "";
 
-function getProviderProxyDispatcher() {
+function getProviderProxyDispatcher(url) {
+  if (isLocalProviderUrl(url)) return undefined;
+
   const proxyUrl =
     process.env.PROVIDER_PROXY_URL ||
     process.env.HTTPS_PROXY ||
@@ -86,7 +88,7 @@ export async function providerFetch(url, options = {}) {
   const timeoutMs = options.timeoutMs || 30000;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  const dispatcher = getProviderProxyDispatcher();
+  const dispatcher = getProviderProxyDispatcher(url);
 
   try {
     const fetchImpl = dispatcher ? undiciFetch : fetch;
@@ -101,6 +103,15 @@ export async function providerFetch(url, options = {}) {
     throw new ProviderError("NETWORK_ERROR", "网络连接失败", { cause: error });
   } finally {
     clearTimeout(timer);
+  }
+}
+
+function isLocalProviderUrl(value) {
+  try {
+    const { hostname } = new URL(value);
+    return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+  } catch {
+    return false;
   }
 }
 

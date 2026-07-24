@@ -4,16 +4,6 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
 import { sanitizeReferenceImage } from "@/lib/projects";
 
-async function getImageForUser(imageId, userId) {
-  return prisma.referenceImage.findFirst({
-    where: {
-      id: imageId,
-      project: { userId },
-    },
-    include: { project: true },
-  });
-}
-
 export async function PATCH(req, context) {
   try {
     const { imageId } = await context.params;
@@ -94,48 +84,69 @@ export async function DELETE(_req, context) {
   try {
     const { imageId } = await context.params;
     const user = await requireCurrentUser();
-    const image = await getImageForUser(imageId, user.id);
-
-    if (!image) {
-      return NextResponse.json({ error: "图片不存在" }, { status: 404 });
-    }
-
-    await prisma.referenceImage.delete({
-      where: { id: imageId },
-    });
-
-    await prisma.productIdentity.updateMany({
-      where: { projectId: image.projectId },
-      data: { isStale: true },
-    });
-
-    if (image.localPath) {
-      await fs.rm(image.localPath, { force: true });
-    }
-
-    if (image.isPrimary) {
-      const nextPrimary = await prisma.referenceImage.findFirst({
-        where: { projectId: image.projectId },
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    const deleted = await prisma.$transaction(async (tx) => {
+      const image = await tx.referenceImage.findFirst({
+        where: {
+          id: imageId,
+          project: { userId: user.id },
+        },
+        include: { project: true },
       });
 
-      await prisma.project.update({
-        where: { id: image.projectId },
-        data: { coverImageUrl: nextPrimary?.url || null },
-      });
+      if (!image) return null;
 
-      if (nextPrimary) {
-        await prisma.referenceImage.update({
-          where: { id: nextPrimary.id },
-          data: { isPrimary: true },
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${image.projectId}))`;
+
+      await tx.referenceImage.delete({ where: { id: imageId } });
+
+      let nextPrimary = null;
+      if (image.isPrimary) {
+        nextPrimary = await tx.referenceImage.findFirst({
+          where: { projectId: image.projectId },
+          orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
         });
+
+        await tx.project.update({
+          where: { id: image.projectId },
+          data: { coverImageUrl: nextPrimary?.url || null },
+        });
+
+        if (nextPrimary) {
+          await tx.referenceImage.update({
+            where: { id: nextPrimary.id },
+            data: {
+              isPrimary: true,
+              includeInAnalysis: true,
+              includeInGeneration: true,
+            },
+          });
+        }
       }
+
+      await tx.productIdentity.updateMany({
+        where: { projectId: image.projectId },
+        data: { isStale: true },
+      });
+      await tx.imagePlan.updateMany({
+        where: { projectId: image.projectId },
+        data: { isStale: true },
+      });
+
+      return image;
+    });
+
+    if (!deleted) {
+      return NextResponse.json({ code: "REFERENCE_IMAGE_NOT_FOUND", error: "图片不存在" }, { status: 404 });
+    }
+
+    if (deleted.localPath) {
+      await fs.rm(deleted.localPath, { force: true });
     }
 
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
-      { error: error.message || "无法删除图片" },
+      { code: "REFERENCE_IMAGE_DELETE_FAILED", error: error.message || "无法删除图片" },
       { status: error.status || 500 },
     );
   }

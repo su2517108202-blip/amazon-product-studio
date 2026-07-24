@@ -187,11 +187,9 @@ async function resetData() {
 
 async function startNextApp() {
   const port = await getOpenPort();
+  await fs.rm(path.join(root, ".next"), { recursive: true, force: true }).catch(() => {});
   const nextCli = path.join(root, "node_modules", "next", "dist", "bin", "next");
-  const hasProductionBuild = await fileExists(path.join(root, ".next", "BUILD_ID"));
-  const child = spawn(process.execPath, hasProductionBuild
-    ? [nextCli, "start", "-p", String(port)]
-    : [nextCli, "dev", "--webpack", "-p", String(port)], {
+  const child = spawn(process.execPath, [nextCli, "dev", "--webpack", "-p", String(port)], {
     cwd: root,
     env: {
       ...process.env,
@@ -213,7 +211,7 @@ async function startNextApp() {
     logs += chunk.toString();
   });
 
-  const baseUrl = `http://127.0.0.1:${port}`;
+  const baseUrl = `http://localhost:${port}`;
   const deadline = Date.now() + 60000;
   while (Date.now() < deadline) {
     if (child.exitCode != null) throw new Error(`next dev exited early: ${logs.slice(-2000)}`);
@@ -241,15 +239,6 @@ async function expectEnabled(locator, label) {
   await locator.waitFor({ state: "visible", timeout: 30000 });
   const disabled = await locator.evaluate((element) => Boolean(element.disabled));
   assert.equal(disabled, false, `${label} must be enabled`);
-}
-
-async function fileExists(file) {
-  try {
-    await fs.access(file);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 function getOpenPort() {

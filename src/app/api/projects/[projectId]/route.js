@@ -99,16 +99,15 @@ export async function DELETE(_req, context) {
       return NextResponse.json({ error: "项目不存在" }, { status: 404 });
     }
 
+    await deleteProjectStorage(projectId);
     await prisma.project.delete({
       where: { id: projectId },
     });
 
-    await deleteProjectStorage(projectId);
-
     return NextResponse.json({ ok: true });
   } catch (error) {
     return NextResponse.json(
-      { error: error.message || "无法删除项目" },
+      { code: "PROJECT_DELETE_FAILED", error: error.message || "无法删除项目" },
       { status: error.status || 500 },
     );
   }

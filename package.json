@@ -13,6 +13,7 @@
     "test:stage-7-1": "node scripts/stage-7-1-upload-tests.mjs && node scripts/stage-7-1-cn-output-tests.mjs",
     "test:stage-7-2": "node scripts/stage-7-2-remediation-tests.mjs",
     "test:stage-7-2-1": "node scripts/stage-7-2-1-upload-e2e.mjs",
+    "test:stage-8": "node scripts/stage-8-final-release-e2e.mjs",
     "test:ui-text": "node scripts/ui-text-tests.mjs",
     "lint": "eslint",
     "generate:credential-key": "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""

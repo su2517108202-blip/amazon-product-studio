@@ -99,6 +99,8 @@ export default function ProjectsHomePage() {
   }
 
   async function deleteProject(projectId) {
+    const ok = window.confirm("确认删除这个项目？关联记录和本项目本地文件会一起清理。");
+    if (!ok) return;
     setError("");
     const res = await fetch(`/api/projects/${projectId}`, {
       method: "DELETE",
@@ -266,6 +268,7 @@ export default function ProjectsHomePage() {
                 <article
                   key={project.id}
                   data-testid="project-card"
+                  data-project-id={project.id}
                   className="overflow-hidden border border-zinc-800 bg-zinc-900/45"
                 >
                   <div className="aspect-[4/3] bg-zinc-950">
@@ -324,6 +327,8 @@ export default function ProjectsHomePage() {
                       </button>
                       <button
                         onClick={() => deleteProject(project.id)}
+                        data-testid="delete-project-button"
+                        data-project-id={project.id}
                         className="border border-zinc-800 px-3 py-2 text-zinc-300 hover:border-red-700 hover:text-red-300"
                         aria-label="删除项目"
                         title="删除项目"

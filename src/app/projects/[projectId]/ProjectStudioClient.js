@@ -93,16 +93,13 @@ export default function ProjectStudioClient({ projectId }) {
 
   const fetchProject = useCallback(async () => {
     setError("");
-    const [projectRes, identityRes, assignmentsRes, runsRes, plansRes, planningRunsRes, summaryRes] =
-      await Promise.all([
-        fetch(`/api/projects/${projectId}`),
-        fetch(`/api/projects/${projectId}/product-identity`),
-        fetch("/api/model-role-assignments"),
-        fetch(`/api/projects/${projectId}/analysis-runs`),
-        fetch(`/api/projects/${projectId}/image-plans`),
-        fetch(`/api/projects/${projectId}/image-planning-runs`),
-        fetch(`/api/projects/${projectId}/generation-summary`),
-      ]);
+    const projectRes = await fetch(`/api/projects/${projectId}`);
+    const identityRes = await fetch(`/api/projects/${projectId}/product-identity`);
+    const assignmentsRes = await fetch("/api/model-role-assignments");
+    const runsRes = await fetch(`/api/projects/${projectId}/analysis-runs`);
+    const plansRes = await fetch(`/api/projects/${projectId}/image-plans`);
+    const planningRunsRes = await fetch(`/api/projects/${projectId}/image-planning-runs`);
+    const summaryRes = await fetch(`/api/projects/${projectId}/generation-summary`);
 
     const projectData = await projectRes.json();
     const identityData = await identityRes.json();
@@ -194,6 +191,12 @@ export default function ProjectStudioClient({ projectId }) {
   const failedRuns = runs.filter((run) => run.status === "failed");
   const lastRun = runs[0];
   const lastPlanningRun = planningRuns[0];
+  const workflowSteps = buildWorkflowSteps({
+    project,
+    identity,
+    planInfo,
+    generationSummary,
+  });
 
   useEffect(() => {
     const processingRun = generationSummary?.plans?.find(
@@ -230,6 +233,7 @@ export default function ProjectStudioClient({ projectId }) {
   }
 
   function selectPlan(index) {
+    if (index === activePlanIndex) return;
     if (planDirty && !window.confirm("当前策划有未保存修改，切换后会丢失。是否继续？")) {
       return;
     }
@@ -342,6 +346,8 @@ export default function ProjectStudioClient({ projectId }) {
   }
 
   async function deleteImage(imageId) {
+    const ok = window.confirm("确认删除这张参考图？如果它是主参考图，系统会自动选择下一张作为主参考图。");
+    if (!ok) return;
     setError("");
     setMessage("");
     const res = await fetch(`/api/reference-images/${imageId}`, {
@@ -580,9 +586,12 @@ export default function ProjectStudioClient({ projectId }) {
     setError("");
     setMessage("");
     const nextId = candidate.isPreferred ? null : candidate.id;
+    const targetPlanId = candidate.imagePlanId || selectedPlan.id;
+    const targetPlanIndex =
+      plans.find((plan) => plan.id === targetPlanId)?.planIndex || selectedPlan.planIndex;
     try {
       const res = await fetch(
-        `/api/projects/${projectId}/image-plans/${selectedPlan.id}/preferred-image`,
+        `/api/projects/${projectId}/image-plans/${targetPlanId}/preferred-image`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -592,7 +601,7 @@ export default function ProjectStudioClient({ projectId }) {
       const data = await res.json();
       if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "设置失败"}`);
       await fetchProject();
-      setMessage(nextId ? `图${selectedPlan.planIndex} 首选图已保存` : `图${selectedPlan.planIndex} 首选图已取消`);
+      setMessage(nextId ? `图${targetPlanIndex} 首选图已保存` : `图${targetPlanIndex} 首选图已取消`);
     } catch (err) {
       setError(err.message);
     }
@@ -701,9 +710,12 @@ export default function ProjectStudioClient({ projectId }) {
             </button>
           </form>
 
+          <StageProgress steps={workflowSteps} />
+
           <WorkflowPanel
             identity={identity}
             selectedCount={selectedCount}
+            generationReferenceCount={generationReferenceCount}
             visionAssignment={visionAssignment}
             planningAssignment={planningAssignment}
             generationAssignment={generationAssignment}
@@ -786,11 +798,8 @@ export default function ProjectStudioClient({ projectId }) {
           <dl className="mt-4 space-y-3 text-sm">
             <Info label="识别成功" value={`${successfulRuns.length}`} />
             <Info label="识别失败" value={`${failedRuns.length}`} />
-            <Info label="上次识别模型" value={lastRun?.model || "无"} />
             <Info label="策划成功" value={`${planInfo.stats?.successCount || 0}`} />
             <Info label="策划失败" value={`${planInfo.stats?.failureCount || 0}`} />
-            <Info label="上次策划供应商" value={lastPlanningRun?.provider || "无"} />
-            <Info label="上次策划模型" value={lastPlanningRun?.model || "无"} />
             <Info
               label="上次策划耗时"
               value={
@@ -800,6 +809,17 @@ export default function ProjectStudioClient({ projectId }) {
               }
             />
           </dl>
+          <details className="mt-5 border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-400">
+            <summary className="cursor-pointer font-semibold text-zinc-200">高级信息</summary>
+            <dl className="mt-3 space-y-3">
+              <Info label="识别 Provider" value={lastRun?.provider || "无"} />
+              <Info label="识别 Model ID" value={lastRun?.model || "无"} />
+              <Info label="识别 fingerprint" value={lastRun?.inputFingerprint || "无"} />
+              <Info label="策划 Provider" value={lastPlanningRun?.provider || "无"} />
+              <Info label="策划 Model ID" value={lastPlanningRun?.model || "无"} />
+              <Info label="策划 fingerprint" value={lastPlanningRun?.inputFingerprint || "无"} />
+            </dl>
+          </details>
           <div className="mt-5 space-y-2">
             <h3 className="text-sm font-semibold text-zinc-400">最近策划记录</h3>
             {planningRuns.slice(0, 5).map((run) => (
@@ -821,6 +841,7 @@ export default function ProjectStudioClient({ projectId }) {
 function WorkflowPanel({
   identity,
   selectedCount,
+  generationReferenceCount,
   visionAssignment,
   planningAssignment,
   generationAssignment,
@@ -832,6 +853,34 @@ function WorkflowPanel({
   onGenerate,
 }) {
   const hasPlans = planInfo?.plans?.length === 5;
+  const analyzeDisabledReason = analyzing
+    ? "正在识别，请稍候"
+    : !visionAssignment?.providerProfile
+      ? "请先到 API 设置绑定商品识图模型"
+      : selectedCount === 0
+        ? "请先上传并选择参与识别的参考图"
+        : "";
+  const reanalyzeDisabledReason = analyzing
+    ? "正在识别，请稍候"
+    : !identity
+      ? "还没有可重新识别的产品身份证"
+      : "";
+  const planningDisabledReason = planning
+    ? "正在生成策划，请稍候"
+    : !planningAssignment?.providerProfile
+      ? "请先到 API 设置绑定策划模型"
+      : !identity
+        ? "请先完成商品识别"
+        : "";
+  const generationReason = !generationAssignment?.providerProfile
+    ? "请先到 API 设置绑定图片生成模型"
+    : generationReferenceCount === 0
+      ? "请先选择参与生成的参考图"
+      : generationReferenceCount > 4
+        ? "参与生成的参考图最多 4 张"
+        : generatingImage
+          ? "图片生成处理中"
+          : "准备就绪";
   return (
     <div className="mt-5 space-y-5 border-t border-zinc-800 pt-4">
       <section>
@@ -846,7 +895,9 @@ function WorkflowPanel({
         <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             onClick={() => onAnalyze({ force: false })}
-            disabled={analyzing || !visionAssignment?.providerProfile}
+            disabled={Boolean(analyzeDisabledReason)}
+            title={analyzeDisabledReason || "开始商品识别"}
+            data-testid="analyze-product-button"
             className="flex items-center justify-center gap-2 bg-zinc-100 px-3 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white disabled:bg-zinc-800 disabled:text-zinc-500"
           >
             {analyzing ? <FaSpinner className="animate-spin" /> : <FaEye />}
@@ -854,12 +905,14 @@ function WorkflowPanel({
           </button>
           <button
             onClick={() => onAnalyze({ force: true })}
-            disabled={analyzing || !identity}
+            disabled={Boolean(reanalyzeDisabledReason)}
+            title={reanalyzeDisabledReason || "重新识别商品"}
             className="border border-zinc-800 px-3 py-2.5 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600"
           >
             重新识别
           </button>
         </div>
+        <DisabledReason reason={analyzeDisabledReason || reanalyzeDisabledReason} />
         <p className="mt-3 text-sm text-zinc-500">
           状态：{analysisStatus(identity, visionAssignment, analyzing)}
         </p>
@@ -878,12 +931,15 @@ function WorkflowPanel({
         </p>
         <button
           onClick={() => onGenerate({ force: hasPlans })}
-          disabled={planning || !planningAssignment?.providerProfile || !identity}
+          disabled={Boolean(planningDisabledReason)}
+          title={planningDisabledReason || "生成五张主图策划"}
+          data-testid="generate-plans-button"
           className="mt-3 flex w-full items-center justify-center gap-2 bg-emerald-500 px-3 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-500"
         >
           {planning ? <FaSpinner className="animate-spin" /> : <FaLightbulb />}
           {hasPlans ? "重新生成 5 张策划" : "生成 5 张主图策划"}
         </button>
+        <DisabledReason reason={planningDisabledReason} />
       </section>
 
       <section>
@@ -895,10 +951,38 @@ function WorkflowPanel({
             : "未配置"}
         </p>
         <p className="mt-2 text-sm text-zinc-500">
-          状态：{generationAssignment?.providerProfile ? (generatingImage ? "正在生成" : "准备生成") : "等待配置图片模型"}
+          状态：{generationReason}
         </p>
       </section>
     </div>
+  );
+}
+
+function StageProgress({ steps }) {
+  return (
+    <section className="mt-5 border-t border-zinc-800 pt-4">
+      <h2 className="text-base font-semibold text-white">四步流程</h2>
+      <ol className="mt-3 space-y-2">
+        {steps.map((step) => (
+          <li
+            key={step.index}
+            className={`border px-3 py-2 text-sm ${
+              step.status === "current"
+                ? "border-sky-700 bg-sky-950/30 text-sky-100"
+                : step.status === "complete"
+                  ? "border-emerald-800 bg-emerald-950/20 text-emerald-100"
+                  : "border-zinc-800 bg-zinc-950 text-zinc-500"
+            }`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <span className="font-semibold">{step.index} {step.label}</span>
+              <span>{formatStepStatus(step.status)}</span>
+            </div>
+            {step.reason && <p className="mt-1 text-xs text-zinc-400">{step.reason}</p>}
+          </li>
+        ))}
+      </ol>
+    </section>
   );
 }
 
@@ -1100,6 +1184,8 @@ function PlanningSection({
             <button
               key={tab.index}
               onClick={() => onSelectPlan(tab.index)}
+              data-testid={`plan-tab-${tab.index}`}
+              data-active={active ? "true" : "false"}
               className={`min-h-20 border px-3 py-2 text-left text-sm ${
                 active
                   ? "border-emerald-500 bg-emerald-950/30 text-emerald-100"
@@ -1197,6 +1283,8 @@ function PlanningSection({
             {planDirty && <p className="mb-2 text-sm text-amber-300">有未保存修改</p>}
             <button
               disabled={savingPlan}
+              data-testid="save-plan-button"
+              data-plan-id={selectedPlan?.id || ""}
               className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:bg-zinc-800"
 	            >
 	              {savingPlan ? <FaSpinner className="animate-spin" /> : <FaSave />}
@@ -1243,6 +1331,7 @@ function GenerationSummaryBar({ summary, onDownloadPreferredZip }) {
           type="button"
           onClick={onDownloadPreferredZip}
           disabled={!summary?.zipReady}
+          data-testid="download-preferred-zip-button"
           className="flex items-center justify-center gap-2 border border-emerald-800 px-3 py-2 font-semibold text-emerald-200 hover:border-emerald-500 disabled:border-zinc-800 disabled:text-zinc-600"
         >
           <FaDownload />
@@ -1278,6 +1367,21 @@ function GenerationPanel({
   const provider = generationAssignment?.providerProfile;
   const latestRun = generationInfo?.latestRun;
   const latestImage = generationInfo?.latestImage;
+  const generateDisabledReason = generatingImage
+    ? "图片生成处理中"
+    : !provider
+      ? "请先到 API 设置绑定图片生成模型"
+      : !provider.supportsReferenceImages
+        ? "当前图片生成协议不会真实传递参考图"
+        : !identity
+          ? "请先完成商品识别"
+          : !selectedPlan
+            ? "请先选择一条主图策划"
+            : generationReferenceCount === 0
+              ? "请先选择参与生成的参考图"
+              : generationReferenceCount > 4
+                ? "参与生成的参考图最多 4 张"
+                : "";
   const canGenerate =
     provider &&
     provider.supportsReferenceImages &&
@@ -1302,12 +1406,20 @@ function GenerationPanel({
       </div>
 
       <div className="grid gap-3 md:grid-cols-4">
-        <Info label="图片模型" value={provider ? `${provider.name} / ${provider.modelId}` : "未配置"} />
-        <Info label="协议" value={formatProtocol(provider?.protocol || "未配置")} />
         <Info label="参考图能力" value={formatReferenceSupport(provider)} />
         <Info label="比例" value={project.aspectRatio || "1:1"} />
         <Info label="参考图" value={`${generationReferenceCount}/4`} />
       </div>
+      <details className="mt-3 border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-400">
+        <summary className="cursor-pointer font-semibold text-zinc-200">高级信息</summary>
+        <div className="mt-3 grid gap-3 md:grid-cols-3">
+          <Info label="服务商" value={provider?.provider || "未配置"} />
+          <Info label="模型 ID" value={provider?.modelId || "未配置"} />
+          <Info label="接口协议" value={formatProtocol(provider?.protocol || "未配置")} />
+          <Info label="上次 fingerprint" value={latestRun?.inputFingerprint || "无"} />
+          <Info label="上次 run ID" value={latestRun?.id || "无"} />
+        </div>
+      </details>
 
       <div className="mt-3 grid gap-3 sm:grid-cols-[160px_1fr_1fr]">
         <Field label="分辨率">
@@ -1324,6 +1436,9 @@ function GenerationPanel({
           type="button"
           onClick={() => onGenerateImage({ force: false })}
           disabled={!canGenerate}
+          title={generateDisabledReason || "生成当前策划图片"}
+          data-testid="generate-current-image-button"
+          data-plan-id={selectedPlan?.id || ""}
           className="flex items-center justify-center gap-2 bg-sky-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-sky-400 disabled:bg-zinc-800 disabled:text-zinc-500"
         >
           {generatingImage ? <FaSpinner className="animate-spin" /> : <FaImage />}
@@ -1333,11 +1448,15 @@ function GenerationPanel({
           type="button"
           onClick={() => onGenerateImage({ force: true })}
           disabled={!canGenerate || !latestImage}
+          title={!latestImage ? "当前策划还没有旧候选图" : generateDisabledReason || "强制重新生成当前图片"}
+          data-testid="force-generate-current-image-button"
+          data-plan-id={selectedPlan?.id || ""}
           className="border border-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600"
         >
           强制重新生成
         </button>
       </div>
+      <DisabledReason reason={generateDisabledReason || (!latestImage ? "" : "")} />
 
       {latestRun?.status === "processing" && latestRun.mode === "async" && (
         <button
@@ -1416,7 +1535,7 @@ function CandidateHistory({
       ) : (
         <div className="grid gap-3 md:grid-cols-2">
           {candidates.map((candidate) => (
-            <div key={candidate.id} className="border border-zinc-800 bg-zinc-950 p-3">
+            <div key={candidate.id} data-testid="candidate-card" className="border border-zinc-800 bg-zinc-950 p-3">
               <div className="relative aspect-square bg-black">
                 <Image
                   src={candidate.url}
@@ -1438,7 +1557,9 @@ function CandidateHistory({
                 </div>
               </div>
 
-              <div className="mt-3 grid gap-2 text-sm sm:grid-cols-2">
+              <details className="mt-3 border border-zinc-800 bg-zinc-900 p-2 text-sm text-zinc-400">
+                <summary className="cursor-pointer font-semibold text-zinc-200">高级信息</summary>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <Info label="生成时间" value={formatDate(candidate.createdAt)} />
                 <Info label="状态" value={formatRunStatus(candidate.run?.status || "completed")} />
                 <Info label="服务商" value={candidate.run?.provider || "未知"} />
@@ -1449,12 +1570,15 @@ function CandidateHistory({
                 <Info label="输入是否过期" value={candidate.run?.usedStaleInput ? "是" : "否"} />
                 <Info label="强制版本" value={candidate.isForcedVersion ? "是" : "否"} />
                 <Info label="新版本" value={candidate.isNewVersion ? "是" : "否"} />
-              </div>
+                </div>
+              </details>
 
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <button
                   type="button"
                   onClick={() => onDownloadCandidate(candidate)}
+                  data-testid="download-candidate-button"
+                  data-plan-id={candidate.imagePlanId || ""}
                   className="flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-200 hover:text-white"
                 >
                   <FaDownload />
@@ -1463,6 +1587,8 @@ function CandidateHistory({
                 <button
                   type="button"
                   onClick={() => onSetPreferredCandidate(candidate)}
+                  data-testid="set-preferred-candidate-button"
+                  data-plan-id={candidate.imagePlanId || ""}
                   className={`flex items-center justify-center gap-2 px-3 py-2 text-sm font-semibold ${
                     candidate.isPreferred
                       ? "border border-emerald-700 text-emerald-200 hover:border-emerald-500"
@@ -1476,6 +1602,8 @@ function CandidateHistory({
                   type="button"
                   onClick={() => onDeleteCandidate(candidate)}
                   disabled={candidate.isPreferred}
+                  data-testid="delete-candidate-button"
+                  data-plan-id={candidate.imagePlanId || ""}
                   className="flex items-center justify-center gap-2 border border-red-900 px-3 py-2 text-sm font-semibold text-red-200 hover:border-red-600 disabled:border-zinc-800 disabled:text-zinc-600"
                 >
                   <FaTrash />
@@ -1612,6 +1740,59 @@ function generationStatus(identity, selectedPlan, provider, latestRun) {
   if (latestRun?.status === "completed") return "生成成功";
   if (latestRun?.status === "failed") return "生成失败";
   return "准备生成";
+}
+
+function buildWorkflowSteps({ project, identity, planInfo, generationSummary }) {
+  const hasReferences = (project?.referenceImages || []).length > 0;
+  const hasPrimary = (project?.referenceImages || []).some((image) => image.isPrimary);
+  const hasIdentity = Boolean(identity);
+  const hasPlans = planInfo?.plans?.length === 5;
+  const hasGenerated = (generationSummary?.generatedPlanCount || 0) > 0;
+  const zipReady = Boolean(generationSummary?.zipReady);
+
+  const base = [
+    {
+      index: 1,
+      label: "参考图",
+      complete: hasReferences && hasPrimary,
+      reason: hasReferences ? (hasPrimary ? "" : "需要设置主参考图") : "需要上传商品参考图",
+    },
+    {
+      index: 2,
+      label: "商品识别",
+      complete: hasIdentity && !identity?.isStale,
+      reason: !hasReferences || !hasPrimary ? "先完成参考图" : hasIdentity ? (identity?.isStale ? "需要重新识别" : "") : "需要商品识别",
+    },
+    {
+      index: 3,
+      label: "五图策划",
+      complete: hasPlans && !planInfo?.hasStalePlans,
+      reason: !hasIdentity ? "先完成商品识别" : hasPlans ? (planInfo?.hasStalePlans ? "需要重新策划" : "") : "需要生成五张策划",
+    },
+    {
+      index: 4,
+      label: "图片生成与导出",
+      complete: zipReady,
+      reason: !hasPlans ? "先生成五张策划" : zipReady ? "" : hasGenerated ? "等待五张首选图" : "需要逐张生成图片",
+    },
+  ];
+
+  const currentIndex = base.find((step) => !step.complete)?.index || 4;
+  return base.map((step) => ({
+    ...step,
+    status: step.complete ? "complete" : step.index === currentIndex ? "current" : "pending",
+  }));
+}
+
+function formatStepStatus(status) {
+  if (status === "complete") return "已完成";
+  if (status === "current") return "当前步骤";
+  return "等待";
+}
+
+function DisabledReason({ reason }) {
+  if (!reason) return null;
+  return <p className="mt-2 text-xs text-amber-300">暂不可用：{reason}</p>;
 }
 
 function formatDate(value) {

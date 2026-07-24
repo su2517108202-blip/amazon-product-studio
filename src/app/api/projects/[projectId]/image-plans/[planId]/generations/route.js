@@ -21,22 +21,22 @@ import {
 async function loadGenerationContext(projectId, planId, userId) {
   const project = await prisma.project.findFirst({
     where: { id: projectId, userId },
-    include: {
-      productIdentity: true,
-      referenceImages: {
-        orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
-      },
-      imagePlans: {
-        where: { id: planId },
-        take: 1,
-      },
-    },
   });
 
   if (!project) throw new ProviderError("PROJECT_NOT_FOUND", "未找到项目");
-  const imagePlan = project.imagePlans[0];
+  const [productIdentity, referenceImages, imagePlan] = await Promise.all([
+    prisma.productIdentity.findUnique({ where: { projectId } }),
+    prisma.referenceImage.findMany({
+      where: { projectId },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+    }),
+    prisma.imagePlan.findFirst({ where: { id: planId, projectId } }),
+  ]);
   if (!imagePlan) throw new ProviderError("MISSING_IMAGE_PLAN", "未找到图片策划");
-  return { project, imagePlan };
+  return {
+    project: { ...project, productIdentity, referenceImages },
+    imagePlan,
+  };
 }
 
 export async function GET(_req, context) {
