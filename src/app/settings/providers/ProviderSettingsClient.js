@@ -16,6 +16,7 @@ import {
   CAPABILITIES,
   IMAGE_GENERATION_PROTOCOLS,
   PROVIDER_DEFAULTS,
+  inferProviderDraftSettings,
 } from "@/lib/provider-profiles";
 
 const EMPTY_FORM = {
@@ -50,6 +51,7 @@ export default function ProviderSettingsClient() {
   const [draftModels, setDraftModels] = useState([]);
   const [modelSearch, setModelSearch] = useState("");
   const [manualModel, setManualModel] = useState(false);
+  const [lockedRoles, setLockedRoles] = useState({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [storage, setStorage] = useState({
@@ -116,6 +118,23 @@ export default function ProviderSettingsClient() {
       modelId: "",
       name: current.name || `${defaults.name} 配置`,
     }));
+  }
+
+  function applyModelSelection(modelId) {
+    setForm((current) => {
+      const inferred = inferProviderDraftSettings({
+        provider: current.provider,
+        modelId,
+        protocol: current.protocol,
+        capabilities: current.capabilities,
+      });
+      return {
+        ...current,
+        modelId,
+        protocol: inferred.protocol,
+        capabilities: inferred.capabilities,
+      };
+    });
   }
 
   function toggleCapability(capability) {
@@ -287,6 +306,38 @@ export default function ProviderSettingsClient() {
     }
   }
 
+  function toggleRoleLock(role) {
+    setLockedRoles((current) => ({ ...current, [role]: !current[role] }));
+  }
+
+  async function recommendRoles() {
+    setBusyAction("recommend-roles");
+    setError("");
+    setMessage("");
+    try {
+      let changed = 0;
+      for (const role of ROLE_ORDER) {
+        if (lockedRoles[role]) continue;
+        const current = assignmentMap[role]?.providerProfile;
+        const recommended = pickRecommendedProfile(role, profiles, current);
+        if (recommended && recommended.id !== assignmentMap[role]?.providerProfileId) {
+          await runJson(`/api/model-role-assignments/${role}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ providerProfileId: recommended.id }),
+          });
+          changed += 1;
+        }
+      }
+      await loadData();
+      setMessage(changed > 0 ? `已推荐并更新 ${changed} 个角色。` : "当前角色绑定已是推荐状态。");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
   async function storageAction(action, extra = {}) {
     setBusyAction(action);
     setError("");
@@ -403,33 +454,18 @@ export default function ProviderSettingsClient() {
               />
             </Field>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <Field label="协议">
-                <input
-                  list="provider-protocol-options"
-                  value={form.protocol}
-                  onChange={(event) => patchForm({ protocol: event.target.value })}
-                  className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
-                />
-                <datalist id="provider-protocol-options">
-                  <option value="openai-compatible" />
-                  {IMAGE_GENERATION_PROTOCOLS.map((protocol) => (
-                    <option key={protocol} value={protocol} />
-                  ))}
-                </datalist>
-              </Field>
-              <Field label="模型 ID">
+            <Field label="模型 ID">
                 {manualModel ? (
                   <input
                     value={form.modelId}
-                    onChange={(event) => patchForm({ modelId: event.target.value })}
+                    onChange={(event) => applyModelSelection(event.target.value)}
                     className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
                     required
                   />
                 ) : (
                   <select
                     value={form.modelId}
-                    onChange={(event) => patchForm({ modelId: event.target.value })}
+                    onChange={(event) => applyModelSelection(event.target.value)}
                     className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
                     required
                   >
@@ -444,8 +480,7 @@ export default function ProviderSettingsClient() {
                     )}
                   </select>
                 )}
-              </Field>
-            </div>
+            </Field>
 
             {draftModels.length > 0 && !manualModel && (
               <div className="flex items-center gap-2">
@@ -478,19 +513,38 @@ export default function ProviderSettingsClient() {
               </Field>
             </div>
 
-            <div>
-              <span className="mb-2 block text-[13px] font-semibold uppercase text-zinc-500">
-                能力
-              </span>
-              <div className="grid grid-cols-2 gap-2">
-                {CAPABILITIES.map((capability) => (
-                  <label key={capability} className="flex items-center gap-2 border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm">
-                    <input checked={form.capabilities.includes(capability)} onChange={() => toggleCapability(capability)} type="checkbox" />
-                    {capability}
-                  </label>
-                ))}
+            <details className="border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-400">
+              <summary className="cursor-pointer font-semibold text-zinc-200">高级设置：协议与模型能力</summary>
+              <div className="mt-3 grid gap-3">
+                <Field label="协议">
+                  <input
+                    list="provider-protocol-options"
+                    value={form.protocol}
+                    onChange={(event) => patchForm({ protocol: event.target.value })}
+                    className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
+                  />
+                  <datalist id="provider-protocol-options">
+                    <option value="openai-compatible" />
+                    {IMAGE_GENERATION_PROTOCOLS.map((protocol) => (
+                      <option key={protocol} value={protocol} />
+                    ))}
+                  </datalist>
+                </Field>
+                <div>
+                  <span className="mb-2 block text-[13px] font-semibold uppercase text-zinc-500">
+                    自动识别能力，可手动修正
+                  </span>
+                  <div className="grid grid-cols-2 gap-2">
+                    {CAPABILITIES.map((capability) => (
+                      <label key={capability} className="flex items-center gap-2 border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm">
+                        <input checked={form.capabilities.includes(capability)} onChange={() => toggleCapability(capability)} type="checkbox" />
+                        {capability}
+                      </label>
+                    ))}
+                  </div>
+                </div>
               </div>
-            </div>
+            </details>
 
             <label className="flex items-center gap-2 text-sm font-semibold text-zinc-300">
               <input checked={form.enabled} onChange={(event) => patchForm({ enabled: event.target.checked })} type="checkbox" />
@@ -567,7 +621,19 @@ export default function ProviderSettingsClient() {
           </section>
 
           <section className="border border-zinc-800 bg-zinc-900/35 p-4">
-            <h2 className="mb-4 flex items-center gap-2 text-sm font-semibold text-white"><FaWrench /> 三角色绑定</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="flex items-center gap-2 text-sm font-semibold text-white"><FaWrench /> 三角色绑定</h2>
+              <button
+                type="button"
+                onClick={recommendRoles}
+                disabled={busyAction === "recommend-roles"}
+                data-testid="recommend-roles-button"
+                className="inline-flex items-center gap-2 border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-200 hover:border-emerald-500 disabled:border-zinc-800 disabled:text-zinc-600"
+              >
+                {busyAction === "recommend-roles" ? <FaSpinner className="animate-spin" /> : <FaCheck />}
+                一键推荐三角色
+              </button>
+            </div>
             <div className="grid gap-3 lg:grid-cols-3">
               {ROLE_ORDER.map((role) => {
                 const current = assignmentMap[role];
@@ -575,7 +641,18 @@ export default function ProviderSettingsClient() {
                 const unavailable = profiles.filter((profile) => !roleAvailable(role, profile).ok);
                 return (
                   <article key={role} className="border border-zinc-800 bg-zinc-950 p-4">
-                    <h3 className="text-sm font-semibold text-white">{ROLE_LABELS[role]}</h3>
+                    <div className="flex items-center justify-between gap-3">
+                      <h3 className="text-sm font-semibold text-white">{ROLE_LABELS[role]}</h3>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-zinc-400">
+                        <input
+                          checked={Boolean(lockedRoles[role])}
+                          onChange={() => toggleRoleLock(role)}
+                          data-testid={`role-lock-${role}`}
+                          type="checkbox"
+                        />
+                        锁定
+                      </label>
+                    </div>
                     <p className="mt-1 min-h-12 text-sm text-zinc-500">
                       {current?.providerProfile
                         ? `${providerName(current.providerProfile.provider)} · ${current.providerProfile.name} · ${current.providerProfile.modelId} · ${roleAvailable(role, current.providerProfile).label}`
@@ -672,6 +749,35 @@ function roleAvailable(role, profile) {
     }
   }
   return { ok: true, reason: "", label: "能力可用" };
+}
+
+function pickRecommendedProfile(role, profiles, current) {
+  if (current && roleAvailable(role, current).ok) return current;
+  const candidates = profiles.filter((profile) => roleAvailable(role, profile).ok);
+  if (candidates.length === 0) return null;
+  return [...candidates].sort((a, b) => roleScore(role, b) - roleScore(role, a))[0];
+}
+
+function roleScore(role, profile) {
+  const capabilities = profile.capabilities || [];
+  let score = profile.enabled ? 10 : 0;
+  if (role === "product_vision") {
+    if (capabilities.includes("vision")) score += 20;
+    if (capabilities.includes("text")) score += 4;
+    if (capabilities.includes("image") || capabilities.includes("asyncImage")) score -= 4;
+    if (profile.provider === "openai" || profile.provider === "gemini") score += 2;
+  }
+  if (role === "image_planning") {
+    if (capabilities.includes("text")) score += 20;
+    if (capabilities.includes("reasoning")) score += 6;
+    if (!capabilities.includes("image")) score += 2;
+  }
+  if (role === "image_generation") {
+    if (capabilities.includes("image")) score += 20;
+    if (profile.supportsReferenceImages) score += 10;
+    if (profile.provider === "gemini" || profile.protocol === "openai-image-edit") score += 2;
+  }
+  return score;
 }
 
 function formatBytes(bytes) {

@@ -18,6 +18,60 @@ export const IMAGE_GENERATION_PROTOCOLS = [
   "generic-async-image",
 ];
 
+export function inferModelCapabilities(provider, modelId = "") {
+  const model = String(modelId || "").toLowerCase();
+  const defaults = getProviderDefaults(provider).capabilities;
+  const capabilities = new Set(defaults.includes("reasoning") ? ["text", "reasoning"] : ["text"]);
+
+  if (
+    provider === "gemini" ||
+    /\b(gpt-4o|o3|o4|vision|vl|visual|multimodal|omni|gemini|pixtral)\b/.test(model)
+  ) {
+    capabilities.add("vision");
+  }
+
+  if (/(gpt-image|dall-e|image|imagen|nano-banana|seedream|kolors|flux|stable-diffusion|sdxl)/.test(model)) {
+    capabilities.add("image");
+  }
+
+  if (/(async|task|seedream|doubao|volc|ark)/.test(model) || provider === "doubao") {
+    capabilities.add("asyncImage");
+  }
+
+  if (provider === "deepseek") {
+    capabilities.delete("vision");
+    capabilities.delete("image");
+    capabilities.delete("asyncImage");
+  }
+
+  return [...capabilities].filter((capability) => CAPABILITIES.includes(capability));
+}
+
+export function inferProviderProtocol(provider, modelId = "", capabilities = []) {
+  const model = String(modelId || "").toLowerCase();
+  if (provider === "gemini" && capabilities.includes("image")) return "gemini-native-image";
+  if (provider === "openai" && capabilities.includes("image")) return "openai-image-edit";
+  if (provider === "openai-compatible" && capabilities.includes("image")) return "openai-image-edit";
+  if (provider === "doubao" || capabilities.includes("asyncImage") || /(seedream|doubao|volc|ark)/.test(model)) {
+    return "doubao-image";
+  }
+  return getProviderDefaults(provider).protocol;
+}
+
+export function inferProviderDraftSettings({ provider, modelId, protocol, capabilities } = {}) {
+  const inferredCapabilities = inferModelCapabilities(provider, modelId);
+  const nextCapabilities =
+    inferredCapabilities.length > 0
+      ? inferredCapabilities
+      : Array.isArray(capabilities) && capabilities.length > 0
+        ? capabilities
+        : getProviderDefaults(provider).capabilities;
+  return {
+    capabilities: nextCapabilities,
+    protocol: inferProviderProtocol(provider, modelId, nextCapabilities) || protocol,
+  };
+}
+
 export const MODEL_ROLES = {
   product_vision: {
     label: "商品识图",

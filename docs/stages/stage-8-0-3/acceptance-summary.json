@@ -1,0 +1,12 @@
+{
+  "branch": "codex/stage-8-0-3-auto-match-drag-drop",
+  "paidProviderCalls": 0,
+  "homeClickUpload": true,
+  "workspaceDragUpload": true,
+  "workspacePasteUpload": true,
+  "modelCapabilityAutoDetect": true,
+  "roleRecommendationPreservesLockedRoles": true,
+  "workspaceThreeColumnLayout": true,
+  "mobileChecked": true,
+  "preservedLocalNoLoginProjectsGalleryResultManagement": true
+}

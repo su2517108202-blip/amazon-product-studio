@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   FaCopy,
   FaFolderOpen,
@@ -23,12 +24,16 @@ const EMPTY_FORM = {
 };
 
 export default function ProjectsHomePage() {
+  const router = useRouter();
   const [projects, setProjects] = useState([]);
   const [assignments, setAssignments] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [quickUploading, setQuickUploading] = useState(false);
+  const [draggingQuickUpload, setDraggingQuickUpload] = useState(false);
   const [error, setError] = useState("");
+  const quickInputRef = useRef(null);
 
   const fetchProjects = useCallback(async () => {
     setLoading(true);
@@ -83,6 +88,65 @@ export default function ProjectsHomePage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  const quickUploadFiles = useCallback(async (files) => {
+    const incoming = Array.from(files || []).filter((file) => file?.type?.startsWith("image/"));
+    if (!incoming.length) return;
+    setQuickUploading(true);
+    setError("");
+    try {
+      const fallbackName = incoming[0]?.name?.replace(/\.[^.]+$/, "") || "未命名商品";
+      const projectPayload = {
+        ...form,
+        name: form.name.trim() || fallbackName,
+        productName: form.productName.trim() || fallbackName,
+      };
+      const projectRes = await fetch("/api/projects", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(projectPayload),
+      });
+      const projectData = await projectRes.json();
+      if (!projectRes.ok) throw new Error(projectData.error || "无法创建项目");
+
+      const uploadData = new FormData();
+      incoming.forEach((file) => uploadData.append("files", file));
+      uploadData.append("imageRole", "other");
+      const uploadRes = await fetch(`/api/projects/${projectData.id}/reference-images`, {
+        method: "POST",
+        body: uploadData,
+      });
+      const uploaded = await uploadRes.json();
+      if (!uploadRes.ok) throw new Error(uploaded.error || "无法上传参考图");
+      setProjects((current) => [projectData, ...current]);
+      router.push(`/projects/${projectData.id}`);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setQuickUploading(false);
+      setDraggingQuickUpload(false);
+      if (quickInputRef.current) quickInputRef.current.value = "";
+    }
+  }, [form, router]);
+
+  useEffect(() => {
+    const onPaste = (event) => {
+      const files = Array.from(event.clipboardData?.files || []).filter((file) =>
+        file.type.startsWith("image/"),
+      );
+      if (!files.length) return;
+      event.preventDefault();
+      quickUploadFiles(files);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [quickUploadFiles]);
+
+  function handleQuickDrop(event) {
+    event.preventDefault();
+    setDraggingQuickUpload(false);
+    quickUploadFiles(Array.from(event.dataTransfer?.files || []));
   }
 
   async function duplicateProject(projectId) {
@@ -200,6 +264,45 @@ export default function ProjectsHomePage() {
               新建商品项目
             </button>
           </form>
+
+          <input
+            ref={quickInputRef}
+            type="file"
+            multiple
+            accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+            className="hidden"
+            data-testid="home-quick-file-input"
+            onChange={(event) => quickUploadFiles(Array.from(event.target.files || []))}
+          />
+
+          <button
+            type="button"
+            onClick={() => quickInputRef.current?.click()}
+            onDrop={handleQuickDrop}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setDraggingQuickUpload(true);
+            }}
+            onDragEnter={(event) => {
+              event.preventDefault();
+              setDraggingQuickUpload(true);
+            }}
+            onDragLeave={(event) => {
+              event.preventDefault();
+              setDraggingQuickUpload(false);
+            }}
+            data-testid="home-quick-upload-zone"
+            className={`mt-5 flex min-h-36 w-full flex-col items-center justify-center border border-dashed px-4 py-5 text-center transition ${
+              draggingQuickUpload
+                ? "border-emerald-500 bg-emerald-950/30 text-emerald-100"
+                : "border-zinc-800 bg-zinc-950/50 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
+            }`}
+          >
+            {quickUploading ? <FaSpinner className="mb-3 animate-spin text-2xl" /> : <FaImage className="mb-3 text-2xl" />}
+            <span className="text-sm font-bold">
+              {quickUploading ? "正在创建项目并上传" : "拖入商品图、点击选择，或 Ctrl+V 粘贴"}
+            </span>
+          </button>
 
           {error && (
             <p className="mt-4 border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">

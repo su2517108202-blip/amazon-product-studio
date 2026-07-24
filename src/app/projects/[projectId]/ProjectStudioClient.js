@@ -87,11 +87,15 @@ export default function ProjectStudioClient({ projectId }) {
   const [generatingImage, setGeneratingImage] = useState(false);
   const [generationResolution, setGenerationResolution] = useState("1K");
   const [planDirty, setPlanDirty] = useState(false);
+  const [draggingUpload, setDraggingUpload] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const fileInputRef = useRef(null);
+  const fetchRequestIdRef = useRef(0);
 
   const fetchProject = useCallback(async () => {
+    const requestId = fetchRequestIdRef.current + 1;
+    fetchRequestIdRef.current = requestId;
     setError("");
     const projectRes = await fetch(`/api/projects/${projectId}`);
     const identityRes = await fetch(`/api/projects/${projectId}/product-identity`);
@@ -116,6 +120,7 @@ export default function ProjectStudioClient({ projectId }) {
     if (!plansRes.ok) throw new Error(plansData.error || "无法读取主图策划");
     if (!planningRunsRes.ok) throw new Error(planningRunsData.error || "无法读取策划记录");
     if (!summaryRes.ok) throw new Error(summaryData.error || "无法读取生成摘要");
+    if (requestId !== fetchRequestIdRef.current) return;
 
     setProject(projectData);
     setDraft({
@@ -160,6 +165,7 @@ export default function ProjectStudioClient({ projectId }) {
       if (!candidatesRes.ok) {
         throw new Error(candidatesData.error || "无法读取候选图历史");
       }
+      if (requestId !== fetchRequestIdRef.current) return;
       setGenerationInfo(generationData);
       setCandidateInfo(candidatesData);
     } else {
@@ -293,14 +299,15 @@ export default function ProjectStudioClient({ projectId }) {
     }
   }
 
-  async function uploadFiles(files) {
-    if (!files.length) return;
+  const uploadFiles = useCallback(async (files) => {
+    const incoming = Array.from(files || []).filter((file) => file?.type?.startsWith("image/"));
+    if (!incoming.length) return;
     setUploading(true);
     setError("");
     setMessage("");
     try {
       const formData = new FormData();
-      files.forEach((file) => formData.append("files", file));
+      incoming.forEach((file) => formData.append("files", file));
       formData.append("imageRole", "other");
 
       const res = await fetch(`/api/projects/${projectId}/reference-images`, {
@@ -317,7 +324,21 @@ export default function ProjectStudioClient({ projectId }) {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
-  }
+  }, [fetchProject, projectId]);
+
+  useEffect(() => {
+    if (!project) return undefined;
+    const onPaste = (event) => {
+      const files = Array.from(event.clipboardData?.files || []).filter((file) =>
+        file.type.startsWith("image/"),
+      );
+      if (!files.length) return;
+      event.preventDefault();
+      uploadFiles(files);
+    };
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [project, uploadFiles]);
 
   async function updateImage(imageId, payload) {
     setError("");
@@ -647,7 +668,7 @@ export default function ProjectStudioClient({ projectId }) {
 
   return (
     <main className="flex-1 overflow-y-auto bg-zinc-950 text-zinc-100">
-      <div className="mx-auto grid max-w-7xl gap-5 px-4 py-5 xl:grid-cols-[320px_1fr_300px]">
+      <div className="mx-auto grid max-w-[1760px] gap-5 px-4 py-5 xl:grid-cols-[360px_minmax(0,1fr)_340px]">
         <aside className="border border-zinc-800 bg-zinc-900/45 p-4">
           <Link
             href="/"
@@ -710,6 +731,19 @@ export default function ProjectStudioClient({ projectId }) {
             </button>
           </form>
 
+          <ReferenceImages
+            fileInputRef={fileInputRef}
+            project={project}
+            uploading={uploading}
+            selectedCount={selectedCount}
+            generationReferenceCount={generationReferenceCount}
+            draggingUpload={draggingUpload}
+            onDragState={setDraggingUpload}
+            onUpload={uploadFiles}
+            onUpdate={updateImage}
+            onDelete={deleteImage}
+          />
+
           <StageProgress steps={workflowSteps} />
 
           <WorkflowPanel
@@ -741,17 +775,6 @@ export default function ProjectStudioClient({ projectId }) {
         </aside>
 
         <section className="min-w-0 space-y-5">
-          <ReferenceImages
-            fileInputRef={fileInputRef}
-            project={project}
-            uploading={uploading}
-            selectedCount={selectedCount}
-            generationReferenceCount={generationReferenceCount}
-            onUpload={uploadFiles}
-            onUpdate={updateImage}
-            onDelete={deleteImage}
-          />
-
           <PlanningSection
             plans={plans}
             planForm={planForm}
@@ -776,12 +799,7 @@ export default function ProjectStudioClient({ projectId }) {
             onResolutionChange={setGenerationResolution}
             onGenerateImage={generateCurrentImage}
             onCheckGeneration={checkCurrentGeneration}
-            onSetPreferredCandidate={setPreferredCandidate}
-            onDeleteCandidate={deleteCandidate}
-            onDownloadCandidate={downloadCandidate}
             onDownloadPreferredZip={downloadPreferredZip}
-            onLoadMoreCandidates={loadMoreCandidates}
-            loadingMoreCandidates={loadingMoreCandidates}
           />
 
           <IdentitySection
@@ -794,6 +812,15 @@ export default function ProjectStudioClient({ projectId }) {
         </section>
 
         <aside className="border border-zinc-800 bg-zinc-900/45 p-4 xl:sticky xl:top-24 xl:self-start">
+          <CandidateHistory
+            candidateInfo={candidateInfo}
+            onSetPreferredCandidate={setPreferredCandidate}
+            onDeleteCandidate={deleteCandidate}
+            onDownloadCandidate={downloadCandidate}
+            onLoadMoreCandidates={loadMoreCandidates}
+            loadingMoreCandidates={loadingMoreCandidates}
+          />
+          <div className="mt-5 border-t border-zinc-800 pt-4">
           <h2 className="text-base font-semibold text-white">调用统计</h2>
           <dl className="mt-4 space-y-3 text-sm">
             <Info label="识别成功" value={`${successfulRuns.length}`} />
@@ -831,6 +858,7 @@ export default function ProjectStudioClient({ projectId }) {
                 {run.errorCode && <p className="mt-1 text-red-300">{run.errorCode}</p>}
               </div>
             ))}
+          </div>
           </div>
         </aside>
       </div>
@@ -992,16 +1020,31 @@ function ReferenceImages({
   uploading,
   selectedCount,
   generationReferenceCount,
+  draggingUpload,
+  onDragState,
   onUpload,
   onUpdate,
   onDelete,
 }) {
+  function handleDrop(event) {
+    event.preventDefault();
+    onDragState(false);
+    onUpload(Array.from(event.dataTransfer?.files || []));
+  }
+
+  function handleDrag(event, active) {
+    event.preventDefault();
+    onDragState(active);
+  }
+
   return (
-    <section className="border border-zinc-800 bg-zinc-900/35 p-4">
+    <section className="mt-5 border border-zinc-800 bg-zinc-900/35 p-4">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h1 className="truncate text-xl font-bold text-white">{project.name}</h1>
-          <p className="mt-1 text-sm text-zinc-500">{project.referenceImages.length}/14</p>
+          <h2 className="text-base font-semibold text-white">商品参考图</h2>
+          <p className="mt-1 text-sm text-zinc-500">
+            {project.referenceImages.length}/14 · 可拖拽、点击或 Ctrl+V 上传
+          </p>
         </div>
         <button
           onClick={() => fileInputRef.current?.click()}
@@ -1024,16 +1067,36 @@ function ReferenceImages({
         onChange={(event) => onUpload(Array.from(event.target.files || []))}
       />
 
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        onDrop={handleDrop}
+        onDragOver={(event) => handleDrag(event, true)}
+        onDragEnter={(event) => handleDrag(event, true)}
+        onDragLeave={(event) => handleDrag(event, false)}
+        data-testid="reference-drop-zone"
+        className={`mb-4 flex min-h-28 w-full flex-col items-center justify-center border border-dashed px-4 py-5 text-center transition ${
+          draggingUpload
+            ? "border-emerald-500 bg-emerald-950/30 text-emerald-100"
+            : "border-zinc-800 bg-zinc-950/50 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
+        }`}
+      >
+        <FaImage className="mb-2 text-2xl" />
+        <span className="text-sm font-bold">
+          {uploading ? "正在上传参考图" : "拖入图片、点击选择，或 Ctrl+V 粘贴"}
+        </span>
+      </button>
+
       {project.referenceImages.length === 0 ? (
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="flex min-h-[320px] w-full flex-col items-center justify-center border border-dashed border-zinc-800 bg-zinc-950/50 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
+          className="flex min-h-[220px] w-full flex-col items-center justify-center border border-dashed border-zinc-800 bg-zinc-950/50 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300"
         >
           <FaImage className="mb-3 text-3xl" />
           <span className="text-sm font-bold">添加商品参考图</span>
         </button>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4">
           {project.referenceImages.map((image) => (
             <article
               key={image.id}
@@ -1142,12 +1205,7 @@ function PlanningSection({
   onResolutionChange,
   onGenerateImage,
   onCheckGeneration,
-  onSetPreferredCandidate,
-  onDeleteCandidate,
-  onDownloadCandidate,
   onDownloadPreferredZip,
-  onLoadMoreCandidates,
-  loadingMoreCandidates,
 }) {
   return (
     <section className="border border-zinc-800 bg-zinc-900/35 p-4">
@@ -1303,11 +1361,6 @@ function PlanningSection({
 	              onResolutionChange={onResolutionChange}
 	              onGenerateImage={onGenerateImage}
 	              onCheckGeneration={onCheckGeneration}
-	              onSetPreferredCandidate={onSetPreferredCandidate}
-	              onDeleteCandidate={onDeleteCandidate}
-	              onDownloadCandidate={onDownloadCandidate}
-	              onLoadMoreCandidates={onLoadMoreCandidates}
-	              loadingMoreCandidates={loadingMoreCandidates}
 	            />
 	          </div>
 	        </form>
@@ -1358,11 +1411,6 @@ function GenerationPanel({
   onResolutionChange,
   onGenerateImage,
   onCheckGeneration,
-  onSetPreferredCandidate,
-  onDeleteCandidate,
-  onDownloadCandidate,
-  onLoadMoreCandidates,
-  loadingMoreCandidates,
 }) {
   const provider = generationAssignment?.providerProfile;
   const latestRun = generationInfo?.latestRun;
@@ -1496,14 +1544,6 @@ function GenerationPanel({
         </div>
       )}
 
-      <CandidateHistory
-        candidateInfo={candidateInfo}
-        onSetPreferredCandidate={onSetPreferredCandidate}
-        onDeleteCandidate={onDeleteCandidate}
-        onDownloadCandidate={onDownloadCandidate}
-        onLoadMoreCandidates={onLoadMoreCandidates}
-        loadingMoreCandidates={loadingMoreCandidates}
-      />
     </div>
   );
 }

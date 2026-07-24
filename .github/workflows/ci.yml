@@ -101,6 +101,9 @@ jobs:
       - name: Stage 8.0.2 local usability checks
         run: npm run test:stage-8-0-2
 
+      - name: Stage 8.0.3 auto match drag drop checks
+        run: npm run test:stage-8-0-3
+
       - name: Upload Playwright failure diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -112,6 +115,8 @@ jobs:
             tmp/stage7-2-1-e2e/diagnostics/**
             tmp/stage8-final-e2e/diagnostics/**
             tmp/stage8-0-2-local-usability/diagnostics/**
+            tmp/stage8-0-3-auto-match/diagnostics/**
             docs/stages/stage-7-2-1/ui-acceptance/*.png
             docs/stages/stage-8/ui-acceptance/*.png
             docs/stages/stage-8-0-2/ui-acceptance/*.png
+            docs/stages/stage-8-0-3/ui-acceptance/*.png
