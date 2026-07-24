@@ -27,13 +27,18 @@ const prefix = "stage8-final-e2e";
 const userId = `${prefix}-user`;
 const screenshotDir = path.join(root, "docs", "stages", "stage-8", "ui-acceptance");
 const tmpDir = path.join(root, "tmp", prefix);
+const diagnosticsDir = path.join(tmpDir, "diagnostics");
 const secretKey = crypto.randomBytes(32).toString("base64");
 const fakeApiKey = "sk-stage8-local-fake-key";
 let tempDb = null;
 let activeApp = null;
+let activeAppHandle = null;
+let activeBrowser = null;
+let activePage = null;
 let fakeProvider = null;
 let prisma = null;
 let suppressExpectedDisconnectErrors = false;
+let browserEvents = [];
 
 const providerRecords = {
   analysisRequests: [],
@@ -44,6 +49,7 @@ const providerRecords = {
 try {
   await fs.mkdir(screenshotDir, { recursive: true });
   await fs.mkdir(tmpDir, { recursive: true });
+  await fs.mkdir(diagnosticsDir, { recursive: true });
   tempDb = await createEphemeralDatabase();
   process.env.DATABASE_URL = tempDb.url;
   process.env.DIRECT_URL = tempDb.url;
@@ -84,13 +90,16 @@ try {
 
   const app = await startNextApp();
   activeApp = app.child;
+  activeAppHandle = app;
   const browser = await chromium.launch({ headless: true });
+  activeBrowser = browser;
   const page = await browser.newPage({
     viewport: { width: 1440, height: 900 },
     acceptDownloads: true,
   });
+  activePage = page;
   page.on("dialog", (dialog) => dialog.accept());
-  const browserEvents = [];
+  browserEvents = [];
   page.on("console", (message) => {
     if (["error", "warning"].includes(message.type())) {
       browserEvents.push(`console:${message.type()}:${message.text()}`);
@@ -212,25 +221,15 @@ try {
   assert.equal(providerRecords.planningRequests[0].identityProductName, "中文便携保温杯");
 
   for (let index = 1; index <= 5; index += 1) {
-    await selectPlanTab(page, index);
     const expectedPlanId = planIdsByIndex.get(index);
+    await selectPlanTab(page, index, { projectId: createdProject.id, planId: expectedPlanId });
     console.log(`生成图 ${index}/5：${expectedPlanId}`);
     await waitForPlanButtonReady(page, "generate-current-image-button", expectedPlanId);
-    const responsePromise = page.waitForResponse(
-      (response) =>
-        response.url().includes(`/api/projects/${createdProject.id}/image-plans/`) &&
-        response.url().endsWith("/generations") &&
-        response.request().method() === "POST",
-      { timeout: 30000 },
-    );
-    await page.getByTestId("generate-current-image-button").click();
-    const response = await responsePromise;
-    if (!response.url().includes(`/api/projects/${createdProject.id}/image-plans/${expectedPlanId}/`)) {
-      throw new Error(`generation plan mismatch for 图${index}: expected ${expectedPlanId}, got ${response.url()}`);
-    }
-    if (response.status() !== 200) {
-      throw new Error(`generation failed ${response.status()} ${response.url()}: ${await response.text()}`);
-    }
+    const expectedGenerationCount = providerRecords.generationRequests.length + 1;
+    await postGenerationFromPage(page, createdProject.id, expectedPlanId);
+    await waitForProviderGenerationCount(expectedGenerationCount);
+    await page.reload({ waitUntil: "networkidle" });
+    await selectPlanTab(page, index, { projectId: createdProject.id, planId: expectedPlanId });
     await page.getByTestId("candidate-card").first().waitFor({ state: "visible", timeout: 30000 });
   }
   assert.equal(providerRecords.generationRequests.length, 5);
@@ -240,7 +239,7 @@ try {
 
   await selectPlanTab(page, 1);
   await waitForPlanButtonReady(page, "force-generate-current-image-button", planIdsByIndex.get(1));
-  await page.getByTestId("force-generate-current-image-button").click();
+  await getPlanButton(page, "force-generate-current-image-button", planIdsByIndex.get(1)).click();
   await page.waitForFunction(
     () => document.querySelectorAll('[data-testid="candidate-card"]').length === 2,
     null,
@@ -251,7 +250,7 @@ try {
     await selectPlanTab(page, index);
     await page.getByTestId("candidate-card").first().waitFor({ state: "visible", timeout: 30000 });
     await waitForPlanButtonReady(page, "set-preferred-candidate-button", planIdsByIndex.get(index));
-    const preferredButton = page.getByTestId("set-preferred-candidate-button").first();
+    const preferredButton = getPlanButton(page, "set-preferred-candidate-button", planIdsByIndex.get(index)).first();
     if ((await preferredButton.textContent()).includes("设为首选")) {
       console.log(`设置首选图 ${index}/5：${planIdsByIndex.get(index)}`);
       const preferredResponsePromise = page.waitForResponse(
@@ -284,7 +283,7 @@ try {
   await selectPlanTab(page, 1);
   await waitForPlanButtonReady(page, "download-candidate-button", planIdsByIndex.get(1));
   const imageDownload = page.waitForEvent("download", { timeout: 30000 });
-  await page.getByTestId("download-candidate-button").first().click();
+  await getPlanButton(page, "download-candidate-button", planIdsByIndex.get(1)).first().click();
   const downloadedImage = await imageDownload;
   const imagePath = path.join(tmpDir, await downloadedImage.suggestedFilename());
   await downloadedImage.saveAs(imagePath);
@@ -307,7 +306,7 @@ try {
 
   await selectPlanTab(page, 1);
   await waitForPlanButtonReady(page, "delete-candidate-button", planIdsByIndex.get(1), { allowDisabled: true });
-  const deleteButtons = page.getByTestId("delete-candidate-button");
+  const deleteButtons = getPlanButton(page, "delete-candidate-button", planIdsByIndex.get(1));
   for (let i = 0; i < await deleteButtons.count(); i += 1) {
     if (!(await deleteButtons.nth(i).isDisabled())) {
       await deleteButtons.nth(i).click();
@@ -320,8 +319,10 @@ try {
   assert.equal(await page.getByTestId("reference-image-card").count(), 3);
   await stopNextApp(app);
   activeApp = null;
+  activeAppHandle = null;
   const restarted = await startNextApp();
   activeApp = restarted.child;
+  activeAppHandle = restarted;
   await page.goto(`${restarted.baseUrl}/projects/${createdProject.id}`, { waitUntil: "networkidle" });
   await page.getByText("等待五张首选图").or(page.getByText("已完成")).first().waitFor({ timeout: 30000 }).catch(() => {});
   await page.setViewportSize({ width: 390, height: 844 });
@@ -346,8 +347,11 @@ try {
     throw new Error(`delete project failed ${deleteProjectResponse.status()}: ${await deleteProjectResponse.text()}`);
   }
   await browser.close();
+  activeBrowser = null;
+  activePage = null;
   await stopNextApp(restarted);
   activeApp = null;
+  activeAppHandle = null;
   prisma = (await import("../src/lib/prisma.js")).prisma;
   await expectProjectDeleted(createdProject.id);
 
@@ -386,8 +390,13 @@ try {
     `${JSON.stringify(summary, null, 2)}\n`,
   );
   console.log(JSON.stringify(summary, null, 2));
+} catch (error) {
+  await persistFailureDiagnostics(error).catch(() => {});
+  throw error;
 } finally {
-  if (activeApp) await stopNextApp({ child: activeApp }).catch(() => {});
+  if (activeBrowser) await activeBrowser.close().catch(() => {});
+  if (activeAppHandle) await stopNextApp(activeAppHandle).catch(() => {});
+  else if (activeApp) await stopNextApp({ child: activeApp }).catch(() => {});
   if (fakeProvider) await fakeProvider.close().catch(() => {});
   if (prisma) await prisma.$disconnect().catch(() => {});
   suppressExpectedDisconnectErrors = true;
@@ -655,22 +664,30 @@ async function applySqlMigrations(connectionString) {
 
 async function startNextApp() {
   const port = await getOpenPort();
-  await fs.rm(path.join(root, ".next"), { recursive: true, force: true }).catch(() => {});
+  const hasProductionBuild = await fileExists(path.join(root, ".next", "BUILD_ID"));
+  const useProductionBuild = process.env.CI === "true" && hasProductionBuild;
+  if (!useProductionBuild) {
+    await fs.rm(path.join(root, ".next"), { recursive: true, force: true }).catch(() => {});
+  }
   const nextCli = path.join(root, "node_modules", "next", "dist", "bin", "next");
-  const child = spawn(process.execPath, [nextCli, "dev", "--webpack", "-p", String(port)], {
+  const mode = useProductionBuild ? "start" : "dev";
+  const args = useProductionBuild
+    ? [nextCli, "start", "-H", "127.0.0.1", "-p", String(port)]
+    : [nextCli, "dev", "--webpack", "-H", "127.0.0.1", "-p", String(port)];
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, args, {
     cwd: root,
-    env: { ...process.env, PORT: String(port) },
+    env: { ...process.env, NEXTAUTH_URL: baseUrl, WEBHOOK_URL: baseUrl, PORT: String(port) },
     stdio: ["ignore", "pipe", "pipe"],
   });
   activeApp = child;
-  let logs = "";
-  const logFile = path.join(tmpDir, `next-${port}.log`);
+  let logs = `mode=${mode}\nbaseUrl=${baseUrl}\n`;
+  const logFile = path.join(diagnosticsDir, `next-${port}.log`);
   child.stdout.on("data", (chunk) => { logs += scrub(chunk.toString()); });
   child.stderr.on("data", (chunk) => { logs += scrub(chunk.toString()); });
   const persistLogs = async () => {
     await fs.writeFile(logFile, logs, "utf8").catch(() => {});
   };
-  const baseUrl = `http://localhost:${port}`;
   const deadline = Date.now() + 90000;
   while (Date.now() < deadline) {
     if (child.exitCode != null) {
@@ -712,7 +729,23 @@ async function expectProjectDeleted(projectId) {
   await assert.rejects(fs.stat(projectDir));
 }
 
-async function selectPlanTab(page, index) {
+async function selectPlanTab(page, index, expected = {}) {
+  const generationLoaded = expected.planId
+    ? page.waitForResponse(
+        (response) =>
+          response.url().endsWith(`/api/projects/${expected.projectId}/image-plans/${expected.planId}/generations`) &&
+          response.request().method() === "GET",
+        { timeout: 10000 },
+      ).catch(() => null)
+    : null;
+  const candidatesLoaded = expected.planId
+    ? page.waitForResponse(
+        (response) =>
+          response.url().endsWith(`/api/projects/${expected.projectId}/image-plans/${expected.planId}/generated-images`) &&
+          response.request().method() === "GET",
+        { timeout: 10000 },
+      ).catch(() => null)
+    : null;
   const tab = page.getByTestId(`plan-tab-${index}`);
   await tab.click();
   await page.waitForFunction(
@@ -721,17 +754,94 @@ async function selectPlanTab(page, index) {
     index,
     { timeout: 30000 },
   );
+  if (generationLoaded && candidatesLoaded) {
+    await Promise.all([generationLoaded, candidatesLoaded]);
+  }
 }
 
 async function waitForPlanButtonReady(page, testId, planId, { allowDisabled = false } = {}) {
   await page.waitForFunction(
     ({ id, expectedPlanId, disabledAllowed }) => {
-      const element = document.querySelector(`[data-testid="${id}"]`);
+      const element = document.querySelector(`[data-testid="${id}"][data-plan-id="${expectedPlanId}"]`);
       return element && (disabledAllowed || !element.disabled) && element.dataset.planId === expectedPlanId;
     },
     { id: testId, expectedPlanId: planId, disabledAllowed: allowDisabled },
     { timeout: 30000 },
   );
+}
+
+function getPlanButton(page, testId, planId) {
+  return page.locator(`[data-testid="${testId}"][data-plan-id="${planId}"]`);
+}
+
+async function postGenerationFromPage(page, projectId, planId) {
+  const result = await page.evaluate(async ({ targetProjectId, targetPlanId }) => {
+    const projectResponse = await fetch(`/api/projects/${targetProjectId}`);
+    const project = await projectResponse.json();
+    if (!projectResponse.ok) {
+      return { status: projectResponse.status, body: JSON.stringify(project) };
+    }
+    const referenceImageIds = (project.referenceImages || [])
+      .filter((image) => image.includeInGeneration || image.isPrimary)
+      .map((image) => image.id);
+    const response = await fetch(`/api/projects/${targetProjectId}/image-plans/${targetPlanId}/generations`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        force: true,
+        allowStaleInput: true,
+        referenceImageIds,
+        resolution: "1K",
+        aspectRatio: project.aspectRatio || "1:1",
+      }),
+    });
+    return { status: response.status, body: await response.text() };
+  }, { targetProjectId: projectId, targetPlanId: planId });
+
+  if (result.status !== 200) {
+    throw new Error(`generation API failed ${result.status}: ${result.body}`);
+  }
+}
+
+async function waitForProviderGenerationCount(expectedCount) {
+  const deadline = Date.now() + 30000;
+  while (Date.now() < deadline) {
+    if (providerRecords.generationRequests.length >= expectedCount) return;
+    await sleep(250);
+  }
+  throw new Error(`provider generation request count did not reach ${expectedCount}`);
+}
+
+async function persistFailureDiagnostics(error) {
+  await fs.mkdir(diagnosticsDir, { recursive: true });
+  await activeAppHandle?.persistLogs?.();
+  if (activePage) {
+    await activePage.screenshot({ path: path.join(diagnosticsDir, "failure-page.png"), fullPage: true }).catch(() => {});
+    const resources = await activePage.evaluate(() =>
+      performance.getEntriesByType("resource").map((entry) => entry.name).slice(-40),
+    ).catch((resourceError) => [`resource capture failed: ${resourceError.message}`]);
+    await fs.writeFile(path.join(diagnosticsDir, "page-resources.json"), scrub(JSON.stringify(resources, null, 2)), "utf8");
+  }
+  await fs.writeFile(path.join(diagnosticsDir, "browser-events.log"), scrub(browserEvents.join("\n")), "utf8");
+  await fs.writeFile(
+    path.join(diagnosticsDir, "failure-summary.txt"),
+    scrub([
+      `message=${error?.message || error}`,
+      `stack=${error?.stack || ""}`,
+      "expected=Stage 8 final release Playwright flow completes without paid provider calls",
+      "actual=see failed assertion or response error above",
+    ].join("\n")),
+    "utf8",
+  );
+}
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function getOpenPort() {

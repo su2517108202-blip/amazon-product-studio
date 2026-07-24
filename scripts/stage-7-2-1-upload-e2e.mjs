@@ -16,12 +16,19 @@ const prefix = "stage7-2-1-e2e";
 const userId = `${prefix}-user`;
 const screenshotDir = path.join(root, "docs", "stages", "stage-7-2-1", "ui-acceptance");
 const tmpDir = path.join(root, "tmp", prefix);
+const diagnosticsDir = path.join(tmpDir, "diagnostics");
 let activeApp = null;
+let activeAppHandle = null;
+let activeBrowser = null;
+let activePage = null;
+let browserEvents = [];
+let keepDiagnostics = false;
 
 try {
   await resetData();
   await fs.mkdir(screenshotDir, { recursive: true });
   await fs.mkdir(tmpDir, { recursive: true });
+  await fs.mkdir(diagnosticsDir, { recursive: true });
   await prisma.user.create({
     data: { id: userId, name: "Stage 7.2.1 E2E", email: `${userId}@local.test`, credits: 0 },
   });
@@ -29,10 +36,13 @@ try {
   const files = await createImageFiles();
   const app = await startNextApp();
   activeApp = app.child;
+  activeAppHandle = app;
 
   const browser = await chromium.launch({ headless: true });
+  activeBrowser = browser;
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-  const browserEvents = [];
+  activePage = page;
+  browserEvents = [];
   page.on("console", (message) => browserEvents.push(`console:${message.type()}:${message.text()}`));
   page.on("pageerror", (error) => browserEvents.push(`pageerror:${error.message}`));
   const responses = [];
@@ -75,8 +85,8 @@ try {
     await page.locator("form").first().evaluate((form) => form.requestSubmit());
     createResponse = await createResponsePromise;
   }
-  assert.equal(createResponse.status(), 201);
-  const createdProject = await createResponse.json();
+  const createText = await assertResponseStatus(createResponse, 201, "create-project");
+  const createdProject = JSON.parse(createText);
   assert.equal(createdProject.name, projectName);
   await page.goto(`${app.baseUrl}/projects/${createdProject.id}`, { waitUntil: "networkidle" });
   await page.waitForLoadState("networkidle");
@@ -132,8 +142,11 @@ try {
   assert.equal(responses.length, 1, "network must include exactly one upload POST");
 
   await browser.close();
+  activeBrowser = null;
+  activePage = null;
   await stopNextApp(app);
   activeApp = null;
+  activeAppHandle = null;
 
   console.log(JSON.stringify({
     playwrightFileInputUpload: true,
@@ -150,8 +163,14 @@ try {
     ],
     paidProviderCalls: 0,
   }, null, 2));
+} catch (error) {
+  keepDiagnostics = true;
+  await persistFailureDiagnostics(error).catch(() => {});
+  throw error;
 } finally {
-  if (activeApp) await stopNextApp({ child: activeApp }).catch(() => {});
+  if (activeBrowser) await activeBrowser.close().catch(() => {});
+  if (activeAppHandle) await stopNextApp(activeAppHandle).catch(() => {});
+  else if (activeApp) await stopNextApp({ child: activeApp }).catch(() => {});
   await resetData().catch(() => {});
   await prisma.$disconnect();
 }
@@ -182,20 +201,33 @@ async function resetData() {
     await Promise.all(projectIds.map((id) => fs.rm(path.join(root, "storage", "projects", id), { recursive: true, force: true }).catch(() => {})));
   }
   await prisma.user.deleteMany({ where: { id: userId } }).catch(() => {});
-  await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  if (!keepDiagnostics) {
+    await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
 }
 
 async function startNextApp() {
   const port = await getOpenPort();
-  await fs.rm(path.join(root, ".next"), { recursive: true, force: true }).catch(() => {});
+  const hasProductionBuild = await fileExists(path.join(root, ".next", "BUILD_ID"));
+  const useProductionBuild = process.env.CI === "true" && hasProductionBuild;
+  if (!useProductionBuild) {
+    await fs.rm(path.join(root, ".next"), { recursive: true, force: true }).catch(() => {});
+  }
   const nextCli = path.join(root, "node_modules", "next", "dist", "bin", "next");
-  const child = spawn(process.execPath, [nextCli, "dev", "--webpack", "-p", String(port)], {
+  const mode = useProductionBuild ? "start" : "dev";
+  const args = useProductionBuild
+    ? [nextCli, "start", "-H", "127.0.0.1", "-p", String(port)]
+    : [nextCli, "dev", "--webpack", "-H", "127.0.0.1", "-p", String(port)];
+  const baseUrl = `http://127.0.0.1:${port}`;
+  const child = spawn(process.execPath, args, {
     cwd: root,
     env: {
       ...process.env,
       APP_MODE: "local",
       NEXT_PUBLIC_APP_MODE: "local",
       DEFAULT_LOCAL_USER_ID: userId,
+      NEXTAUTH_URL: baseUrl,
+      WEBHOOK_URL: baseUrl,
       NEXT_TELEMETRY_DISABLED: "1",
       PORT: String(port),
     },
@@ -203,25 +235,32 @@ async function startNextApp() {
   });
   activeApp = child;
 
-  let logs = "";
+  let logs = `mode=${mode}\nbaseUrl=${baseUrl}\n`;
+  const logFile = path.join(diagnosticsDir, "next-tail.log");
   child.stdout.on("data", (chunk) => {
-    logs += chunk.toString();
+    logs += scrub(chunk.toString());
   });
   child.stderr.on("data", (chunk) => {
-    logs += chunk.toString();
+    logs += scrub(chunk.toString());
   });
+  const persistLogs = async () => {
+    await fs.writeFile(logFile, logs.slice(-12000), "utf8").catch(() => {});
+  };
 
-  const baseUrl = `http://localhost:${port}`;
   const deadline = Date.now() + 60000;
   while (Date.now() < deadline) {
-    if (child.exitCode != null) throw new Error(`next dev exited early: ${logs.slice(-2000)}`);
+    if (child.exitCode != null) {
+      await persistLogs();
+      throw new Error(`next ${mode} exited early: ${logs.slice(-2000)}`);
+    }
     try {
       const response = await fetch(baseUrl);
-      if (response.status < 500) return { child, baseUrl };
+      if (response.status < 500) return { child, baseUrl, persistLogs, logs: () => logs };
     } catch {}
     await sleep(1000);
   }
-  throw new Error(`next dev did not become ready: ${logs.slice(-2000)}`);
+  await persistLogs();
+  throw new Error(`next ${mode} did not become ready: ${logs.slice(-2000)}`);
 }
 
 async function stopNextApp(app) {
@@ -239,6 +278,62 @@ async function expectEnabled(locator, label) {
   await locator.waitFor({ state: "visible", timeout: 30000 });
   const disabled = await locator.evaluate((element) => Boolean(element.disabled));
   assert.equal(disabled, false, `${label} must be enabled`);
+}
+
+async function assertResponseStatus(response, expected, label) {
+  const text = await response.text();
+  if (response.status() !== expected) {
+    await fs.writeFile(
+      path.join(diagnosticsDir, `${label}-response.txt`),
+      scrub(`expected=${expected}\nactual=${response.status()}\nurl=${response.url()}\n\n${text}`),
+      "utf8",
+    ).catch(() => {});
+    throw new Error(`${label} expected HTTP ${expected}, got ${response.status()}: ${scrub(text).slice(0, 1000)}`);
+  }
+  return text;
+}
+
+async function persistFailureDiagnostics(error) {
+  await fs.mkdir(diagnosticsDir, { recursive: true });
+  await activeAppHandle?.persistLogs?.();
+  if (activePage) {
+    await activePage.screenshot({ path: path.join(diagnosticsDir, "failure-page.png"), fullPage: true }).catch(() => {});
+    const resources = await activePage.evaluate(() =>
+      performance.getEntriesByType("resource").map((entry) => entry.name).slice(-40),
+    ).catch((resourceError) => [`resource capture failed: ${resourceError.message}`]);
+    await fs.writeFile(path.join(diagnosticsDir, "page-resources.json"), scrub(JSON.stringify(resources, null, 2)), "utf8");
+  }
+  await fs.writeFile(path.join(diagnosticsDir, "browser-events.log"), scrub(browserEvents.join("\n")), "utf8");
+  await fs.writeFile(
+    path.join(diagnosticsDir, "failure-summary.txt"),
+    scrub([
+      `message=${error?.message || error}`,
+      `stack=${error?.stack || ""}`,
+      "expected=create project POST returns HTTP 201 before upload assertions continue",
+      "actual=GitHub Ubuntu run 30096658987 returned HTTP 500 at scripts/stage-7-2-1-upload-e2e.mjs:78",
+    ].join("\n")),
+    "utf8",
+  );
+}
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function scrub(value) {
+  return String(value || "")
+    .replace(/postgresql:\/\/[^\s"']+/gi, "postgresql://[REDACTED]")
+    .replace(/Authorization:\s*[^\r\n]+/gi, "Authorization: [REDACTED]")
+    .replace(/Bearer\s+[A-Za-z0-9._-]+/g, "Bearer [REDACTED]")
+    .replace(/[A-Z]:\\[^\s"'<>]+/g, "[LOCAL_PATH]")
+    .replace(/\/home\/runner\/work\/[^\s"'<>]+/g, "[LOCAL_PATH]")
+    .replace(/\/mnt\/[^\s"'<>]+/g, "[LOCAL_PATH]")
+    .replace(/data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+/gi, "data:image/[REDACTED];base64,[REDACTED]");
 }
 
 function getOpenPort() {

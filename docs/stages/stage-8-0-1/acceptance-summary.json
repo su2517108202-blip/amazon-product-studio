@@ -1,0 +1,72 @@
+{
+  "stage": "8.0.1",
+  "type": "ci-hotfix",
+  "branch": "codex/stage-8-0-1-ci-hotfix",
+  "baseTag": "stage-8-final-release",
+  "baseCommit": "1505c34e2fa69940af211cb8d948e927d74c9721",
+  "failedGitHubActionsRun": 30096658987,
+  "failedGitHubActionsJob": 89492278597,
+  "diagnosis": {
+    "realFailureLocation": "scripts/stage-7-2-1-upload-e2e.mjs:78",
+    "expected": "HTTP 201 from project creation POST",
+    "actual": "HTTP 500 from project creation POST",
+    "classification": "CI harness and cross-platform timing/observability issue",
+    "windowsVsUbuntu": "Windows local development-server run passed; Ubuntu CI had a completed production build but the old Playwright script deleted .next and forced next dev, so the CI path differed and produced no useful diagnostics."
+  },
+  "ciWorkflowIncludes": [
+    "npm run test:stage-6-1",
+    "npm run test:stage-6-2",
+    "npm run test:stage-7",
+    "npm run test:stage-7-1",
+    "npm run test:stage-7-2",
+    "npm run test:ui-text",
+    "npm run test:stage-7-2-1",
+    "npm run test:stage-8",
+    "npm audit --omit=dev --audit-level=high",
+    "npm run lint",
+    "npm run build"
+  ],
+  "localValidation": {
+    "npmCi": "passed",
+    "prismaGenerate": "passed",
+    "prismaMigrateDeploy": "passed",
+    "stage6_1": "passed",
+    "stage6_2": "passed",
+    "stage7": "passed",
+    "stage7_1": "passed",
+    "stage7_2": "passed",
+    "uiText": "passed",
+    "stage7_2_1": "passed",
+    "stage8": "passed",
+    "productionAuditCritical": 0,
+    "productionAuditHigh": 0,
+    "lint": "passed",
+    "lintErrors": 0,
+    "build": "passed"
+  },
+  "stage7_2_1Coverage": {
+    "realSetInputFiles": true,
+    "uploadedFormats": ["jpg", "png", "webp"],
+    "referenceImagesPostCount": 1,
+    "thumbnailCount": 3,
+    "firstImagePrimary": true,
+    "refreshRecovery": true,
+    "mobileSevereHorizontalOverflow": false
+  },
+  "stage8Coverage": {
+    "runsInCiWorkflow": true,
+    "playwrightChromium": true,
+    "fakeProviderGenerationRequests": 6,
+    "paidProviderCallsAdded": 0,
+    "productionBuildPathInCi": true
+  },
+  "diagnosticsOnFailure": {
+    "browserScreenshot": true,
+    "consoleAndPageErrorLog": true,
+    "nextTailLog": true,
+    "playwrightFailureSummary": true,
+    "temporaryDiagnosticFiles": true,
+    "artifactUpload": "actions/upload-artifact@v4"
+  },
+  "stage9Started": false
+}
