@@ -23,11 +23,17 @@ export function inferModelCapabilities(provider, modelId = "") {
   const defaults = getProviderDefaults(provider).capabilities;
   const capabilities = new Set(defaults.includes("reasoning") ? ["text", "reasoning"] : ["text"]);
 
-  if (
-    provider === "gemini" ||
-    /\b(gpt-4o|o3|o4|vision|vl|visual|multimodal|omni|gemini|pixtral)\b/.test(model)
-  ) {
-    capabilities.add("vision");
+  // Vision: only when model name clearly indicates visual capability
+  if (provider === "gemini") {
+    // Gemini Flash/Pro/Ultra/Vision models generally support vision,
+    // but embedding/aqa models do not
+    if (/(vision|flash|pro|ultra)/.test(model) && !/(embedding|aqa|text-)/.test(model)) {
+      capabilities.add("vision");
+    }
+  } else if (provider === "openai" || provider === "openai-compatible") {
+    if (/\b(gpt-4o|o3|o4|vision|vl|visual|multimodal|omni|pixtral)\b/.test(model)) {
+      capabilities.add("vision");
+    }
   }
 
   if (/(gpt-image|dall-e|image|imagen|nano-banana|seedream|kolors|flux|stable-diffusion|sdxl)/.test(model)) {

@@ -208,7 +208,7 @@ export default function ProviderSettingsClient() {
     }
   }
 
-  async function discoverModels() {
+  async function discoverDraftModels() {
     setBusyAction("discover");
     setError("");
     setMessage("");
@@ -264,7 +264,7 @@ export default function ProviderSettingsClient() {
     }
   }
 
-  async function discoverModels(profileId) {
+  async function discoverSavedProfileModels(profileId) {
     setBusyAction(`discover-${profileId}`);
     setError("");
     try {
@@ -583,7 +583,7 @@ export default function ProviderSettingsClient() {
                 {busyAction === "test-draft" ? <FaSpinner className="animate-spin" /> : <FaPlug />}
                 测试连接
               </button>
-              <button type="button" onClick={discoverModels} disabled={busyAction === "discover"} className="inline-flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600">
+              <button type="button" onClick={discoverDraftModels} disabled={busyAction === "discover"} className="inline-flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600">
                 {busyAction === "discover" ? <FaSpinner className="animate-spin" /> : <FaRedo />}
                 {draftModels.length ? "刷新模型" : "获取模型"}
               </button>
@@ -637,11 +637,11 @@ export default function ProviderSettingsClient() {
                         <>
                           {models.length > 0 && (
                             <div className="mb-3 max-h-32 overflow-y-auto border border-zinc-800 bg-zinc-900/50 p-2">
-                              <p className="mb-1 text-[11px] font-semibold text-zinc-600">已发现模型 ({models.length})</p>
+                              <p className="mb-1 text-xs font-semibold text-zinc-600">已发现模型 ({models.length})</p>
                               {models.map((m) => (
                                 <div key={m.modelId} className="flex items-center gap-2 py-0.5 text-xs">
                                   <span className="truncate text-zinc-300">{m.modelId}</span>
-                                  {(m.capabilities || []).map((c) => (<span key={c} className="border border-zinc-700 px-1 text-[10px] text-zinc-500">{c}</span>))}
+                                  {(m.capabilities || []).map((c) => (<span key={c} className="border border-zinc-700 px-1 text-xs text-zinc-500">{c}</span>))}
                                 </div>
                               ))}
                             </div>
@@ -655,7 +655,7 @@ export default function ProviderSettingsClient() {
                             <button onClick={() => deleteProfile(profile)} className="inline-flex items-center justify-center border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-400 hover:border-red-700 hover:text-red-300">
                               <FaTrash />
                             </button>
-                            <button onClick={() => discoverModels(profile.id)} disabled={busyAction === `discover-${profile.id}`} className="col-span-3 inline-flex items-center justify-center gap-2 border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-200 hover:border-emerald-500 disabled:border-zinc-800 disabled:text-zinc-600">
+                            <button onClick={() => discoverSavedProfileModels(profile.id)} disabled={busyAction === `discover-${profile.id}`} className="col-span-3 inline-flex items-center justify-center gap-2 border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-200 hover:border-emerald-500 disabled:border-zinc-800 disabled:text-zinc-600">
                               {busyAction === `discover-${profile.id}` ? <FaSpinner className="animate-spin" /> : <FaRedo />}
                               {models.length ? "刷新模型列表" : "获取模型列表"}
                             </button>
@@ -686,42 +686,114 @@ export default function ProviderSettingsClient() {
             <div className="grid gap-3 lg:grid-cols-3">
               {ROLE_ORDER.map((role) => {
                 const current = assignmentMap[role];
-                const available = profiles.filter((profile) => roleAvailable(role, profile).ok);
-                const unavailable = profiles.filter((profile) => !roleAvailable(role, profile).ok);
+                const currentModelId = current?.modelId || current?.providerProfile?.modelId || "";
+
+                // Collect all discovered models from all saved profiles
+                const allModels = [];
+                for (const p of profiles) {
+                  const dms = discoveredModels[p.id] || [];
+                  if (dms.length > 0) {
+                    for (const m of dms) {
+                      allModels.push({ ...m, providerProfileId: p.id, profileName: p.name, provider: p.provider });
+                    }
+                  }
+                  // Fallback: profile's own modelId if no discovered models
+                  if (!dms.length && p.modelId) {
+                    allModels.push({
+                      modelId: p.modelId,
+                      providerProfileId: p.id,
+                      profileName: p.name,
+                      provider: p.provider,
+                      capabilities: p.capabilities || [],
+                      protocol: p.protocol,
+                      capabilityStatus: "unverified",
+                      reason: "未从 API 发现，使用配置默认模型",
+                    });
+                  }
+                }
+
+                const requiredCap = role === "product_vision" ? "vision" : role === "image_planning" ? "text" : null;
+                const suitable = allModels.filter((m) => {
+                  const caps = m.capabilities || [];
+                  if (role === "product_vision") return caps.includes("vision");
+                  if (role === "image_planning") return caps.includes("text");
+                  if (role === "image_generation")
+                    return (caps.includes("image") || caps.includes("asyncImage")) && m.provider !== "deepseek";
+                  return false;
+                });
+                const unsuitable = allModels.filter((m) => !suitable.includes(m));
+
                 return (
                   <article key={role} className="border border-zinc-800 bg-zinc-950 p-4">
                     <div className="flex items-center justify-between gap-3">
                       <h3 className="text-sm font-semibold text-white">{ROLE_LABELS[role]}</h3>
                       <label className="flex items-center gap-2 text-xs font-semibold text-zinc-400">
-                        <input
-                          checked={Boolean(lockedRoles[role])}
-                          onChange={() => toggleRoleLock(role)}
-                          data-testid={`role-lock-${role}`}
-                          type="checkbox"
-                        />
+                        <input checked={Boolean(lockedRoles[role])} onChange={() => toggleRoleLock(role)} type="checkbox" />
                         锁定
                       </label>
                     </div>
                     <p className="mt-1 min-h-12 text-sm text-zinc-500">
                       {current?.providerProfile
-                        ? `${providerName(current.providerProfile.provider)} · ${current.providerProfile.name} · ${current.providerProfile.modelId} · ${roleAvailable(role, current.providerProfile).label}`
+                        ? `${providerName(current.providerProfile.provider)} · ${currentModelId}${current.isUserForced ? "（手动选择）" : "（推荐）"}`
                         : "未绑定"}
                     </p>
-                    <select value={current?.providerProfileId || ""} onChange={(event) => event.target.value ? assignRole(role, event.target.value) : clearRole(role)} className="mt-3 w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-sm outline-none">
+
+                    <select
+                      value={current ? `${current.providerProfileId}::${currentModelId}` : ""}
+                      onChange={(event) => {
+                        const val = event.target.value;
+                        if (!val) return clearRole(role);
+                        const [ppId, mId] = val.split("::");
+                        assignRole(role, ppId, mId || undefined);
+                      }}
+                      className="mt-2 w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-sm outline-none"
+                    >
                       <option value="">清除绑定</option>
-                      {available.map((profile) => (
-                        <option key={profile.id} value={profile.id}>{profile.name} - {profile.modelId}</option>
-                      ))}
-                    </select>
-                    {unavailable.length > 0 && (
-                      <div className="mt-3 border border-zinc-800 bg-zinc-900/60 p-2">
-                        <p className="mb-2 text-[13px] font-semibold text-zinc-500">不可用配置</p>
-                        <div className="space-y-1">
-                          {unavailable.map((profile) => (
-                            <p key={profile.id} className="text-[13px] text-zinc-500">{profile.name}：{roleAvailable(role, profile).reason}</p>
+                      {suitable.length > 0 && (
+                        <optgroup label="── 可选模型 ──">
+                          {suitable.map((m) => (
+                            <option key={`${m.providerProfileId}::${m.modelId}`} value={`${m.providerProfileId}::${m.modelId}`}>
+                              {m.profileName} / {m.modelId}
+                            </option>
                           ))}
+                        </optgroup>
+                      )}
+                      {unsuitable.length > 0 && (
+                        <optgroup label="── 不可用（能力不匹配）──">
+                          {unsuitable.map((m) => {
+                            const caps = m.capabilities || [];
+                            const reason = requiredCap && !caps.includes(requiredCap)
+                              ? `缺少${requiredCap}能力`
+                              : m.provider === "deepseek" ? "DeepSeek不支持图片生成" : "能力不匹配";
+                            return (
+                              <option key={`${m.providerProfileId}::${m.modelId}`} value={`${m.providerProfileId}::${m.modelId}`} disabled>
+                                {m.profileName} / {m.modelId} [{reason}]
+                              </option>
+                            );
+                          })}
+                        </optgroup>
+                      )}
+                    </select>
+
+                    {unsuitable.length > 0 && (
+                      <details className="mt-2">
+                        <summary className="cursor-pointer text-xs font-semibold text-zinc-600">不可用原因</summary>
+                        <div className="mt-1 space-y-1">
+                          {unsuitable.map((m) => {
+                            const caps = m.capabilities || [];
+                            const reasons = [];
+                            if (role === "product_vision" && !caps.includes("vision")) reasons.push("不支持vision");
+                            if (role === "image_planning" && !caps.includes("text")) reasons.push("不支持text");
+                            if (role === "image_generation" && !caps.includes("image") && !caps.includes("asyncImage")) reasons.push("不支持image");
+                            if (role === "image_generation" && m.provider === "deepseek") reasons.push("DeepSeek不支持图片生成");
+                            return (
+                              <p key={`${m.providerProfileId}-${m.modelId}`} className="text-xs text-zinc-600">
+                                {m.profileName} / {m.modelId}：{reasons.join("、") || "能力不匹配"}
+                              </p>
+                            );
+                          })}
                         </div>
-                      </div>
+                      </details>
                     )}
                   </article>
                 );
