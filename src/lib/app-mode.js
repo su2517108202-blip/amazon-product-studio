@@ -1,7 +1,7 @@
 import { getServerSession } from "next-auth/next";
-import { authOptions } from "@/lib/auth";
-import config from "@/lib/config";
-import { prisma } from "@/lib/prisma";
+import { authOptions } from "./auth.js";
+import config from "./config.js";
+import { prisma } from "./prisma.js";
 
 export function isLocalMode() {
   return config.app.mode === "local";
@@ -10,16 +10,36 @@ export function isLocalMode() {
 export async function ensureDefaultLocalUser() {
   const id = config.app.defaultLocalUserId;
 
-  return prisma.user.upsert({
-    where: { id },
-    update: {},
-    create: {
-      id,
-      name: "Local User",
-      email: `${id}@local.lingtu`,
-      credits: 0,
-    },
-  });
+  try {
+    return await prisma.user.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        name: "Local User",
+        email: `${id}@local.lingtu`,
+        credits: 0,
+      },
+    });
+  } catch (error) {
+    if (!isDefaultLocalUserIdConflict(error)) throw error;
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (user) return user;
+    throw error;
+  }
+}
+
+function isDefaultLocalUserIdConflict(error) {
+  const target = error?.meta?.target;
+  const message = error?.message || "";
+  const targetText = Array.isArray(target) ? target.join(",") : String(target || "");
+  const idOnlyTarget =
+    (Array.isArray(target) && target.length === 1 && target[0] === "id") ||
+    /^User_(pkey|id_key)$/.test(targetText) ||
+    /fields:\s*\(`id`\)/.test(message);
+
+  return error?.code === "P2002" && idOnlyTarget && !/email/i.test(targetText) && !/fields:\s*\(`email`\)/i.test(message);
 }
 
 export async function getCurrentUser() {

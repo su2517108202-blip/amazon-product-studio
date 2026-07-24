@@ -1,6 +1,6 @@
 import { PrismaAdapter } from "@next-auth/prisma-adapter";
 import * as GoogleProviderModule from "next-auth/providers/google";
-import { prisma } from "./prisma";
+import { prisma } from "./prisma.js";
 
 const GoogleProvider =
   GoogleProviderModule.default?.default ||

@@ -98,6 +98,9 @@ jobs:
       - name: Stage 8 final release E2E
         run: npm run test:stage-8
 
+      - name: Stage 8.0.2 local user race checks
+        run: npm run test:stage-8-0-2
+
       - name: Upload Playwright failure diagnostics
         if: failure()
         uses: actions/upload-artifact@v4
@@ -108,5 +111,6 @@ jobs:
           path: |
             tmp/stage7-2-1-e2e/diagnostics/**
             tmp/stage8-final-e2e/diagnostics/**
+            tmp/stage8-0-2-local-user-race/diagnostics/**
             docs/stages/stage-7-2-1/ui-acceptance/*.png
             docs/stages/stage-8/ui-acceptance/*.png
