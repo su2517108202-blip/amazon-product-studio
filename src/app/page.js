@@ -96,11 +96,11 @@ export default function ProjectsHomePage() {
     setQuickUploading(true);
     setError("");
     try {
-      const fallbackName = incoming[0]?.name?.replace(/\.[^.]+$/, "") || "未命名商品";
+      const fallbackName = "未命名项目";
       const projectPayload = {
         ...form,
         name: form.name.trim() || fallbackName,
-        productName: form.productName.trim() || fallbackName,
+        productName: form.productName.trim() || "",
       };
       const projectRes = await fetch("/api/projects", {
         method: "POST",

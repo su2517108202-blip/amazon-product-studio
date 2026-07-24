@@ -52,6 +52,8 @@ export default function ProviderSettingsClient() {
   const [modelSearch, setModelSearch] = useState("");
   const [manualModel, setManualModel] = useState(false);
   const [lockedRoles, setLockedRoles] = useState({});
+  const [discoveredModels, setDiscoveredModels] = useState({});
+  const [roleModelOverrides, setRoleModelOverrides] = useState({});
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [storage, setStorage] = useState({
@@ -262,6 +264,27 @@ export default function ProviderSettingsClient() {
     }
   }
 
+  async function discoverModels(profileId) {
+    setBusyAction(`discover-${profileId}`);
+    setError("");
+    try {
+      const data = await runJson("/api/provider-models/discover", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ providerProfileId: profileId }),
+      });
+      setDiscoveredModels((prev) => ({
+        ...prev,
+        [profileId]: data.models || [],
+      }));
+      setMessage(data.message || `已发现 ${data.count || 0} 个模型`);
+    } catch (err) {
+      setError(`模型发现失败: ${err.message}`);
+    } finally {
+      setBusyAction("");
+    }
+  }
+
   async function deleteProfile(profile) {
     const usedBy = assignments
       .filter((item) => item.providerProfileId === profile.id)
@@ -283,13 +306,17 @@ export default function ProviderSettingsClient() {
     }
   }
 
-  async function assignRole(role, providerProfileId) {
+  async function assignRole(role, providerProfileId, modelId = "") {
     setError("");
     try {
       await runJson(`/api/model-role-assignments/${role}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ providerProfileId }),
+        body: JSON.stringify({
+          providerProfileId,
+          modelId: modelId || null,
+          isUserForced: !lockedRoles[role],
+        }),
       });
       await loadData();
     } catch (err) {
@@ -604,16 +631,38 @@ export default function ProviderSettingsClient() {
                     <p className="mb-1 text-sm text-zinc-500">协议：{profile.protocol}</p>
                     <p className="mb-1 text-sm text-zinc-500">密钥：{profile.maskedApiKey || "未保存"}</p>
                     <p className="mb-3 text-sm text-zinc-500">参考图：{formatReferenceSupport(profile)}</p>
-                    <div className="grid grid-cols-4 gap-2">
-                      <button onClick={() => editProfile(profile)} className="border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white">编辑</button>
-                      <button onClick={() => testSavedProfile(profile.id)} disabled={busyAction === `test-${profile.id}`} className="col-span-2 inline-flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600">
-                        {busyAction === `test-${profile.id}` ? <FaSpinner className="animate-spin" /> : <FaPlug />}
-                        测试
-                      </button>
-                      <button onClick={() => deleteProfile(profile)} className="inline-flex items-center justify-center border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-400 hover:border-red-700 hover:text-red-300">
-                        <FaTrash />
-                      </button>
-                    </div>
+                    {(() => {
+                      const models = discoveredModels[profile.id] || [];
+                      return (
+                        <>
+                          {models.length > 0 && (
+                            <div className="mb-3 max-h-32 overflow-y-auto border border-zinc-800 bg-zinc-900/50 p-2">
+                              <p className="mb-1 text-[11px] font-semibold text-zinc-600">已发现模型 ({models.length})</p>
+                              {models.map((m) => (
+                                <div key={m.modelId} className="flex items-center gap-2 py-0.5 text-xs">
+                                  <span className="truncate text-zinc-300">{m.modelId}</span>
+                                  {(m.capabilities || []).map((c) => (<span key={c} className="border border-zinc-700 px-1 text-[10px] text-zinc-500">{c}</span>))}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div className="grid grid-cols-3 gap-2">
+                            <button onClick={() => editProfile(profile)} className="border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white">编辑</button>
+                            <button onClick={() => testSavedProfile(profile.id)} disabled={busyAction === `test-${profile.id}`} className="inline-flex items-center justify-center gap-2 border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600">
+                              {busyAction === `test-${profile.id}` ? <FaSpinner className="animate-spin" /> : <FaPlug />}
+                              测试
+                            </button>
+                            <button onClick={() => deleteProfile(profile)} className="inline-flex items-center justify-center border border-zinc-800 px-3 py-2 text-sm font-semibold text-zinc-400 hover:border-red-700 hover:text-red-300">
+                              <FaTrash />
+                            </button>
+                            <button onClick={() => discoverModels(profile.id)} disabled={busyAction === `discover-${profile.id}`} className="col-span-3 inline-flex items-center justify-center gap-2 border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-200 hover:border-emerald-500 disabled:border-zinc-800 disabled:text-zinc-600">
+                              {busyAction === `discover-${profile.id}` ? <FaSpinner className="animate-spin" /> : <FaRedo />}
+                              {models.length ? "刷新模型列表" : "获取模型列表"}
+                            </button>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </article>
                 ))}
               </div>

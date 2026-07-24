@@ -110,6 +110,7 @@ export async function POST(req, context) {
     if (!profile) {
       throw new ProviderError("MISSING_IMAGE_GENERATION_PROVIDER", "请先配置图片生成模型");
     }
+    const effectiveModelId = (assignment.modelId || profile.modelId || "").trim();
     if (!supportsImageGenerationProfile(profile)) {
       throw new ProviderError("CAPABILITY_MISMATCH", "当前服务商未勾选 image 能力");
     }
@@ -167,7 +168,7 @@ export async function POST(req, context) {
         imagePlanId: planId,
         providerProfileId: profile.id,
         provider: profile.provider,
-        model: profile.modelId,
+        model: effectiveModelId,
         protocol: profile.protocol,
         status: "processing",
         mode: "sync",
@@ -182,7 +183,7 @@ export async function POST(req, context) {
     });
 
     const adapter = getProviderAdapter(profile.provider);
-    const result = await adapter.generateImage(buildProviderConfig(profile), {
+    const result = await adapter.generateImage(buildProviderConfig(profile, { modelId: effectiveModelId }), {
       project,
       productIdentity: project.productIdentity,
       imagePlan,

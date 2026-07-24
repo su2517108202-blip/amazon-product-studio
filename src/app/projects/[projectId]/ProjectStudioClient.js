@@ -90,6 +90,8 @@ export default function ProjectStudioClient({ projectId }) {
   const [draggingUpload, setDraggingUpload] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [nameSuggestions, setNameSuggestions] = useState(null);
+  const [userEditedName, setUserEditedName] = useState(false);
   const fileInputRef = useRef(null);
   const fetchRequestIdRef = useRef(0);
 
@@ -411,10 +413,38 @@ export default function ProjectStudioClient({ projectId }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(`${data.code || "ERROR"}：${data.message || "识别失败"}`);
+        let errorMsg = `${data.code || "ERROR"}：${data.message || "识别失败"}`;
+        const diag = data.diagnostic;
+        if (diag) {
+          const parts = [];
+          if (diag.provider) parts.push(`服务商: ${diag.provider}`);
+          if (diag.model) parts.push(`模型: ${diag.model}`);
+          if (diag.upstreamHttpStatus) parts.push(`HTTP ${diag.upstreamHttpStatus}`);
+          if (diag.upstreamStatus) parts.push(diag.upstreamStatus);
+          if (diag.upstreamMessage) parts.push(diag.upstreamMessage);
+          if (parts.length) errorMsg += `\n[诊断: ${parts.join(" | ")}]`;
+        }
+        throw new Error(errorMsg);
       }
       await fetchProject();
-      setMessage(data.reused ? "已复用上次识别结果" : "识别成功");
+      if (data.reused) {
+        setMessage("已复用上次识别结果");
+      } else {
+        setMessage("识别成功");
+        // 生成命名建议
+        const identityData = data.identity;
+        if (identityData) {
+          const productName = identityData.productName || "";
+          const platform = project?.platform || "";
+          const suggestedProductName = productName || "";
+          const suggestedProjectName = productName
+            ? `${productName}${platform && platform !== "通用电商" ? ` ${platform}` : ""}五图`
+            : "";
+          if (suggestedProductName || suggestedProjectName) {
+            setNameSuggestions({ productName: suggestedProductName, projectName: suggestedProjectName });
+          }
+        }
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -679,6 +709,30 @@ export default function ProjectStudioClient({ projectId }) {
           </Link>
 
           <form onSubmit={saveProject} className="space-y-4">
+            {/* 命名建议 */}
+            {nameSuggestions && !userEditedName && (() => {
+              const projectNameCurrent = draft?.name || project?.name || "";
+              const isUnnamed = !projectNameCurrent || projectNameCurrent === "未命名项目";
+              const hasSuggestion = (nameSuggestions.productName && nameSuggestions.productName !== (draft?.productName || project?.productName || "")) || (nameSuggestions.projectName && isUnnamed);
+              if (!hasSuggestion) return null;
+              return (
+                <div className="border border-emerald-900/60 bg-emerald-950/30 px-3 py-3">
+                  <p className="text-[13px] font-semibold text-emerald-200">AI 识别出以下名称建议：</p>
+                  <div className="mt-2 space-y-1 text-sm text-emerald-100">
+                    {nameSuggestions.productName && <p>商品名称：<strong>{nameSuggestions.productName}</strong></p>}
+                    {nameSuggestions.projectName && isUnnamed && <p>项目名称：<strong>{nameSuggestions.projectName}</strong></p>}
+                  </div>
+                  <div className="mt-3 flex gap-2">
+                    <button type="button" onClick={() => {
+                      if (nameSuggestions.productName) setDraft((d) => ({ ...d, productName: nameSuggestions.productName }));
+                      if (nameSuggestions.projectName) setDraft((d) => ({ ...d, name: nameSuggestions.projectName }));
+                      setNameSuggestions(null); setMessage("已应用 AI 识别名称");
+                    }} className="border border-emerald-700 px-3 py-1.5 text-[13px] font-semibold text-emerald-200 hover:bg-emerald-900/40">应用识别名称</button>
+                    <button type="button" onClick={() => { setNameSuggestions(null); setUserEditedName(true); }} className="border border-zinc-700 px-3 py-1.5 text-[13px] font-semibold text-zinc-400 hover:text-zinc-200">保留当前名称</button>
+                  </div>
+                </div>
+              );
+            })()}
             <Field label="项目名称">
               <input
                 value={draft.name}

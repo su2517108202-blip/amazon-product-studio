@@ -29,16 +29,66 @@ function readGeminiText(data) {
 }
 
 async function classifyGeminiError(response) {
+  let errorStatus = "";
+  let errorMessage = "";
   try {
-    const data = await response.clone().json();
-    const errors = Array.isArray(data) ? data : [data];
-    const text = errors
-      .map((item) => `${item?.error?.status || ""} ${item?.error?.message || ""} ${JSON.stringify(item?.error?.details || [])}`)
-      .join(" ");
-    if (/api.?key|credential|unauthenticated|permission/i.test(text)) return "INVALID_API_KEY";
-    if (/model/i.test(text)) return "MODEL_NOT_FOUND";
+    const cloned = response.clone();
+    const data = await cloned.json();
+    const err = data?.error || data;
+    errorStatus = String(err?.status || err?.code || "");
+    errorMessage = String(err?.message || "");
   } catch {}
-  return classifyHttpError(response.status);
+
+  const status = response.status;
+  const lowered = `${errorStatus} ${errorMessage}`.toLowerCase();
+
+  if (errorStatus === "INVALID_ARGUMENT" || errorStatus === "FAILED_PRECONDITION") {
+    if (/image|media|multipart/i.test(lowered)) return "IMAGE_INPUT_UNSUPPORTED";
+    if (/model.*not.*found/i.test(lowered)) return "MODEL_NOT_FOUND";
+    return "INVALID_REQUEST";
+  }
+  if (errorStatus === "PERMISSION_DENIED") {
+    if (/billing|计费/i.test(lowered)) return "BILLING_REQUIRED";
+    if (/quota|配额|exhausted/i.test(lowered)) return "QUOTA_EXCEEDED";
+    if (/model|access/i.test(lowered)) return "MODEL_ACCESS_DENIED";
+    return "INVALID_API_KEY";
+  }
+  if (errorStatus === "UNAUTHENTICATED") return "INVALID_API_KEY";
+  if (errorStatus === "NOT_FOUND") return "MODEL_NOT_FOUND";
+  if (errorStatus === "RESOURCE_EXHAUSTED") return "RATE_LIMITED";
+  if (errorStatus === "DEADLINE_EXCEEDED") return "PROVIDER_TIMEOUT";
+  if (errorStatus === "INTERNAL" || errorStatus === "UNAVAILABLE") return "PROVIDER_NETWORK_ERROR";
+
+  if (status === 401 || status === 403) {
+    if (/billing|计费/i.test(lowered)) return "BILLING_REQUIRED";
+    return "INVALID_API_KEY";
+  }
+  if (status === 404) return "MODEL_NOT_FOUND";
+  if (status === 400) {
+    if (/image|media|multipart/i.test(lowered)) return "IMAGE_INPUT_UNSUPPORTED";
+    return "INVALID_REQUEST";
+  }
+  if (status === 408) return "PROVIDER_TIMEOUT";
+  if (status === 429) return "RATE_LIMITED";
+  if (status >= 500) return "PROVIDER_NETWORK_ERROR";
+
+  return "UPSTREAM_ERROR";
+}
+
+async function throwGeminiError(response, fallbackMessage) {
+  const code = await classifyGeminiError(response);
+  let bodyText = "";
+  try { const cloned = response.clone(); bodyText = await cloned.text(); } catch {}
+  let summary = { httpStatus: response.status, errorStatus: "", errorMessage: "" };
+  try {
+    const parsed = JSON.parse((bodyText || "").slice(0, 2000));
+    const err = parsed?.error || parsed;
+    summary.errorStatus = String(err?.status || err?.code || "");
+    summary.errorMessage = String(err?.message || "").slice(0, 500);
+  } catch {}
+  throw new ProviderError(code, `${fallbackMessage}（${summary.errorStatus || `HTTP ${summary.httpStatus}`}）`, {
+    httpStatus: response.status, cause: { summary },
+  });
 }
 
 function readGeminiInteractionImages(data) {
@@ -91,9 +141,7 @@ export const geminiAdapter = {
       });
 
       if (!response.ok) {
-        throw new ProviderError(classifyHttpError(response.status), "服务商连接测试失败", {
-          httpStatus: response.status,
-        });
+        await throwGeminiError(response, "服务商连接测试失败");
       }
 
       return {
@@ -121,9 +169,7 @@ export const geminiAdapter = {
       });
 
       if (!response.ok) {
-        throw new ProviderError(classifyHttpError(response.status), "无法读取模型列表", {
-          httpStatus: response.status,
-        });
+        await throwGeminiError(response, "无法读取模型列表");
       }
 
       const data = await response.json();
@@ -185,9 +231,7 @@ export const geminiAdapter = {
       });
 
       if (!response.ok) {
-        throw new ProviderError(classifyHttpError(response.status), "商品识别请求失败", {
-          httpStatus: response.status,
-        });
+        await throwGeminiError(response, "商品识别请求失败");
       }
 
       const text = readGeminiText(await response.json());
@@ -237,9 +281,7 @@ export const geminiAdapter = {
       });
 
       if (!response.ok) {
-        throw new ProviderError(classifyHttpError(response.status), "五图策划请求失败", {
-          httpStatus: response.status,
-        });
+        await throwGeminiError(response, "五图策划请求失败");
       }
 
       const text = readGeminiText(await response.json());

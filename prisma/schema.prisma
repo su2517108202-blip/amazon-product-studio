@@ -308,6 +308,8 @@ model ModelRoleAssignment {
   userId            String
   role              String
   providerProfileId String
+  modelId           String?
+  isUserForced      Boolean         @default(false)
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   User              User            @relation(fields: [userId], references: [id], onDelete: Cascade)

@@ -78,6 +78,7 @@ export async function POST(req, context) {
     }
 
     profile = assignment.providerProfile;
+    const effectiveModelId = (assignment.modelId || profile.modelId || "").trim();
     const capabilities = parseCapabilities(profile);
     if (!profile.enabled || !capabilities.includes("text")) {
       const error = new Error("Planning model is disabled or lacks text capability");
@@ -107,14 +108,14 @@ export async function POST(req, context) {
         projectId,
         providerProfileId: profile.id,
         provider: profile.provider,
-        model: profile.modelId,
+        model: effectiveModelId,
         status: "processing",
         inputFingerprint,
       },
     });
 
     const adapter = getProviderAdapter(profile.provider);
-    const plans = await adapter.createImagePlan(buildProviderConfig(profile), {
+    const plans = await adapter.createImagePlan(buildProviderConfig(profile, { modelId: effectiveModelId }), {
       ...buildImagePlanningInput(project, project.productIdentity, project.referenceImages),
       taskContract: {
         count: 5,

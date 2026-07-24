@@ -50,8 +50,14 @@ export function inferModelCapabilities(provider, modelId = "") {
 export function inferProviderProtocol(provider, modelId = "", capabilities = []) {
   const model = String(modelId || "").toLowerCase();
   if (provider === "gemini" && capabilities.includes("image")) return "gemini-native-image";
-  if (provider === "openai" && capabilities.includes("image")) return "openai-image-edit";
-  if (provider === "openai-compatible" && capabilities.includes("image")) return "openai-image-edit";
+  if (provider === "openai" && capabilities.includes("image")) {
+    if (/gpt-image/.test(model)) return "openai-images";
+    return "openai-image-edit";
+  }
+  if (provider === "openai-compatible" && capabilities.includes("image")) {
+    if (/gpt-image/.test(model)) return "openai-images";
+    return "openai-image-edit";
+  }
   if (provider === "doubao" || capabilities.includes("asyncImage") || /(seedream|doubao|volc|ark)/.test(model)) {
     return "doubao-image";
   }
@@ -85,10 +91,40 @@ export const MODEL_ROLES = {
     label: "图片生成",
     accepts: (capabilities, profile = {}) =>
       profile.provider !== "deepseek" &&
-      (capabilities.includes("image") || capabilities.includes("asyncImage")) &&
-      supportsReferenceImagesProfile(profile),
+      (capabilities.includes("image") || capabilities.includes("asyncImage")),
   },
 };
+
+export const ACCEPTANCE_LABELS = {
+  official:        { label: "官方明确支持",  cls: "text-emerald-300" },
+  adapterVerified: { label: "适配器已验证",  cls: "text-emerald-400" },
+  inferred:        { label: "推断支持",      cls: "text-amber-300" },
+  unverified:      { label: "未验证",        cls: "text-zinc-400" },
+  unsupported:     { label: "明确不支持",    cls: "text-red-400" },
+};
+
+export function roleAcceptanceLevel(role, profile) {
+  if (!profile.enabled) return "unsupported";
+  const capabilities = profile.capabilities || [];
+  if (role === "product_vision") {
+    if (!capabilities.includes("vision")) return "unsupported";
+    if (profile.provider === "gemini") return "adapterVerified";
+    return "inferred";
+  }
+  if (role === "image_planning") {
+    if (!capabilities.includes("text")) return "unsupported";
+    return capabilities.includes("reasoning") ? "adapterVerified" : "inferred";
+  }
+  if (role === "image_generation") {
+    if (!capabilities.includes("image") && !capabilities.includes("asyncImage")) return "unsupported";
+    if (profile.provider === "deepseek") return "unsupported";
+    const refStatus = referenceImageSupportStatus(profile);
+    if (refStatus === "verified") return "adapterVerified";
+    if (refStatus === "text_only") return "inferred";
+    return "unverified";
+  }
+  return "unverified";
+}
 
 export const PROVIDER_DEFAULTS = {
   openai: {
@@ -185,6 +221,8 @@ export function sanitizeRoleAssignment(assignment) {
     userId: assignment.userId,
     role: assignment.role,
     providerProfileId: assignment.providerProfileId,
+    modelId: assignment.modelId || null,
+    isUserForced: Boolean(assignment.isUserForced),
     providerProfile: assignment.providerProfile
       ? sanitizeProviderProfile(assignment.providerProfile)
       : null,
