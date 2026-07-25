@@ -53,7 +53,7 @@ export function inferModelCapabilities(provider, modelId = "") {
   // Reasoning: only specific models
   if (provider === "openai" && /\b(o1|o3|o4)\b/.test(model)) {
     capabilities.add("reasoning");
-  } else if (provider === "deepseek" && /reasoner/.test(model)) {
+  } else if (provider === "deepseek") {
     capabilities.add("reasoning");
   }
 
@@ -91,9 +91,15 @@ export function inferProviderDraftSettings({ provider, modelId, protocol, capabi
       : Array.isArray(capabilities) && capabilities.length > 0
         ? capabilities
         : getProviderDefaults(provider).capabilities;
+  const inferredProtocol = inferProviderProtocol(provider, modelId, nextCapabilities);
+  const model = String(modelId || "").toLowerCase();
+  const preferReferenceImageProtocol =
+    (provider === "openai" || provider === "openai-compatible") &&
+    /gpt-image/.test(model) &&
+    nextCapabilities.includes("image");
   return {
     capabilities: nextCapabilities,
-    protocol: inferProviderProtocol(provider, modelId, nextCapabilities) || protocol,
+    protocol: preferReferenceImageProtocol ? "openai-image-edit" : (inferredProtocol || protocol),
   };
 }
 

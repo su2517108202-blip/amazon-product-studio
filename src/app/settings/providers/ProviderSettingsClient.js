@@ -12,6 +12,17 @@ const ROLE_ORDER = ["product_vision", "image_planning", "image_generation"];
 const ROLE_LABELS = { product_vision: "商品识图", image_planning: "策划与提示词", image_generation: "图片生成" };
 const ROLE_REQUIRED_CAP = { product_vision: "vision", image_planning: "text", image_generation: null };
 
+function normalizeModelDetails(payload) {
+  const source = Array.isArray(payload?.modelDetails) && payload.modelDetails.length
+    ? payload.modelDetails
+    : (Array.isArray(payload?.models) ? payload.models : []);
+  return source
+    .map((item) => (typeof item === "string"
+      ? { modelId: item, capabilities: [], protocol: "", capabilityStatus: "unverified", reason: "" }
+      : item))
+    .filter((item) => item?.modelId);
+}
+
 export default function ProviderSettingsClient() {
   const [profiles, setProfiles] = useState([]);
   const [assignments, setAssignments] = useState([]);
@@ -48,15 +59,6 @@ export default function ProviderSettingsClient() {
   }, []);
 
   useEffect(() => { const timer = setTimeout(() => { loadData().catch((err) => setError(err.message)); }, 0); return () => clearTimeout(timer); }, [loadData]);
-
-  useEffect(() => {
-    async function preload() {
-      const map = {};
-      for (const p of profiles) { if (p.discoveredModelCount === undefined || p.discoveredModelCount > 0) { try { const res = await fetch(`/api/provider-profiles/${p.id}/discovered-models`); const data = await res.json(); if (data.ok) map[p.id] = data.models || []; } catch {} } }
-      setDiscoveredModels(map);
-    }
-    if (profiles.length) preload();
-  }, [profiles]);
 
   const assignmentMap = useMemo(() => Object.fromEntries(assignments.map((item) => [item.role, item])), [assignments]);
 
@@ -105,7 +107,7 @@ export default function ProviderSettingsClient() {
     setBusyAction("discover"); setError(""); setMessage("");
     try {
       const data = await runJson("/api/provider-models/discover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(form) });
-      setDraftModels(data.models || []); setManualModel(false);
+      setDraftModels(normalizeModelDetails(data)); setManualModel(false);
       setMessage(data.message || "模型列表已读取。");
     } catch (err) { setDraftModels([]); setMessage(""); setError(err.message || "该接口不支持自动获取模型"); } finally { setBusyAction(""); }
   }
@@ -124,9 +126,7 @@ export default function ProviderSettingsClient() {
     setBusyAction(`discover-${profileId}`); setError("");
     try {
       const data = await runJson("/api/provider-models/discover", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ providerProfileId: profileId }) });
-      const res = await fetch(`/api/provider-profiles/${profileId}/discovered-models`);
-      const dm = await res.json();
-      if (dm.ok) { setDiscoveredModels((prev) => ({ ...prev, [profileId]: dm.models || [] })); }
+      setDiscoveredModels((prev) => ({ ...prev, [profileId]: normalizeModelDetails(data) }));
       await loadData();
       setMessage(data.message || `已发现 ${data.count || 0} 个模型`);
     } catch (err) { setError(`模型发现失败: ${err.message}`); } finally { setBusyAction(""); }
@@ -260,7 +260,7 @@ export default function ProviderSettingsClient() {
               for (const p of profiles) {
                 const dms = discoveredModels[p.id] || [];
                 dms.forEach((m) => allModels.push({ ...m, providerProfileId: p.id, profileName: p.name, provider: p.provider }));
-                if (!dms.length && p.modelId) allModels.push({ modelId: p.modelId, providerProfileId: p.id, profileName: p.name, provider: p.provider, capabilities: p.capabilities || [], protocol: p.protocol, capabilityStatus: "unverified", reason: "未从 API 发现" });
+                if (!dms.length && p.modelId) allModels.push({ modelId: p.modelId, providerProfileId: p.id, profileName: p.name, provider: p.provider, capabilities: p.capabilities || [], protocol: p.protocol, capabilityStatus: "unverified", reason: "未从 API 发现", isProfileDefault: true });
               }
               // P1-3: inject current assignment model if not in list
               if (current && currentModelId && !allModels.some((m) => m.modelId === currentModelId && m.providerProfileId === current.providerProfileId)) {
@@ -269,12 +269,14 @@ export default function ProviderSettingsClient() {
               const reqC = role === "product_vision" ? "vision" : role === "image_planning" ? "text" : null;
               const suitable = allModels.filter((m) => { const c = m.capabilities || []; if (role === "product_vision") return c.includes("vision"); if (role === "image_planning") return c.includes("text"); if (role === "image_generation") return (c.includes("image") || c.includes("asyncImage")) && m.provider !== "deepseek"; return false; });
               const unsuitable = allModels.filter((m) => !suitable.includes(m));
+              const optionValue = (m) => m.isProfileDefault ? m.providerProfileId : `${m.providerProfileId}::${m.modelId}`;
+              const currentSelectValue = current ? (current.modelId ? `${current.providerProfileId}::${current.modelId}` : current.providerProfileId) : "";
               return (
                 <article key={role} className="border border-zinc-800 bg-zinc-950 p-4">
-                  <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold text-white">{ROLE_LABELS[role]}</h3><label className="flex items-center gap-2 text-xs font-semibold text-zinc-400"><input checked={Boolean(lockedRoles[role])} onChange={() => toggleRoleLock(role)} type="checkbox" />锁定</label></div>
-                  <p className="mt-1 min-h-12 text-sm text-zinc-500">{current?.providerProfile ? `${providerName(current.providerProfile.provider)} · ${currentModelId}${current.isUserForced ? "（手动选择）" : "（推荐）"}` : "未绑定"}</p>
+                  <div className="flex items-center justify-between gap-3"><h3 className="text-sm font-semibold text-white">{ROLE_LABELS[role]}</h3><label className="flex items-center gap-2 text-xs font-semibold text-zinc-400"><input data-testid={`role-lock-${role}`} checked={Boolean(lockedRoles[role])} onChange={() => toggleRoleLock(role)} type="checkbox" />锁定</label></div>
+                  <p className="mt-1 min-h-12 text-sm text-zinc-500">{current?.providerProfile ? `${providerName(current.providerProfile.provider)} · ${current.providerProfile.name} · ${currentModelId}${current.isUserForced ? "（手动选择）" : "（推荐）"}` : "未绑定"}</p>
                   {/* P1-10: unsuitable models selectable with confirmation */}
-                  <select value={current ? `${current.providerProfileId}::${currentModelId}` : ""} onChange={(e) => {
+                  <select value={currentSelectValue} onChange={(e) => {
                     const v = e.target.value; if (!v) return clearRole(role); const [pp, md] = v.split("::");
                     const m = allModels.find((x) => x.providerProfileId === pp && x.modelId === md);
                     const lv = m ? roleAcceptanceLevel(role, { ...m, enabled: true, supportsReferenceImages: m.protocol === "openai-image-edit" || m.protocol === "gemini-native-image", referenceImageSupportStatus: m.protocol === "openai-image-edit" || m.protocol === "gemini-native-image" ? "verified" : "unverified" }) : "unverified";
@@ -282,8 +284,8 @@ export default function ProviderSettingsClient() {
                     assignRole(role, pp, md || undefined, true);
                   }} className="mt-2 w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-sm outline-none">
                     <option value="">清除绑定</option>
-                    {suitable.length > 0 && (<optgroup label="── 可选 ──">{suitable.map((m) => (<option key={`${m.providerProfileId}::${m.modelId}`} value={`${m.providerProfileId}::${m.modelId}`}>{m.profileName} / {m.modelId}</option>))}</optgroup>)}
-                    {unsuitable.length > 0 && (<optgroup label="── 能力可能不匹配 ──">{unsuitable.map((m) => { const cs = m.capabilities || []; const r = reqC && !cs.includes(reqC) ? `缺少${reqC}` : m.provider === "deepseek" ? "DeepSeek不支持" : "未验证"; return (<option key={`${m.providerProfileId}::${m.modelId}`} value={`${m.providerProfileId}::${m.modelId}`}>{m.profileName} / {m.modelId} [{r}]</option>); })}</optgroup>)}
+                    {suitable.length > 0 && (<optgroup label="── 可选 ──">{suitable.map((m) => (<option key={`${m.providerProfileId}::${m.modelId}`} value={optionValue(m)}>{m.profileName} / {m.modelId}</option>))}</optgroup>)}
+                    {unsuitable.length > 0 && (<optgroup label="── 能力可能不匹配 ──">{unsuitable.map((m) => { const cs = m.capabilities || []; const r = reqC && !cs.includes(reqC) ? `缺少${reqC}` : m.provider === "deepseek" ? "DeepSeek不支持" : "未验证"; return (<option key={`${m.providerProfileId}::${m.modelId}`} value={optionValue(m)}>{m.profileName} / {m.modelId} [{r}]</option>); })}</optgroup>)}
                   </select>
                   {unsuitable.length > 0 && (<details className="mt-2"><summary className="cursor-pointer text-xs font-semibold text-zinc-600">能力说明</summary><div className="mt-1 space-y-1">{unsuitable.map((m) => { const cs = m.capabilities || []; const rs = []; if (role === "product_vision" && !cs.includes("vision")) rs.push("无vision"); if (role === "image_planning" && !cs.includes("text")) rs.push("无text"); if (role === "image_generation" && !cs.includes("image") && !cs.includes("asyncImage")) rs.push("无image"); if (role === "image_generation" && m.provider === "deepseek") rs.push("DeepSeek不支持生图"); return (<p key={`${m.providerProfileId}-${m.modelId}`} className="text-xs text-zinc-600">{m.profileName} / {m.modelId}：{rs.join("、") || "未验证能力"}</p>); })}</div></details>)}
                 </article>
@@ -317,7 +319,7 @@ function pickRecommendedProfile(role, profiles, current) {
 function roleScore(role, profile) {
   const lv = roleAcceptanceLevel(role, profile); const cs = profile.capabilities || []; let s = profile.enabled ? 10 : 0;
   if (lv === "adapterVerified") s += 50; else if (lv === "inferred") s += 20; else if (lv === "unverified") s += 5; else return 0;
-  if (role === "product_vision") { if (cs.includes("vision")) s += 20; if (profile.provider === "gemini") s += 2; }
+  if (role === "product_vision") { if (cs.includes("vision")) s += 20; if (cs.includes("image") || cs.includes("asyncImage")) s -= 40; if (profile.provider === "gemini") s += 2; }
   if (role === "image_planning") { if (cs.includes("text")) s += 20; if (cs.includes("reasoning")) s += 6; }
   if (role === "image_generation") { if (cs.includes("image")) s += 20; if (profile.supportsReferenceImages) s += 10; }
   return s;

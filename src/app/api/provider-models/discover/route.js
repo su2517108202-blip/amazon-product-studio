@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
 import { buildProviderConfig } from "@/lib/provider-runtime";
 import { getProviderAdapter } from "@/lib/providers/registry";
-import { validateProviderDraftInput, inferModelCapabilities, inferProviderProtocol, CAPABILITIES } from "@/lib/provider-profiles";
+import { validateProviderDraftInput, inferModelCapabilities, inferProviderProtocol } from "@/lib/provider-profiles";
 import { redactSecrets } from "@/lib/security";
 
 const UNSUPPORTED_MESSAGE = "该服务商不支持自动获取模型列表";
@@ -58,8 +58,7 @@ export async function POST(req) {
         }).filter(Boolean))]
       : [];
 
-    // Build unified model structure: { modelId, capabilities, protocol, capabilityStatus, reason }
-    const models = rawModelIds.map((modelId) => {
+    const modelDetails = rawModelIds.map((modelId) => {
       const capabilities = inferModelCapabilities(provider, modelId);
       const protocol = inferProviderProtocol(provider, modelId, capabilities);
 
@@ -84,10 +83,11 @@ export async function POST(req) {
     return NextResponse.json(redactSecrets({
       ok: true,
       provider,
-      models,
-      count: models.length,
+      models: rawModelIds,
+      modelDetails,
+      count: rawModelIds.length,
       message: result.ok
-        ? `已从官方 API 读取 ${models.length} 个模型`
+        ? `已从官方 API 读取 ${rawModelIds.length} 个模型`
         : (result.message || "模型列表读取完成"),
     }), { status: result.ok ? 200 : 400 });
   } catch (error) {
