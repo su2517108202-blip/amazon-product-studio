@@ -79,8 +79,9 @@ export async function POST(req, context) {
 
     profile = assignment.providerProfile;
     const effectiveModelId = (assignment.modelId || profile.modelId || "").trim();
-    const capabilities = parseCapabilities(profile);
-    if (!profile.enabled || !capabilities.includes("text")) {
+    // P1-5: Use effectiveConfig for all validation
+    const effectiveConfig = buildProviderConfig(profile, { modelId: effectiveModelId });
+    if (!profile.enabled || !effectiveConfig.capabilities?.includes("text")) {
       const error = new Error("Planning model is disabled or lacks text capability");
       error.code = "CAPABILITY_MISMATCH";
       return errorResponse(error, 400);
@@ -89,7 +90,7 @@ export async function POST(req, context) {
     const inputFingerprint = calculatePlanningFingerprint({
       project,
       identity: project.productIdentity,
-      providerProfile: profile,
+      providerProfile: { ...profile, modelId: effectiveModelId },
     });
     const reusablePlans = project.imagePlans.filter(
       (plan) => plan.inputFingerprint === inputFingerprint && !plan.isStale,
@@ -115,7 +116,7 @@ export async function POST(req, context) {
     });
 
     const adapter = getProviderAdapter(profile.provider);
-    const plans = await adapter.createImagePlan(buildProviderConfig(profile, { modelId: effectiveModelId }), {
+    const plans = await adapter.createImagePlan(effectiveConfig, {
       ...buildImagePlanningInput(project, project.productIdentity, project.referenceImages),
       taskContract: {
         count: 5,
@@ -129,7 +130,7 @@ export async function POST(req, context) {
         const data = imagePlanToDbData(plan, {
           inputFingerprint,
           sourceProvider: profile.provider,
-          sourceModel: profile.modelId,
+          sourceModel: effectiveModelId,
           sourceProfileId: profile.id,
         });
         saved.push(

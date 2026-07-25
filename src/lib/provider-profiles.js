@@ -20,13 +20,17 @@ export const IMAGE_GENERATION_PROTOCOLS = [
 
 export function inferModelCapabilities(provider, modelId = "") {
   const model = String(modelId || "").toLowerCase();
-  const defaults = getProviderDefaults(provider).capabilities;
-  const capabilities = new Set(defaults.includes("reasoning") ? ["text", "reasoning"] : ["text"]);
+  // P1-9: Conservative inference — start empty, add only with evidence
+  const capabilities = new Set();
+
+  // Text: most generative models support text, but embedding/audio/image-only do not
+  const isNonTextModel = /(embedding|aqa|whisper|tts|davinci|babbage|dall-e|gpt-image|imagen|seedream|kolors|flux|stable-diffusion|sdxl)/.test(model);
+  if (!isNonTextModel) {
+    capabilities.add("text");
+  }
 
   // Vision: only when model name clearly indicates visual capability
   if (provider === "gemini") {
-    // Gemini Flash/Pro/Ultra/Vision models generally support vision,
-    // but embedding/aqa models do not
     if (/(vision|flash|pro|ultra)/.test(model) && !/(embedding|aqa|text-)/.test(model)) {
       capabilities.add("vision");
     }
@@ -36,12 +40,21 @@ export function inferModelCapabilities(provider, modelId = "") {
     }
   }
 
-  if (/(gpt-image|dall-e|image|imagen|nano-banana|seedream|kolors|flux|stable-diffusion|sdxl)/.test(model)) {
+  // Image generation
+  if (/(gpt-image|dall-e|imagen|nano-banana|seedream|kolors|flux|stable-diffusion|sdxl)/.test(model)) {
     capabilities.add("image");
   }
 
+  // Async image
   if (/(async|task|seedream|doubao|volc|ark)/.test(model) || provider === "doubao") {
     capabilities.add("asyncImage");
+  }
+
+  // Reasoning: only specific models
+  if (provider === "openai" && /\b(o1|o3|o4)\b/.test(model)) {
+    capabilities.add("reasoning");
+  } else if (provider === "deepseek" && /reasoner/.test(model)) {
+    capabilities.add("reasoning");
   }
 
   if (provider === "deepseek") {

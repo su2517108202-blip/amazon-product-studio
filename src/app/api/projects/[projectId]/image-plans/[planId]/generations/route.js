@@ -111,10 +111,12 @@ export async function POST(req, context) {
       throw new ProviderError("MISSING_IMAGE_GENERATION_PROVIDER", "请先配置图片生成模型");
     }
     const effectiveModelId = (assignment.modelId || profile.modelId || "").trim();
+    // P1-5: Use effectiveConfig for all validation
+    const effectiveConfig = buildProviderConfig(profile, { modelId: effectiveModelId });
     if (!supportsImageGenerationProfile(profile)) {
       throw new ProviderError("CAPABILITY_MISMATCH", "当前服务商未勾选 image 能力");
     }
-    validateImageGenerationProtocol(profile);
+    validateImageGenerationProtocol(effectiveConfig);
 
     const selectedReferences = selectReferenceImages(project.referenceImages, body.referenceImageIds);
     const loadedReferences = await loadGenerationReferences(selectedReferences);
@@ -136,7 +138,7 @@ export async function POST(req, context) {
       productIdentity: project.productIdentity,
       imagePlan,
       referenceImages: selectedReferences,
-      providerProfile: profile,
+      providerProfile: { ...profile, modelId: effectiveModelId },
       output,
     });
 
@@ -169,7 +171,7 @@ export async function POST(req, context) {
         providerProfileId: profile.id,
         provider: profile.provider,
         model: effectiveModelId,
-        protocol: profile.protocol,
+        protocol: effectiveConfig.protocol,
         status: "processing",
         mode: "sync",
         inputFingerprint,

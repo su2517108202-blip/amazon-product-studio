@@ -3,11 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
 import { buildProviderConfig } from "@/lib/provider-runtime";
 import { getProviderAdapter } from "@/lib/providers/registry";
-import { parseCapabilities } from "@/lib/provider-profiles";
 import { identityToDbData, identityToResponse } from "@/lib/product-identity";
 import { buildAnalysisImages, calculateInputFingerprint, pickAnalysisImages, runToResponse } from "@/lib/product-analysis";
 import { sanitizeReferenceImage } from "@/lib/projects";
 import { humanErrorLabel } from "@/lib/providers/errors";
+import { redactSecrets } from "@/lib/security";
+import crypto from "crypto";
 
 async function getProject(projectId, userId) {
   return prisma.project.findFirst({
@@ -18,29 +19,18 @@ async function getProject(projectId, userId) {
 
 export async function POST(req, context) {
   const startedAt = Date.now();
-  let run = null;
-  let profile = null;
-  let effectiveModelId = "";
-  let projectId = "";
+  let run = null, profile = null, effectiveModelId = "", projectId = "";
 
   try {
-    const params = await context.params;
-    projectId = params.projectId;
+    projectId = (await context.params).projectId;
     const user = await requireCurrentUser();
     const body = await req.json().catch(() => ({}));
     const project = await getProject(projectId, user.id);
     if (!project) return NextResponse.json({ error: "项目不存在" }, { status: 404 });
 
     const selectedImages = pickAnalysisImages(project);
-    const inputFingerprint = await calculateInputFingerprint(project, selectedImages);
 
-    if (project.productIdentity && project.productIdentity.inputFingerprint === inputFingerprint && !project.productIdentity.isStale && !body.force) {
-      return NextResponse.json({
-        ok: true, reused: true, message: "当前参考图未变化，可复用上次识别结果",
-        identity: identityToResponse(project.productIdentity), selectedImages: selectedImages.map(sanitizeReferenceImage),
-      });
-    }
-
+    // Get assignment first to compute effectiveModelId for fingerprint
     const assignment = await prisma.modelRoleAssignment.findUnique({
       where: { userId_role: { userId: user.id, role: "product_vision" } },
       include: { providerProfile: true },
@@ -48,19 +38,33 @@ export async function POST(req, context) {
     if (!assignment?.providerProfile) {
       return NextResponse.json({ ok: false, code: "MISSING_PROVIDER_PROFILE", message: "请先在 API 设置中绑定商品识图模型" }, { status: 400 });
     }
-
     profile = assignment.providerProfile;
     effectiveModelId = (assignment.modelId || profile.modelId || "").trim();
-    const capabilities = parseCapabilities(profile);
+    const effectiveConfig = buildProviderConfig(profile, { modelId: effectiveModelId });
+
+    // P1-7: fingerprint includes model info so changing model invalidates cache
+    const imageFingerprint = await calculateInputFingerprint(project, selectedImages);
+    const modelFingerprint = crypto.createHash("sha256").update(JSON.stringify({
+      profileId: profile.id, modelId: effectiveModelId,
+    })).digest("hex");
+    const inputFingerprint = `${imageFingerprint}_${modelFingerprint}`;
+
+    if (project.productIdentity && project.productIdentity.inputFingerprint === inputFingerprint && !project.productIdentity.isStale && !body.force) {
+      return NextResponse.json({
+        ok: true, reused: true, message: "当前参考图和识图模型未变化，可复用上次识别结果",
+        identity: identityToResponse(project.productIdentity), selectedImages: selectedImages.map(sanitizeReferenceImage),
+      });
+    }
 
     if (!profile.enabled) {
       return NextResponse.json({ ok: false, code: "PROFILE_DISABLED", message: "商品识图配置已停用" }, { status: 400 });
     }
-    if (!capabilities.includes("vision")) {
+    // P1-4: use effectiveConfig capabilities, not profile defaults
+    if (!effectiveConfig.capabilities?.includes("vision")) {
       return NextResponse.json({
         ok: false, code: "CAPABILITY_MISMATCH",
         message: `模型 ${effectiveModelId} 缺少视觉能力`,
-        diagnostic: { provider: profile.provider, model: effectiveModelId },
+        diagnostic: redactSecrets({ provider: profile.provider, model: effectiveModelId }),
       }, { status: 400 });
     }
 
@@ -70,8 +74,7 @@ export async function POST(req, context) {
 
     const images = await buildAnalysisImages(project);
     const adapter = getProviderAdapter(profile.provider);
-    const config = buildProviderConfig(profile, { modelId: effectiveModelId });
-    const result = await adapter.analyzeProduct(config, { project, images });
+    const result = await adapter.analyzeProduct(effectiveConfig, { project, images });
 
     const saved = await prisma.productIdentity.upsert({
       where: { projectId },
@@ -80,34 +83,28 @@ export async function POST(req, context) {
     });
 
     const updatedRun = await prisma.productAnalysisRun.update({
-      where: { id: run.id },
-      data: { status: "completed", durationMs: Date.now() - startedAt, completedAt: new Date() },
+      where: { id: run.id }, data: { status: "completed", durationMs: Date.now() - startedAt, completedAt: new Date() },
     });
     await prisma.imagePlan.updateMany({ where: { projectId }, data: { isStale: true } });
 
     return NextResponse.json({
       ok: true, reused: false,
-      identity: identityToResponse(saved),
-      run: runToResponse(updatedRun),
+      identity: identityToResponse(saved), run: runToResponse(updatedRun),
       selectedImages: selectedImages.map(sanitizeReferenceImage),
     });
   } catch (error) {
     const durationMs = Date.now() - startedAt;
-    console.error("[PRODUCT_ANALYSIS_ERROR]", {
-      projectId, profileId: profile?.id || "", provider: profile?.provider || "",
-      model: effectiveModelId || profile?.modelId || "", errorCode: error.code || "UPSTREAM_ERROR",
-      httpStatus: error.httpStatus || 0, durationMs,
-    });
+    console.error("[PRODUCT_ANALYSIS_ERROR]", { projectId, profileId: profile?.id || "", provider: profile?.provider || "", model: effectiveModelId || "", errorCode: error.code || "UPSTREAM_ERROR", httpStatus: error.httpStatus || 0, durationMs });
 
     if (run) {
       await prisma.productAnalysisRun.update({
-        where: { id: run.id },
-        data: { status: "failed", errorCode: error.code || "UPSTREAM_ERROR", errorMessage: error.message || "商品识别失败", durationMs, completedAt: new Date() },
+        where: { id: run.id }, data: { status: "failed", errorCode: error.code || "UPSTREAM_ERROR", errorMessage: error.message || "商品识别失败", durationMs, completedAt: new Date() },
       }).catch(() => {});
     }
 
+    // P1-11: Preserve cause chain. P1-12: redactSecrets diagnostic
     const upstreamSummary = error?.cause?.summary;
-    return NextResponse.json({
+    return NextResponse.json(redactSecrets({
       ok: false,
       code: error.code || "UPSTREAM_ERROR",
       message: error.message || humanErrorLabel(error.code) || "商品识别失败",
@@ -120,6 +117,6 @@ export async function POST(req, context) {
         upstreamMessage: upstreamSummary?.errorMessage || "",
         upstreamDetails: upstreamSummary?.errorDetails || "",
       },
-    }, { status: error.httpStatus >= 500 ? 502 : 400 });
+    }), { status: error.httpStatus >= 500 ? 502 : 400 });
   }
 }

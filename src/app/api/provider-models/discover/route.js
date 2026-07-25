@@ -52,7 +52,10 @@ export async function POST(req) {
 
     const result = await adapter.listModels(config);
     const rawModelIds = Array.isArray(result.models)
-      ? [...new Set(result.models.map((m) => String(m || "").trim()).filter(Boolean))]
+      ? [...new Set(result.models.map((m) => {
+          const id = typeof m === "string" ? m : (m.id || m.name || "");
+          return String(id).trim();
+        }).filter(Boolean))]
       : [];
 
     // Build unified model structure: { modelId, capabilities, protocol, capabilityStatus, reason }

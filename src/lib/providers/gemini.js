@@ -179,8 +179,14 @@ export const geminiAdapter = {
       }
 
       const data = await response.json();
+      // P1-8: Preserve official metadata (displayName, supportedGenerationMethods, etc.)
       const models = Array.isArray(data.models)
-        ? data.models.map((item) => item.name).filter(Boolean)
+        ? data.models.map((item) => ({
+            id: item.name || item.id || "",
+            displayName: item.displayName || "",
+            description: item.description || "",
+            supportedGenerationMethods: item.supportedGenerationMethods || [],
+          })).filter((m) => m.id)
         : [];
 
       return {
@@ -250,6 +256,7 @@ export const geminiAdapter = {
       const normalized = normalizeProviderError(error);
       throw new ProviderError(normalized.code, normalized.message, {
         httpStatus: normalized.httpStatus,
+        cause: error?.cause || normalized.cause,
       });
     }
   },
@@ -300,6 +307,7 @@ export const geminiAdapter = {
       const normalized = normalizeProviderError(error);
       throw new ProviderError(normalized.code, normalized.message, {
         httpStatus: normalized.httpStatus,
+        cause: error?.cause || normalized.cause,
       });
     }
   },
@@ -365,6 +373,7 @@ export const geminiAdapter = {
       const normalized = normalizeProviderError(error);
       throw new ProviderError(normalized.code, normalized.message, {
         httpStatus: normalized.httpStatus,
+        cause: error?.cause || normalized.cause,
       });
     }
   },
