@@ -1,5 +1,13 @@
 # Migration Result
 
+## Status
+Verified.
+
+## Database
+- PostgreSQL was started on `localhost:55432`.
+- Database used for validation: `amazon_product_studio_stage1`.
+- Local PostgreSQL runtime was restored from the project local data area, not by resetting or deleting data.
+
 ## Migration File
 `prisma/migrations/202607250001_stage8_0_4_role_model_id/migration.sql`
 
@@ -8,21 +16,14 @@ ALTER TABLE "ModelRoleAssignment" ADD COLUMN "modelId" TEXT;
 ALTER TABLE "ModelRoleAssignment" ADD COLUMN "isUserForced" BOOLEAN NOT NULL DEFAULT false;
 ```
 
-## Execution Status
-- `prisma validate`: ✅ Schema valid
-- `prisma generate`: ✅ Client generated
-- `prisma migrate status`: ❌ Cannot connect (P1001: PostgreSQL at localhost:55432 not running)
-- `prisma migrate deploy`: ❌ Not executed (database offline)
+## Commands Verified
+- `npx prisma validate --config prisma.config.ts`: passed.
+- `npx prisma generate --config prisma.config.ts`: passed.
+- `npx prisma migrate deploy --config prisma.config.ts`: passed.
 
-## Database State
-- Host: localhost:55432
-- PostgreSQL 17 data directory exists at `C:\Program Files\PostgreSQL\17\data`
-- PostgreSQL binaries not found (incomplete installation)
-- No migration has been applied to the database
-
-## Recovery
-When PostgreSQL is available:
-```bash
-npx prisma migrate deploy
-```
-This applies only 202607250001 (safe ADD COLUMN).
+## Result
+- 11 migrations were found.
+- Stage 8.0.2 local usability migration was applied.
+- Stage 8.0.4 role model override migration was applied.
+- Migration deploy completed successfully.
+- No database reset was performed.

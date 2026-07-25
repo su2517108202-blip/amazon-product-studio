@@ -1,35 +1,31 @@
 # Model Discovery Result
 
-## API Endpoint
+## Endpoint
 `POST /api/provider-models/discover`
 
-## Modes
-- **Draft**: `{ provider, baseUrl, apiKey }` — calls adapter.listModels()
-- **Saved**: `{ providerProfileId }` — server decrypts, calls adapter.listModels()
+## Verified Result
+- Provider: Gemini.
+- Official model list request completed with HTTP 200.
+- Returned model count: 50.
+- API key was not returned, logged, or written to the response.
+- Legacy response compatibility is preserved: `models` remains a string array.
+- Enhanced model information is returned in `modelDetails`.
 
-## Security
-- Saved mode: AND userId check (`where: { id: profileId, userId: user.id }`)
-- API Key never returned to browser, never logged
+## modelDetails Metadata
+For official Gemini results, `modelDetails.metadata` now passes through:
+- `displayName`
+- `description`
+- `supportedGenerationMethods`
 
-## Return Structure
-```json
-{
-  "models": [{
-    "modelId": "string",
-    "capabilities": ["text", "vision", ...],
-    "protocol": "string",
-    "capabilityStatus": "inferred|unverified|...",
-    "reason": "string"
-  }]
-}
-```
+## Capability Handling
+- Model discovery does not treat unclear Gemini capability metadata as verified.
+- When the official list does not explicitly describe vision or image capability, the model remains `unverified`.
+- The UI may still let a user force-select an unverified model, but the API does not describe that as verified support.
 
-## Capability Inference Rules
-- Gemini: vision only for flash/pro/ultra/vision models (NOT embedding, aqa, text-)
-- OpenAI: vision for gpt-4o/o3/o4/vision variants
-- GPT-image: image capability, openai-images protocol
-- DeepSeek: no vision, no image
+## Account-Specific Model Finding
+- `models/gemini-2.5-flash` was present in the official model list.
+- In this account, a real product-vision call to `models/gemini-2.5-flash` returned `MODEL_NOT_FOUND` / HTTP 404 with the provider message that this model is no longer available to new users.
+- This is recorded only as the result for the current account and key. It is not a claim that `gemini-2.5-flash` is globally unavailable for all accounts.
 
-## Testing
-- Static tests: 25/25 ✅
-- Real API test: NOT EXECUTED (database offline, no API key configured)
+## Final Working Model
+- Actual successful product-vision model: `gemini-flash-latest`.

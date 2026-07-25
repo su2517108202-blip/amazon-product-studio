@@ -3,6 +3,12 @@ import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
 import { MODEL_ROLES, parseCapabilities, inferModelCapabilities, roleAcceptanceLevel, sanitizeRoleAssignment } from "@/lib/provider-profiles";
 
+function hasHardRoleConflict(role, profile) {
+  if (!profile.enabled) return true;
+  if (role === "image_generation" && profile.provider === "deepseek") return true;
+  return false;
+}
+
 export async function PUT(req, context) {
   try {
     const { role } = await context.params;
@@ -28,7 +34,8 @@ export async function PUT(req, context) {
     const effectiveProfile = { ...profile, modelId: effectiveModelId, capabilities: effectiveCaps };
 
     const level = roleAcceptanceLevel(role, effectiveProfile);
-    if (level === "unsupported") {
+    const capabilityStatus = level === "unsupported" && isUserForced ? "unverified" : level;
+    if (level === "unsupported" && (!isUserForced || hasHardRoleConflict(role, effectiveProfile))) {
       return NextResponse.json(
         { error: `该模型不具备 ${roleConfig.label} 所需能力`, code: "CAPABILITY_MISMATCH", capabilityStatus: level },
         { status: 400 },
@@ -42,7 +49,7 @@ export async function PUT(req, context) {
       include: { providerProfile: true },
     });
 
-    return NextResponse.json({ ...sanitizeRoleAssignment(assignment), acceptanceLevel: level });
+    return NextResponse.json({ ...sanitizeRoleAssignment(assignment), acceptanceLevel: capabilityStatus });
   } catch (error) {
     return NextResponse.json({ error: error.message || "无法保存角色绑定" }, { status: error.status || 500 });
   }

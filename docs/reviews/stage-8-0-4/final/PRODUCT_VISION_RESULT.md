@@ -1,39 +1,42 @@
 # Product Vision Result
 
-## Status: NOT TESTED
+## Status
+Verified with a real local JPG product image and a real Gemini product-vision request.
 
-**PostgreSQL not available**: The database at localhost:55432 could not be started. PostgreSQL binaries not found (data directory exists but no pg_ctl.exe). Migration not applied.
+## Local Flow Verified
+1. Created a local validation project.
+2. Uploaded a real JPG product image.
+3. Bound product vision to the saved Gemini provider profile.
+4. Triggered product recognition from the local workspace.
+5. Confirmed `ProductIdentity` was saved.
+6. Confirmed name suggestions displayed in the workspace.
+7. Refreshed the project page and confirmed saved identity data remained available.
 
-## Expected Flow (documented, not executed)
-1. Database start → migrate → save Gemini profile with API key
-2. Click "获取模型列表" → GET /v1beta/models
-3. Select vision model from returned list
-4. Bind to product_vision role
-5. Create project, upload JPG, set primary reference
-6. Click "商品识别"
-7. Image enters Gemini request as inlineData
-8. Response parsed into ProductIdentity
-9. Name suggestions displayed
+## HTTP Results
+- JPG upload: HTTP 201.
+- Product recognition: HTTP 200.
+- Product identity read after refresh: HTTP 200.
 
-## Expected Request
-```
-POST https://generativelanguage.googleapis.com/v1beta/models/{modelId}:generateContent
-Content-Type: application/json
-x-goog-api-key: [REDACTED]
+## Actual Model
+- Provider: Gemini.
+- Model used successfully: `gemini-flash-latest`.
+- Selected images sent for recognition: 1.
+- Result status: completed.
 
-{ "contents": [{ "role": "user", "parts": [
-    { "text": "你是严谨的电商商品识图助手..." },
-    { "inlineData": { "mimeType": "image/jpeg", "data": "[BASE64_REDACTED]" } }
-]}] }
-```
+## Saved ProductIdentity
+- `ProductIdentity` was saved.
+- `isStale`: false after successful recognition.
+- Source provider: `gemini`.
+- Source model: `gemini-flash-latest`.
 
-## Error Handling (implemented, not tested against real API)
-11 error codes mapped from Gemini error.status:
-INVALID_API_KEY, BILLING_REQUIRED, QUOTA_EXCEEDED, MODEL_NOT_FOUND,
-MODEL_ACCESS_DENIED, RATE_LIMITED, IMAGE_INPUT_UNSUPPORTED,
-INVALID_REQUEST, PROVIDER_TIMEOUT, PROVIDER_NETWORK_ERROR, UPSTREAM_ERROR
+## Name Suggestions
+- The workspace displayed the AI name suggestion panel after recognition.
+- Example recognized product wording included a black matte portable travel coffee cup.
 
-## Blockers
-1. PostgreSQL not running (binaries missing)
-2. No Gemini API key configured
-3. Migration not applied
+## Non-Goal
+- Real paid image generation was not triggered.
+- Real paid image generation calls added: 0.
+
+## Account-Specific Model Finding
+- A product-vision call using `models/gemini-2.5-flash` returned `MODEL_NOT_FOUND` for the current account.
+- This is not documented as a global deprecation for every Gemini account.

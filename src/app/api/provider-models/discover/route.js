@@ -51,15 +51,31 @@ export async function POST(req) {
     }
 
     const result = await adapter.listModels(config);
+    const modelMetadata = new Map();
     const rawModelIds = Array.isArray(result.models)
       ? [...new Set(result.models.map((m) => {
           const id = typeof m === "string" ? m : (m.id || m.name || "");
-          return String(id).trim();
+          const modelId = String(id).trim();
+          if (modelId && typeof m === "object") {
+            modelMetadata.set(modelId, {
+              displayName: m.displayName || "",
+              description: m.description || "",
+              supportedGenerationMethods: Array.isArray(m.supportedGenerationMethods)
+                ? m.supportedGenerationMethods
+                : [],
+            });
+          }
+          return modelId;
         }).filter(Boolean))]
       : [];
 
     const modelDetails = rawModelIds.map((modelId) => {
-      const capabilities = inferModelCapabilities(provider, modelId);
+      const metadata = modelMetadata.get(modelId) || {
+        displayName: "",
+        description: "",
+        supportedGenerationMethods: [],
+      };
+      let capabilities = inferModelCapabilities(provider, modelId);
       const protocol = inferProviderProtocol(provider, modelId, capabilities);
 
       // Capability status: only mark as "inferred" (not "verified" or "official")
@@ -67,17 +83,26 @@ export async function POST(req) {
       let capabilityStatus = "inferred";
       let reason = "";
 
-      // For Gemini, only mark vision if model name contains vision/visual signals
       if (provider === "gemini") {
+        const methods = metadata.supportedGenerationMethods || [];
         const modelLower = modelId.toLowerCase();
-        const hasVisionSignal = /vision|flash|pro|ultra/i.test(modelLower);
-        if (!hasVisionSignal) {
-          capabilityStatus = "unverified";
-          reason = "模型名称未包含视觉信号，能力未经验证";
-        }
+        const geminiCapabilities = new Set();
+        if (methods.includes("generateContent")) geminiCapabilities.add("text");
+        if (/vision/.test(modelLower)) geminiCapabilities.add("vision");
+        if (/(imagen|image|nano-banana)/.test(modelLower)) geminiCapabilities.add("image");
+        capabilities = [...geminiCapabilities];
+        capabilityStatus = "unverified";
+        reason = "Gemini 官方模型列表未明确声明视觉或生图能力，需实际绑定后验证";
       }
 
-      return { modelId, capabilities, protocol, capabilityStatus, reason };
+      return {
+        modelId,
+        capabilities,
+        protocol,
+        capabilityStatus,
+        reason,
+        metadata,
+      };
     });
 
     return NextResponse.json(redactSecrets({

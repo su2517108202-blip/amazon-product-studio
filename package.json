@@ -16,6 +16,7 @@
     "test:stage-8": "node scripts/stage-8-final-release-e2e.mjs",
     "test:stage-8-0-2": "node scripts/stage-8-0-2-local-usability-tests.mjs",
     "test:stage-8-0-3": "node scripts/stage-8-0-3-auto-match-drag-drop-tests.mjs",
+    "test:stage-8-0-4": "node scripts/stage-8-0-4-checkpoint-0-1-tests.mjs",
     "test:ui-text": "node scripts/ui-text-tests.mjs",
     "lint": "eslint",
     "generate:credential-key": "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""
