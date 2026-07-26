@@ -45,3 +45,9 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local stage review bundles
+stage-8-final-release.bundle
+stage-8.0.4-review*.bundle
+stage-8.0.4-review*.diff
+stage-8.0.4-review*-log.txt

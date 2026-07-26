@@ -1,25 +1,59 @@
-# Changed Files (21 files, +937/-311)
+# Changed Files
 
-| # | File | Status | Change |
-|---|------|--------|--------|
-| 1 | prisma/schema.prisma | M | ModelRoleAssignment +modelId +isUserForced |
-| 2 | prisma/migrations/202607250001_*/migration.sql | A | ALTER TABLE ADD COLUMN |
-| 3 | src/lib/provider-profiles.js | M | roleAcceptanceLevel, ACCEPTANCE_LABELS, GPT-image protocol, capability inference rules |
-| 4 | src/lib/provider-runtime.js | M | buildProviderConfig supports overrides.modelId |
-| 5 | src/lib/providers/errors.js | M | humanErrorLabel, classifyHttpError enhanced |
-| 6 | src/lib/providers/gemini.js | M | classifyGeminiError, throwGeminiError, safeSummary |
-| 7 | src/app/api/provider-models/discover/route.js | M | Dual-mode: draft + saved profile, userId check, capabilityStatus |
-| 8 | src/app/api/model-role-assignments/[role]/route.js | M | modelId + isUserForced, effectiveModelId validation |
-| 9 | src/app/api/projects/[projectId]/analyze/route.js | M | effectiveModelId, diagnostic errors, completed run in response |
-| 10 | src/app/api/.../generate/route.js | M | effectiveModelId through buildProviderConfig |
-| 11 | src/app/api/.../generations/route.js | M | effectiveModelId through buildProviderConfig |
-| 12 | src/app/page.js | M | Default "未命名项目" |
-| 13 | src/app/projects/[projectId]/ProjectStudioClient.js | M | Name suggestions, diagnostic error display |
-| 14 | src/app/settings/providers/ProviderSettingsClient.js | M | Model discovery buttons, role dropdown with discovered models |
-| 15 | scripts/stage-8-0-4-checkpoint-0-1-tests.mjs | A | 25 static unit tests |
-| 16-21 | docs/stages/stage-8-0-4-minimal/* | A | Stage documentation |
+## Diff Range
+`12ae3b1d52d58abe6c6ccc6b993ed5f4252d3fc5..HEAD`
 
-## No data structure changes beyond ADD COLUMN
-- ProviderProfile.modelId: still required String
-- No DiscoveredModel table
-- No column renames or deletions
+## True Shortstat
+`31 files changed, 1420 insertions(+), 950 deletions(-)`
+
+## Counts
+- Business and test files: 17
+- Documentation files: 14
+- Total changed files: 31
+- Insertions: 1420
+- Deletions: 950
+- Stage 8.0.4 test script test cases: 17
+- Stage 8.0.4 assertion calls: 32
+
+## Changed Files
+### Documentation Files (14)
+1. `docs/reviews/stage-8-0-4/final/CHANGED_FILES.md`
+2. `docs/reviews/stage-8-0-4/final/IMPLEMENTATION_SUMMARY.md`
+3. `docs/reviews/stage-8-0-4/final/MIGRATION_RESULT.md`
+4. `docs/reviews/stage-8-0-4/final/MODEL_DISCOVERY_RESULT.md`
+5. `docs/reviews/stage-8-0-4/final/PRODUCT_VISION_RESULT.md`
+6. `docs/reviews/stage-8-0-4/final/REMAINING_ISSUES.md`
+7. `docs/reviews/stage-8-0-4/final/SECURITY_CHECK.md`
+8. `docs/reviews/stage-8-0-4/final/TESTS_ACTUALLY_RUN.md`
+9. `docs/stages/stage-8-0-4-minimal/IMPLEMENTATION_PLAN.md`
+10. `docs/stages/stage-8-0-4-minimal/KNOWN_ISSUES.md`
+11. `docs/stages/stage-8-0-4-minimal/MIGRATION_NOTES.md`
+12. `docs/stages/stage-8-0-4-minimal/MODEL_DISCOVERY_DESIGN.md`
+13. `docs/stages/stage-8-0-4-minimal/PRODUCT_VISION_ACCEPTANCE.md`
+14. `docs/stages/stage-8-0-4-minimal/acceptance-summary.json`
+
+### Business And Test Files (17)
+1. `.gitignore`
+2. `package.json`
+3. `prisma/migrations/202607250001_stage8_0_4_role_model_id/migration.sql`
+4. `prisma/schema.prisma`
+5. `scripts/stage-8-0-4-checkpoint-0-1-tests.mjs`
+6. `src/app/api/model-role-assignments/[role]/route.js`
+7. `src/app/api/projects/[projectId]/analyze/route.js`
+8. `src/app/api/projects/[projectId]/image-plans/[planId]/generations/route.js`
+9. `src/app/api/projects/[projectId]/image-plans/generate/route.js`
+10. `src/app/api/provider-models/discover/route.js`
+11. `src/app/page.js`
+12. `src/app/projects/[projectId]/ProjectStudioClient.js`
+13. `src/app/settings/providers/ProviderSettingsClient.js`
+14. `src/lib/provider-profiles.js`
+15. `src/lib/provider-runtime.js`
+16. `src/lib/providers/errors.js`
+17. `src/lib/providers/gemini.js`
+
+## Notes
+- Previous stale file-count and line-count summaries are superseded by the values above.
+- Previous stale Stage 8.0.4 test-count wording is superseded by the values above.
+- Stage 8.0.4 currently has 17 scripted test cases and 32 assertion calls in `scripts/stage-8-0-4-checkpoint-0-1-tests.mjs`.
+- No `DiscoveredModel` table was added.
+- No destructive database migration was added.

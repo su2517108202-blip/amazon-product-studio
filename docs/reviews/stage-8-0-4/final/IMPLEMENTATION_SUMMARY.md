@@ -6,6 +6,16 @@
 ## Baseline
 `stage-8.0.3-auto-match-drag-drop` / `12ae3b1d52d58abe6c6ccc6b993ed5f4252d3fc5`
 
+## Final Acceptance And Planned Tag
+Final acceptance commit:
+`94f7c09adb196f266d0e3df7095d48d654039920`
+
+Planned tag:
+`stage-8.0.4-minimal-model-discovery`
+
+Tag must point to:
+the final documentation closure commit created by `docs: finalize stage 8.0.4 acceptance records`.
+
 ## Scope
 Stage 8.0.4 remains a minimal model-discovery and product-vision validation closure.
 
