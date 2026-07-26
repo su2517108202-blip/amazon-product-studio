@@ -1,4 +1,8 @@
-import { hasCredentialKey, maskApiKey } from "./security.js";
+﻿import { hasCredentialKey, maskApiKey } from "./security.js";
+import {
+  protocolSupportsReferenceImages as protocolSupportsReferenceImagesResolved,
+  resolveEffectiveModelCapability,
+} from "./model-capabilities.js";
 
 export const PROVIDERS = [
   "openai",
@@ -19,70 +23,16 @@ export const IMAGE_GENERATION_PROTOCOLS = [
 ];
 
 export function inferModelCapabilities(provider, modelId = "") {
-  const model = String(modelId || "").toLowerCase();
-  // P1-9: Conservative inference — start empty, add only with evidence
-  const capabilities = new Set();
-
-  // Text: most generative models support text, but embedding/audio/image-only do not
-  const isNonTextModel = /(embedding|aqa|whisper|tts|davinci|babbage|dall-e|gpt-image|imagen|seedream|kolors|flux|stable-diffusion|sdxl)/.test(model);
-  if (!isNonTextModel) {
-    capabilities.add("text");
-  }
-
-  // Vision: only when model name clearly indicates visual capability
-  if (provider === "gemini") {
-    if (/(vision|flash|pro|ultra)/.test(model) && !/(embedding|aqa|text-)/.test(model)) {
-      capabilities.add("vision");
-    }
-  } else if (provider === "openai" || provider === "openai-compatible") {
-    if (/\b(gpt-4o|o3|o4|vision|vl|visual|multimodal|omni|pixtral)\b/.test(model)) {
-      capabilities.add("vision");
-    }
-  }
-
-  // Image generation
-  if (/(gpt-image|dall-e|imagen|nano-banana|seedream|kolors|flux|stable-diffusion|sdxl)/.test(model)) {
-    capabilities.add("image");
-  }
-
-  // Async image
-  if (/(async|task|seedream|doubao|volc|ark)/.test(model) || provider === "doubao") {
-    capabilities.add("asyncImage");
-  }
-
-  // Reasoning: only specific models
-  if (provider === "openai" && /\b(o1|o3|o4)\b/.test(model)) {
-    capabilities.add("reasoning");
-  } else if (provider === "deepseek") {
-    capabilities.add("reasoning");
-  }
-
-  if (provider === "deepseek") {
-    capabilities.delete("vision");
-    capabilities.delete("image");
-    capabilities.delete("asyncImage");
-  }
-
-  return [...capabilities].filter((capability) => CAPABILITIES.includes(capability));
+  return resolveEffectiveModelCapability({ provider, modelId }).capabilities;
 }
 
 export function inferProviderProtocol(provider, modelId = "", capabilities = []) {
-  const model = String(modelId || "").toLowerCase();
-  if (provider === "gemini" && capabilities.includes("image")) return "gemini-native-image";
-  if (provider === "openai" && capabilities.includes("image")) {
-    if (/gpt-image/.test(model)) return "openai-images";
-    return "openai-image-edit";
-  }
-  if (provider === "openai-compatible" && capabilities.includes("image")) {
-    if (/gpt-image/.test(model)) return "openai-images";
-    return "openai-image-edit";
-  }
-  if (provider === "doubao" || capabilities.includes("asyncImage") || /(seedream|doubao|volc|ark)/.test(model)) {
-    return "doubao-image";
-  }
-  return getProviderDefaults(provider).protocol;
+  return resolveEffectiveModelCapability({
+    provider,
+    modelId,
+    adapterProbe: Array.isArray(capabilities) && capabilities.length ? { capabilities } : null,
+  }).protocol || getProviderDefaults(provider).protocol;
 }
-
 export function inferProviderDraftSettings({ provider, modelId, protocol, capabilities } = {}) {
   const inferredCapabilities = inferModelCapabilities(provider, modelId);
   const nextCapabilities =
@@ -130,9 +80,23 @@ export const ACCEPTANCE_LABELS = {
 
 export function roleAcceptanceLevel(role, profile) {
   if (!profile.enabled) return "unsupported";
-  const capabilities = profile.capabilities || [];
+  const resolved = resolveEffectiveModelCapability({
+    provider: profile.provider,
+    modelId: profile.modelId,
+    profile,
+    adapterProbe: {
+      capabilities: profile.capabilities || [],
+      protocol: profile.protocol,
+      supportsReferenceImages: profile.supportsReferenceImages,
+      capabilityStatus: profile.capabilityStatus,
+    },
+  });
+  const capabilities = resolved.capabilities || [];
+  if (resolved.capabilityStatus === "unsupported") return "unsupported";
   if (role === "product_vision") {
     if (!capabilities.includes("vision")) return "unsupported";
+    if (resolved.capabilityStatus === "unverified") return "unverified";
+    if (resolved.capabilityStatus === "official") return "official";
     if (profile.provider === "gemini") return "adapterVerified";
     return "inferred";
   }
@@ -143,7 +107,8 @@ export function roleAcceptanceLevel(role, profile) {
   if (role === "image_generation") {
     if (!capabilities.includes("image") && !capabilities.includes("asyncImage")) return "unsupported";
     if (profile.provider === "deepseek") return "unsupported";
-    const refStatus = referenceImageSupportStatus(profile);
+    if (resolved.capabilityStatus === "unverified") return "unverified";
+    const refStatus = referenceImageSupportStatus({ ...profile, protocol: resolved.protocol });
     if (refStatus === "verified") return "adapterVerified";
     if (refStatus === "text_only") return "inferred";
     return "unverified";
@@ -196,6 +161,7 @@ export function parseCapabilities(profile) {
 }
 
 export function supportsReferenceImagesProfile(profile = {}) {
+  if (typeof profile.supportsReferenceImages === "boolean") return profile.supportsReferenceImages;
   return protocolSupportsReferenceImages(profile.provider, profile.protocol);
 }
 
@@ -207,11 +173,7 @@ export function referenceImageSupportStatus(profile = {}) {
 }
 
 export function protocolSupportsReferenceImages(provider, protocol) {
-  if (provider === "gemini") return protocol === "gemini-native-image";
-  if (provider === "openai") return protocol === "openai-image-edit";
-  if (provider === "openai-compatible") return protocol === "openai-image-edit";
-  if (provider === "doubao") return false;
-  return false;
+  return protocolSupportsReferenceImagesResolved(provider, protocol);
 }
 
 export function sanitizeProviderProfile(profile) {

@@ -1,7 +1,8 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
-import { MODEL_ROLES, parseCapabilities, inferModelCapabilities, roleAcceptanceLevel, sanitizeRoleAssignment } from "@/lib/provider-profiles";
+import { MODEL_ROLES, parseCapabilities, roleAcceptanceLevel, sanitizeRoleAssignment } from "@/lib/provider-profiles";
+import { resolveEffectiveModelCapability } from "@/lib/model-capabilities";
 
 function hasHardRoleConflict(role, profile) {
   if (!profile.enabled) return true;
@@ -26,18 +27,40 @@ export async function PUT(req, context) {
 
     const effectiveModelId = (modelId || profile.modelId || "").trim();
 
-    // Re-infer capabilities based on effectiveModelId, not just profile defaults
-    const profileCapabilities = parseCapabilities(profile);
-    const effectiveCaps = effectiveModelId && effectiveModelId !== profile.modelId
-      ? inferModelCapabilities(profile.provider, effectiveModelId)
-      : profileCapabilities;
-    const effectiveProfile = { ...profile, modelId: effectiveModelId, capabilities: effectiveCaps };
+    const resolved = resolveEffectiveModelCapability({
+      provider: profile.provider,
+      modelId: effectiveModelId,
+      profile,
+      adapterProbe: { capabilities: parseCapabilities(profile), protocol: profile.protocol },
+    });
+    const effectiveProfile = {
+      ...profile,
+      modelId: effectiveModelId,
+      capabilities: resolved.capabilities,
+      protocol: resolved.protocol,
+      supportsReferenceImages: resolved.supportsReferenceImages,
+      capabilityStatus: resolved.capabilityStatus,
+    };
 
     const level = roleAcceptanceLevel(role, effectiveProfile);
     const capabilityStatus = level === "unsupported" && isUserForced ? "unverified" : level;
     if (level === "unsupported" && (!isUserForced || hasHardRoleConflict(role, effectiveProfile))) {
       return NextResponse.json(
-        { error: `该模型不具备 ${roleConfig.label} 所需能力`, code: "CAPABILITY_MISMATCH", capabilityStatus: level },
+        {
+          error: `该模型不具备 ${roleConfig.label} 所需能力`,
+          code: "CAPABILITY_MISMATCH",
+          capabilityStatus: level,
+          diagnostic: {
+            role,
+            providerProfileId,
+            provider: profile.provider,
+            effectiveModelId,
+            effectiveCapabilities: resolved.capabilities,
+            effectiveProtocol: resolved.protocol,
+            supportsReferenceImages: resolved.supportsReferenceImages,
+            capabilityStatus: resolved.capabilityStatus,
+          },
+        },
         { status: 400 },
       );
     }

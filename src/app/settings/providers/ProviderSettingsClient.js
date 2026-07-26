@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -17,8 +17,14 @@ import {
   IMAGE_GENERATION_PROTOCOLS,
   PROVIDER_DEFAULTS,
   inferProviderDraftSettings,
-  roleAcceptanceLevel,
 } from "@/lib/provider-profiles";
+import {
+  formatModelOptionLabel,
+  modelSearchText,
+  modelSupportsRole,
+  resolveEffectiveModelCapability,
+  sortModelsForRole,
+} from "@/lib/model-capabilities";
 
 const EMPTY_FORM = {
   id: "",
@@ -52,7 +58,7 @@ function normalizeModelDetails(payload) {
     : (Array.isArray(payload?.models) ? payload.models : []);
   return source
     .map((item) => (typeof item === "string"
-      ? { modelId: item, capabilities: [], protocol: "", capabilityStatus: "unverified", reason: "" }
+      ? resolveEffectiveModelCapability({ provider: payload?.provider || "", modelId: item })
       : item))
     .filter((item) => item?.modelId);
 }
@@ -110,7 +116,7 @@ export default function ProviderSettingsClient() {
   const filteredModels = useMemo(() => {
     const needle = modelSearch.trim().toLowerCase();
     if (!needle) return draftModels;
-    return draftModels.filter((m) => String((m.modelId || "").toLowerCase()).includes(needle));
+    return draftModels.filter((m) => modelSearchText(m).includes(needle));
   }, [draftModels, modelSearch]);
 
   function patchForm(patch) {
@@ -344,12 +350,19 @@ export default function ProviderSettingsClient() {
         if (lockedRoles[role]) continue;
         const current = assignmentMap[role];
         if (current?.isUserForced) continue;
-        const recommended = pickRecommendedProfile(role, profiles, current?.providerProfile);
-        if (recommended && recommended.id !== current?.providerProfileId) {
+        const recommended = pickRecommendedModel(role, profiles, discoveredModels, current);
+        if (
+          recommended &&
+          (recommended.providerProfileId !== current?.providerProfileId || recommended.modelId !== current?.modelId)
+        ) {
           await runJson(`/api/model-role-assignments/${role}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ providerProfileId: recommended.id, isUserForced: false }),
+            body: JSON.stringify({
+              providerProfileId: recommended.providerProfileId,
+              modelId: recommended.modelId,
+              isUserForced: false,
+            }),
           });
           changed += 1;
         }
@@ -478,7 +491,7 @@ export default function ProviderSettingsClient() {
           >
             <option value="">先点“获取模型”，或切换手动填写</option>
             {filteredModels.map((model) => (
-              <option key={model.modelId} value={model.modelId}>{model.modelId}</option>
+              <option key={model.modelId} value={model.modelId}>{formatModelOptionLabel(model)}</option>
             ))}
             {form.modelId && !filteredModels.some((model) => model.modelId === form.modelId) && (
               <option value={form.modelId}>{form.modelId}</option>
@@ -789,14 +802,31 @@ function RoleCard({
   onAssignRole,
   onClearRole,
 }) {
+  const [profileDraftId, setProfileDraftId] = useState("");
+  const selectedProfileId = profileDraftId === "__none__"
+    ? ""
+    : (profileDraftId || assignment?.providerProfileId || profiles[0]?.id || "");
+
+  const selectedProfile = profiles.find((profile) => profile.id === selectedProfileId) || null;
   const currentModelId = assignment?.modelId || assignment?.providerProfile?.modelId || "";
-  const allModels = buildRoleModels(profiles, discoveredModels, assignment, currentModelId);
-  const suitable = allModels.filter((model) => isSuitableForRole(role, model));
-  const unsuitable = allModels.filter((model) => !suitable.includes(model));
-  const currentSelectValue = assignment
-    ? (assignment.modelId ? `${assignment.providerProfileId}::${assignment.modelId}` : assignment.providerProfileId)
+  const profileModels = selectedProfile
+    ? buildRoleModelsForProfile(selectedProfile, discoveredModels, assignment, currentModelId, role)
+    : [];
+  const sortedModels = sortModelsForRole(role, profileModels, currentModelId);
+  const suitable = sortedModels.filter((model) => isSuitableForRole(role, model));
+  const unsuitable = sortedModels.filter((model) => !isSuitableForRole(role, model));
+  const modelSelectValue = assignment?.providerProfileId === selectedProfileId
+    ? (assignment?.modelId || assignment?.providerProfile?.modelId || "")
     : "";
-  const optionValue = (model) => model.isProfileDefault ? model.providerProfileId : `${model.providerProfileId}::${model.modelId}`;
+
+  function bindModel(profileId, modelId) {
+    if (!profileId) return onClearRole(role);
+    const model = profileModels.find((item) => item.modelId === modelId);
+    if (model && !isSuitableForRole(role, model)) {
+      if (!window.confirm("该模型能力尚未验证或与当前角色不匹配，强制绑定可能导致功能异常。确认继续？")) return;
+    }
+    onAssignRole(role, profileId, modelId || undefined, true);
+  }
 
   return (
     <article className="border border-zinc-800 bg-zinc-950 p-4">
@@ -808,58 +838,72 @@ function RoleCard({
       </div>
       <p className="mt-2 min-h-12 text-sm text-zinc-500">
         {assignment?.providerProfile
-          ? `${providerName(assignment.providerProfile.provider)} · ${assignment.providerProfile.name} · ${currentModelId}${assignment.isUserForced ? "（手动选择）" : "（推荐）"}`
+          ? `${providerName(assignment.providerProfile.provider)} / ${assignment.providerProfile.name} / ${currentModelId}${assignment.isUserForced ? "（手动选择）" : "（推荐）"}`
           : "未绑定"}
       </p>
-      <select
-        value={currentSelectValue}
-        onChange={(event) => {
-          const value = event.target.value;
-          if (!value) return onClearRole(role);
-          const [profileId, modelId] = value.split("::");
-          const model = allModels.find((item) => item.providerProfileId === profileId && item.modelId === modelId);
-          const level = model
-            ? roleAcceptanceLevel(role, {
-                ...model,
-                enabled: true,
-                supportsReferenceImages: model.protocol === "openai-image-edit" || model.protocol === "gemini-native-image",
-                referenceImageSupportStatus: model.protocol === "openai-image-edit" || model.protocol === "gemini-native-image" ? "verified" : "unverified",
-              })
-            : "unverified";
-          if (level === "unsupported" || (model && unsuitable.includes(model))) {
-            if (!window.confirm("该模型标记为能力不匹配，强制绑定可能导致功能异常。确认继续？")) return;
-          }
-          onAssignRole(role, profileId, modelId || undefined, true);
-        }}
-        className="mt-2 w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-sm outline-none"
-      >
-        <option value="">清除绑定</option>
-        {suitable.length > 0 && (
-          <optgroup label="可用配置">
-            {suitable.map((model) => (
-              <option key={`${model.providerProfileId}::${model.modelId}`} value={optionValue(model)}>
-                {model.profileName} / {model.modelId}
-              </option>
-            ))}
-          </optgroup>
-        )}
-        {unsuitable.length > 0 && (
-          <optgroup label="不可用配置">
-            {unsuitable.map((model) => (
-              <option key={`${model.providerProfileId}::${model.modelId}`} value={optionValue(model)}>
-                {model.profileName} / {model.modelId} [{friendlyRoleReason(role, model)}]
-              </option>
-            ))}
-          </optgroup>
-        )}
-      </select>
+
+      <Field label="使用哪个 AI 配置">
+        <select
+          value={selectedProfileId}
+          onChange={(event) => {
+            const profileId = event.target.value;
+            setProfileDraftId(profileId || "__none__");
+            if (!profileId) {
+              onClearRole(role);
+              return;
+            }
+            const profile = profiles.find((item) => item.id === profileId);
+            if (profile?.modelId) bindModel(profileId, profile.modelId);
+          }}
+          className="w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-sm outline-none"
+        >
+          <option value="">清除绑定</option>
+          {profiles.map((profile) => (
+            <option key={profile.id} value={profile.id}>
+              {providerName(profile.provider)} / {profile.name}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      <div className="mt-3">
+        <Field label="使用该配置下的哪个模型">
+          <select
+            value={modelSelectValue}
+            onChange={(event) => bindModel(selectedProfileId, event.target.value)}
+            disabled={!selectedProfile}
+            className="w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-sm outline-none disabled:text-zinc-600"
+          >
+            <option value="">清除绑定</option>
+            {suitable.length > 0 && (
+              <optgroup label="可用模型">
+                {suitable.map((model) => (
+                  <option key={`${model.providerProfileId}::${model.modelId}`} value={model.modelId}>
+                    {formatModelOptionLabel(model)}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {unsuitable.length > 0 && (
+              <optgroup label="不可用或未验证模型">
+                {unsuitable.map((model) => (
+                  <option key={`${model.providerProfileId}::${model.modelId}`} value={model.modelId}>
+                    {formatModelOptionLabel(model)} [{friendlyRoleReason(role, model)}]
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </Field>
+      </div>
+
       {unsuitable.length > 0 && (
         <details className="mt-3">
           <summary className="cursor-pointer text-xs font-semibold text-zinc-600">查看不可用原因</summary>
           <div className="mt-2 space-y-1">
             {unsuitable.map((model) => (
               <p key={`${model.providerProfileId}-${model.modelId}`} className="text-xs text-zinc-600">
-                {model.profileName} / {model.modelId}：{friendlyRoleReason(role, model)}
+                {formatModelOptionLabel(model)}：{friendlyRoleReason(role, model)}
               </p>
             ))}
           </div>
@@ -868,7 +912,6 @@ function RoleCard({
     </article>
   );
 }
-
 function StorageSection({
   storage,
   storagePath,
@@ -921,67 +964,85 @@ function StorageSection({
   );
 }
 
-function buildRoleModels(profiles, discoveredModels, assignment, currentModelId) {
-  const allModels = [];
-  for (const profile of profiles) {
-    const foundModels = discoveredModels[profile.id] || [];
-    foundModels.forEach((model) => allModels.push({
-      ...model,
+function buildRoleModelsForProfile(profile, discoveredModels, assignment, currentModelId, role) {
+  const foundModels = discoveredModels[profile.id] || [];
+  const models = foundModels.map((model) => ({
+    ...resolveEffectiveModelCapability({
+      provider: profile.provider,
+      modelId: model.modelId,
+      discoveredModel: model,
+      profile,
+    }),
+    ...model,
+    providerProfileId: profile.id,
+    profileName: profile.name,
+    provider: profile.provider,
+    enabled: profile.enabled,
+  }));
+
+  if (!foundModels.length && profile.modelId) {
+    const resolved = resolveEffectiveModelCapability({
+      provider: profile.provider,
+      modelId: profile.modelId,
+      profile,
+      adapterProbe: {
+        capabilities: profile.capabilities || [],
+        protocol: profile.protocol,
+        supportsReferenceImages: profile.supportsReferenceImages,
+        capabilityStatus: profile.lastTestOk ? "adapterVerified" : "unverified",
+      },
+    });
+    models.push({
+      ...resolved,
       providerProfileId: profile.id,
       profileName: profile.name,
       provider: profile.provider,
       enabled: profile.enabled,
-    }));
-    if (!foundModels.length && profile.modelId) {
-      allModels.push({
-        modelId: profile.modelId,
-        providerProfileId: profile.id,
-        profileName: profile.name,
-        provider: profile.provider,
-        capabilities: profile.capabilities || [],
-        protocol: profile.protocol,
-        capabilityStatus: "unverified",
-        reason: "未从 API 发现",
-        isProfileDefault: true,
-        enabled: profile.enabled,
-      });
-    }
-  }
-  if (assignment && currentModelId && !allModels.some((model) => model.modelId === currentModelId && model.providerProfileId === assignment.providerProfileId)) {
-    allModels.push({
-      modelId: currentModelId,
-      providerProfileId: assignment.providerProfileId,
-      profileName: assignment.providerProfile?.name || "",
-      provider: assignment.providerProfile?.provider || "",
-      capabilities: assignment.providerProfile?.capabilities || [],
-      protocol: assignment.providerProfile?.protocol || "",
-      capabilityStatus: "unverified",
-      reason: "当前已绑定模型（尚未重新发现）",
-      enabled: assignment.providerProfile?.enabled !== false,
+      reason: resolved.reason || "未从 API 发现",
+      isProfileDefault: true,
     });
   }
-  return allModels;
+
+  if (
+    assignment?.providerProfileId === profile.id &&
+    currentModelId &&
+    !models.some((model) => model.modelId === currentModelId)
+  ) {
+    const resolved = resolveEffectiveModelCapability({
+      provider: profile.provider,
+      modelId: currentModelId,
+      profile,
+    });
+    models.push({
+      ...resolved,
+      providerProfileId: profile.id,
+      profileName: profile.name,
+      provider: profile.provider,
+      enabled: profile.enabled,
+      reason: "当前已绑定模型（尚未重新发现）",
+    });
+  }
+
+  return sortModelsForRole(role, models, currentModelId);
 }
 
 function isSuitableForRole(role, model) {
-  const capabilities = model.capabilities || [];
-  if (!model.enabled) return false;
-  if (role === "product_vision") return capabilities.includes("vision");
-  if (role === "image_planning") return capabilities.includes("text");
-  if (role === "image_generation") return (capabilities.includes("image") || capabilities.includes("asyncImage")) && model.provider !== "deepseek";
-  return false;
+  return modelSupportsRole(role, model);
 }
 
 function friendlyRoleReason(role, model) {
   if (!model.enabled) return "配置已停用";
   const capabilities = model.capabilities || [];
-  if (role === "product_vision" && !capabilities.includes("vision")) return "模型没有视觉能力";
+  if (role === "product_vision" && model.capabilityStatus === "unverified") return model.reason || "视觉能力未验证";
+  if (role === "product_vision" && !capabilities.includes("vision")) return model.reason || "该模型明确不支持图片输入";
   if (role === "image_planning" && !capabilities.includes("text")) return "只支持非文案任务或能力未验证";
   if (role === "image_generation" && model.provider === "deepseek") return "该厂商不支持图片生成";
-  if (role === "image_generation" && !capabilities.includes("image") && !capabilities.includes("asyncImage")) return "图片协议不支持生成图";
+  if (role === "image_generation" && !capabilities.includes("image") && !capabilities.includes("asyncImage")) {
+    return capabilities.includes("vision") ? "只支持图片理解，不支持图片输出" : "图片协议不支持生成图";
+  }
+  if (role === "image_generation" && model.supportsReferenceImages === false) return "当前协议不支持传参考图";
   return model.reason || "能力未验证";
 }
-
 function Field({ label, children }) {
   return (
     <label className="block">
@@ -995,35 +1056,20 @@ function providerName(provider) {
   return PROVIDER_DEFAULTS[provider]?.name || provider;
 }
 
-function pickRecommendedProfile(role, profiles, current) {
-  if (current && roleAcceptanceLevel(role, current) !== "unsupported") return current;
-  const candidates = profiles.filter((profile) => roleAcceptanceLevel(role, profile) !== "unsupported");
+function pickRecommendedModel(role, profiles, discoveredModels, current) {
+  const candidates = profiles.flatMap((profile) => {
+    const models = buildRoleModelsForProfile(
+      profile,
+      discoveredModels,
+      current,
+      current?.providerProfileId === profile.id ? (current?.modelId || current?.providerProfile?.modelId || "") : "",
+      role,
+    );
+    return models.filter((model) => isSuitableForRole(role, model));
+  });
   if (!candidates.length) return null;
-  return [...candidates].sort((a, b) => roleScore(role, b) - roleScore(role, a))[0];
-}
-
-function roleScore(role, profile) {
-  const level = roleAcceptanceLevel(role, profile);
-  const capabilities = profile.capabilities || [];
-  let score = profile.enabled ? 10 : 0;
-  if (level === "adapterVerified") score += 50;
-  else if (level === "inferred") score += 20;
-  else if (level === "unverified") score += 5;
-  else return 0;
-  if (role === "product_vision") {
-    if (capabilities.includes("vision")) score += 20;
-    if (capabilities.includes("image") || capabilities.includes("asyncImage")) score -= 40;
-    if (profile.provider === "gemini") score += 2;
-  }
-  if (role === "image_planning") {
-    if (capabilities.includes("text")) score += 20;
-    if (capabilities.includes("reasoning")) score += 6;
-  }
-  if (role === "image_generation") {
-    if (capabilities.includes("image")) score += 20;
-    if (profile.supportsReferenceImages) score += 10;
-  }
-  return score;
+  const sorted = sortModelsForRole(role, candidates, current?.modelId || "");
+  return sorted[0] || null;
 }
 
 function formatBytes(bytes) {

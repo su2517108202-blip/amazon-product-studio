@@ -214,7 +214,10 @@ async function resetData() {
 
 async function startNextApp() {
   const port = await getOpenPort();
-  const hasProductionBuild = await fileExists(path.join(root, ".next", "BUILD_ID"));
+  const hasProductionBuild =
+    await fileExists(path.join(root, ".next", "BUILD_ID")) ||
+    await fileExists(path.join(root, ".next", "server", "app")) ||
+    await fileExists(path.join(root, ".next", "prerender-manifest.json"));
   const useProductionBuild = hasProductionBuild;
   if (!useProductionBuild) {
     await fs.rm(path.join(root, ".next"), { recursive: true, force: true }).catch(() => {});

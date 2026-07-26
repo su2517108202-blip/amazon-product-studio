@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
 import { buildProviderConfig } from "@/lib/provider-runtime";
 import { getProviderAdapter } from "@/lib/providers/registry";
-import { validateProviderDraftInput, inferModelCapabilities, inferProviderProtocol } from "@/lib/provider-profiles";
+import { validateProviderDraftInput } from "@/lib/provider-profiles";
+import { resolveEffectiveModelCapability } from "@/lib/model-capabilities";
 import { redactSecrets } from "@/lib/security";
 
 const UNSUPPORTED_MESSAGE = "该服务商不支持自动获取模型列表";
@@ -75,32 +76,28 @@ export async function POST(req) {
         description: "",
         supportedGenerationMethods: [],
       };
-      let capabilities = inferModelCapabilities(provider, modelId);
-      const protocol = inferProviderProtocol(provider, modelId, capabilities);
-
-      // Capability status: only mark as "inferred" (not "verified" or "official")
-      // because we haven't tested the model yet.
-      let capabilityStatus = "inferred";
-      let reason = "";
-
-      if (provider === "gemini") {
-        const methods = metadata.supportedGenerationMethods || [];
-        const modelLower = modelId.toLowerCase();
-        const geminiCapabilities = new Set();
-        if (methods.includes("generateContent")) geminiCapabilities.add("text");
-        if (/vision/.test(modelLower)) geminiCapabilities.add("vision");
-        if (/(imagen|image|nano-banana)/.test(modelLower)) geminiCapabilities.add("image");
-        capabilities = [...geminiCapabilities];
-        capabilityStatus = "unverified";
-        reason = "Gemini 官方模型列表未明确声明视觉或生图能力，需实际绑定后验证";
-      }
+      const resolved = resolveEffectiveModelCapability({
+        provider,
+        modelId,
+        discoveredModel: { modelId, metadata },
+        profile: config,
+      });
 
       return {
-        modelId,
-        capabilities,
-        protocol,
-        capabilityStatus,
-        reason,
+        modelId: resolved.modelId,
+        rawModelId: modelId,
+        displayName: resolved.displayName,
+        badges: resolved.badges,
+        rank: resolved.rank,
+        recommendedFor: resolved.recommendedFor,
+        lifecycle: resolved.lifecycle,
+        deprecationDate: resolved.deprecationDate,
+        aliases: resolved.aliases,
+        capabilities: resolved.capabilities,
+        protocol: resolved.protocol,
+        supportsReferenceImages: resolved.supportsReferenceImages,
+        capabilityStatus: resolved.capabilityStatus,
+        reason: resolved.reason,
         metadata,
       };
     });

@@ -89,8 +89,9 @@ test("settings role labels are seller-facing, not implementation codes", () => {
   assert(source.settings.includes("商品识别用哪个模型"));
   assert(source.settings.includes("文案策划用哪个模型"));
   assert(source.settings.includes("图片生成用哪个模型"));
-  assert(source.settings.includes("不可用配置"));
-  assert(source.settings.includes("模型没有视觉能力"));
+  assert(source.settings.includes("不可用或未验证模型"));
+  assert(source.settings.includes("视觉能力未验证"));
+  assert(!source.settings.includes("模型没有视觉能力"));
 });
 
 test("launcher uses hidden process startup for PostgreSQL and Next.js", () => {

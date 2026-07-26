@@ -76,9 +76,9 @@ test("o3-mini has reasoning", () => {
   assert(c.includes("reasoning"));
 });
 
-test("gpt-image-1 protocol = openai-images", () => {
+test("gpt-image-1 protocol = openai-image-edit", () => {
   const c = inferModelCapabilities("openai", "gpt-image-1");
-  assert.equal(inferProviderProtocol("openai", "gpt-image-1", c), "openai-images");
+  assert.equal(inferProviderProtocol("openai", "gpt-image-1", c), "openai-image-edit");
 });
 
 console.log("\n=== Role Acceptance (P1-10) ===\n");

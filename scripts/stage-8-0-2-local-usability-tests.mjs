@@ -328,7 +328,7 @@ async function selectRole(page, roleLabel, profileId) {
       response.request().method() === "PUT",
     { timeout: 10000 },
   );
-  await roleCard.locator("select").selectOption(profileId);
+  await roleCard.locator("select").first().selectOption(profileId);
   const response = await responsePromise;
   const text = await response.text();
   assert.equal(response.status(), 200, `role ${roleLabel} binding failed: ${text}`);

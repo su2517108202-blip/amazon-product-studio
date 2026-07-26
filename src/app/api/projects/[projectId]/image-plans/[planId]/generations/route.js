@@ -1,7 +1,9 @@
-import { NextResponse } from "next/server";
+﻿import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireCurrentUser } from "@/lib/app-mode";
 import { buildProviderConfig } from "@/lib/provider-runtime";
+import { resolveEffectiveModelCapability } from "@/lib/model-capabilities";
+import { parseCapabilities } from "@/lib/provider-profiles";
 import { getProviderAdapter } from "@/lib/providers/registry";
 import { ProviderError } from "@/lib/providers/errors";
 import {
@@ -14,7 +16,6 @@ import {
   normalizedGenerationError,
   persistGeneratedImages,
   pickDefaultGenerationReferences,
-  supportsImageGenerationProfile,
   validateImageGenerationProtocol,
 } from "@/lib/image-generation";
 
@@ -111,10 +112,44 @@ export async function POST(req, context) {
       throw new ProviderError("MISSING_IMAGE_GENERATION_PROVIDER", "请先配置图片生成模型");
     }
     const effectiveModelId = (assignment.modelId || profile.modelId || "").trim();
-    // P1-5: Use effectiveConfig for all validation
-    const effectiveConfig = buildProviderConfig(profile, { modelId: effectiveModelId });
-    if (!supportsImageGenerationProfile(profile)) {
-      throw new ProviderError("CAPABILITY_MISMATCH", "当前服务商未勾选 image 能力");
+    const effectiveCapability = resolveEffectiveModelCapability({
+      provider: profile.provider,
+      modelId: effectiveModelId,
+      profile,
+      adapterProbe: { capabilities: parseCapabilities(profile), protocol: profile.protocol },
+    });
+    const effectiveConfig = {
+      ...buildProviderConfig(profile, {
+        modelId: effectiveModelId,
+        capabilities: effectiveCapability.capabilities,
+        protocol: effectiveCapability.protocol,
+      }),
+      protocol: effectiveCapability.protocol,
+      capabilities: effectiveCapability.capabilities,
+      supportsReferenceImages: effectiveCapability.supportsReferenceImages,
+    };
+    const diagnostic = {
+      role: "image_generation",
+      providerProfileId: profile.id,
+      provider: profile.provider,
+      effectiveModelId,
+      effectiveCapabilities: effectiveCapability.capabilities,
+      effectiveProtocol: effectiveCapability.protocol,
+      supportsReferenceImages: effectiveCapability.supportsReferenceImages,
+      capabilityStatus: effectiveCapability.capabilityStatus,
+    };
+    if (!effectiveCapability.capabilities.includes("image") && !effectiveCapability.capabilities.includes("asyncImage")) {
+      const message = effectiveCapability.capabilities.includes("vision")
+        ? "当前绑定模型只支持图片理解，不支持图片输出"
+        : "当前绑定模型不支持图片输出";
+      throw new ProviderError("CAPABILITY_MISMATCH", message, { cause: { diagnostic } });
+    }
+    if (!effectiveCapability.supportsReferenceImages) {
+      throw new ProviderError(
+        "REFERENCE_IMAGES_UNSUPPORTED",
+        "当前模型支持文字生图，但当前协议不支持传参考图",
+        { cause: { diagnostic } },
+      );
     }
     validateImageGenerationProtocol(effectiveConfig);
 
@@ -185,7 +220,7 @@ export async function POST(req, context) {
     });
 
     const adapter = getProviderAdapter(profile.provider);
-    const result = await adapter.generateImage(buildProviderConfig(profile, { modelId: effectiveModelId }), {
+    const result = await adapter.generateImage(effectiveConfig, {
       project,
       productIdentity: project.productIdentity,
       imagePlan,
@@ -248,7 +283,7 @@ export async function POST(req, context) {
       });
     }
     return NextResponse.json(
-      { ok: false, code: normalized.code, error: normalized.message },
+      { ok: false, code: normalized.code, error: normalized.message, diagnostic: error?.cause?.diagnostic || null },
       { status: error.httpStatus || normalized.httpStatus || 400 },
     );
   }

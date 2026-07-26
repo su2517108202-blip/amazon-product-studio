@@ -1,4 +1,4 @@
-import "dotenv/config";
+﻿import "dotenv/config";
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import crypto from "node:crypto";
@@ -191,8 +191,8 @@ async function testProviderAutoDetectAndRecommend(page, baseUrl) {
   assert.equal(assignments.image_generation, profiles.generation.id, "generation role receives recommended profile");
   await page.reload({ waitUntil: "networkidle" });
   await page.getByRole("button", { name: "模型分工" }).click();
-  await page.locator("p", { hasText: "OpenAI Compatible · 视觉模型" }).first().waitFor({ state: "visible" });
-  await page.locator("p", { hasText: "Google Gemini · Gemini生图" }).first().waitFor({ state: "visible" });
+  await page.locator("p", { hasText: "视觉模型" }).first().waitFor({ state: "visible" });
+  await page.locator("p", { hasText: "Gemini生图" }).first().waitFor({ state: "visible" });
   await page.screenshot({ path: path.join(screenshotDir, "03-provider-auto-recommend.png"), fullPage: true });
 }
 
