@@ -197,8 +197,6 @@ export default function ProjectStudioClient({ projectId }) {
       .length || 0;
   const successfulRuns = runs.filter((run) => run.status === "completed");
   const failedRuns = runs.filter((run) => run.status === "failed");
-  const lastRun = runs[0];
-  const lastPlanningRun = planningRuns[0];
   const workflowSteps = buildWorkflowSteps({
     project,
     identity,
@@ -698,223 +696,187 @@ export default function ProjectStudioClient({ projectId }) {
 
   return (
     <main className="flex-1 overflow-y-auto bg-zinc-950 text-zinc-100">
-      <div className="mx-auto grid max-w-[1760px] gap-5 px-4 py-5 xl:grid-cols-[360px_minmax(0,1fr)_340px]">
-        <aside className="border border-zinc-800 bg-zinc-900/45 p-4">
+      <div className="mx-auto max-w-7xl px-4 py-5">
+        <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
           <Link
             href="/"
-            className="mb-4 inline-flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-white"
+            className="inline-flex items-center gap-2 text-xs font-bold text-zinc-400 hover:text-white"
           >
             <FaArrowLeft />
             返回项目
           </Link>
-
-          <form onSubmit={saveProject} className="space-y-4">
-            {/* 命名建议 */}
-            {nameSuggestions && !userEditedName && (() => {
-              const projectNameCurrent = draft?.name || project?.name || "";
-              const isUnnamed = !projectNameCurrent || projectNameCurrent === "未命名项目";
-              const hasSuggestion = (nameSuggestions.productName && nameSuggestions.productName !== (draft?.productName || project?.productName || "")) || (nameSuggestions.projectName && isUnnamed);
-              if (!hasSuggestion) return null;
-              return (
-                <div className="border border-emerald-900/60 bg-emerald-950/30 px-3 py-3">
-                  <p className="text-[13px] font-semibold text-emerald-200">AI 识别出以下名称建议：</p>
-                  <div className="mt-2 space-y-1 text-sm text-emerald-100">
-                    {nameSuggestions.productName && <p>商品名称：<strong>{nameSuggestions.productName}</strong></p>}
-                    {nameSuggestions.projectName && isUnnamed && <p>项目名称：<strong>{nameSuggestions.projectName}</strong></p>}
+          <details className="border border-zinc-800 bg-zinc-900/45 px-4 py-3">
+            <summary className="cursor-pointer text-sm font-semibold text-zinc-200">
+              项目设置
+            </summary>
+            <form onSubmit={saveProject} className="mt-4 grid gap-4 lg:grid-cols-2">
+              {nameSuggestions && !userEditedName && (() => {
+                const projectNameCurrent = draft?.name || project?.name || "";
+                const isUnnamed = !projectNameCurrent || projectNameCurrent === "未命名项目";
+                const hasSuggestion = (nameSuggestions.productName && nameSuggestions.productName !== (draft?.productName || project?.productName || "")) || (nameSuggestions.projectName && isUnnamed);
+                if (!hasSuggestion) return null;
+                return (
+                  <div className="border border-emerald-900/60 bg-emerald-950/30 px-3 py-3 lg:col-span-2">
+                    <p className="text-[13px] font-semibold text-emerald-200">AI 识别出以下名称建议：</p>
+                    <div className="mt-2 space-y-1 text-sm text-emerald-100">
+                      {nameSuggestions.productName && <p>商品名称：<strong>{nameSuggestions.productName}</strong></p>}
+                      {nameSuggestions.projectName && isUnnamed && <p>项目名称：<strong>{nameSuggestions.projectName}</strong></p>}
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <button type="button" onClick={() => {
+                        if (nameSuggestions.productName) setDraft((d) => ({ ...d, productName: nameSuggestions.productName }));
+                        if (nameSuggestions.projectName) setDraft((d) => ({ ...d, name: nameSuggestions.projectName }));
+                        setNameSuggestions(null); setMessage("已应用 AI 识别名称");
+                      }} className="border border-emerald-700 px-3 py-1.5 text-[13px] font-semibold text-emerald-200 hover:bg-emerald-900/40">采用识别名称</button>
+                      <button type="button" onClick={() => { setNameSuggestions(null); setUserEditedName(true); }} className="border border-zinc-700 px-3 py-1.5 text-[13px] font-semibold text-zinc-400 hover:text-zinc-200">保留原名称</button>
+                    </div>
                   </div>
-                  <div className="mt-3 flex gap-2">
-                    <button type="button" onClick={() => {
-                      if (nameSuggestions.productName) setDraft((d) => ({ ...d, productName: nameSuggestions.productName }));
-                      if (nameSuggestions.projectName) setDraft((d) => ({ ...d, name: nameSuggestions.projectName }));
-                      setNameSuggestions(null); setMessage("已应用 AI 识别名称");
-                    }} className="border border-emerald-700 px-3 py-1.5 text-[13px] font-semibold text-emerald-200 hover:bg-emerald-900/40">应用识别名称</button>
-                    <button type="button" onClick={() => { setNameSuggestions(null); setUserEditedName(true); }} className="border border-zinc-700 px-3 py-1.5 text-[13px] font-semibold text-zinc-400 hover:text-zinc-200">保留当前名称</button>
-                  </div>
-                </div>
-              );
-            })()}
-            <Field label="项目名称">
-              <input
-                value={draft.name}
-                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
-                className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
-              />
-            </Field>
-            <Field label="商品名称">
-              <input
-                value={draft.productName}
-                onChange={(event) =>
-                  setDraft({ ...draft, productName: event.target.value })
-                }
-                className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
-              />
-            </Field>
-            <div className="grid grid-cols-2 gap-3">
-              <Field label="平台">
-                <input
-                  value={draft.platform}
-                  onChange={(event) =>
-                    setDraft({ ...draft, platform: event.target.value })
-                  }
-                  className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
-                />
-              </Field>
-              <Field label="比例">
-                <input
-                  value={draft.aspectRatio}
-                  onChange={(event) =>
-                    setDraft({ ...draft, aspectRatio: event.target.value })
-                  }
-                  className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
-                />
-              </Field>
-            </div>
-            <Field label="备注">
-              <textarea
-                value={draft.notes}
-                onChange={(event) => setDraft({ ...draft, notes: event.target.value })}
-                className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600"
-              />
-            </Field>
-            <button
-              disabled={saving}
-              className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:bg-zinc-800"
-            >
-              {saving ? <FaSpinner className="animate-spin" /> : <FaCheck />}
-              保存项目
-            </button>
-          </form>
-
-          <ReferenceImages
-            fileInputRef={fileInputRef}
-            project={project}
-            uploading={uploading}
-            selectedCount={selectedCount}
-            generationReferenceCount={generationReferenceCount}
-            draggingUpload={draggingUpload}
-            onDragState={setDraggingUpload}
-            onUpload={uploadFiles}
-            onUpdate={updateImage}
-            onDelete={deleteImage}
-          />
-
-          <StageProgress steps={workflowSteps} />
-
-          <WorkflowPanel
-            identity={identity}
-            selectedCount={selectedCount}
-            generationReferenceCount={generationReferenceCount}
-            visionAssignment={visionAssignment}
-            planningAssignment={planningAssignment}
-            generationAssignment={generationAssignment}
-            analyzing={analyzing}
-            planning={planning}
-            generatingImage={generatingImage}
-            planInfo={planInfo}
-            onAnalyze={analyzeProduct}
-            onGenerate={generatePlans}
-          />
-
-          {(message || error) && (
-            <p
-              className={`mt-4 border px-3 py-2 text-xs ${
-                error
-                  ? "border-red-900/60 bg-red-950/40 text-red-200"
-                  : "border-emerald-900/60 bg-emerald-950/40 text-emerald-200"
-              }`}
-            >
-              {error || message}
-            </p>
-          )}
-        </aside>
-
-        <section className="min-w-0 space-y-5">
-          <PlanningSection
-            plans={plans}
-            planForm={planForm}
-            activePlanIndex={activePlanIndex}
-            planDirty={planDirty}
-            planning={planning}
-            savingPlan={savingPlan}
-            selectedPlan={selectedPlan}
-            identity={identity}
-            project={project}
-            generationAssignment={generationAssignment}
-            generationInfo={generationInfo}
-            candidateInfo={candidateInfo}
-            generationSummary={generationSummary}
-            generationReferenceCount={generationReferenceCount}
-            generationResolution={generationResolution}
-            generatingImage={generatingImage}
-            onGenerate={generatePlans}
-            onSelectPlan={selectPlan}
-            onUpdatePlanForm={updatePlanForm}
-            onSavePlan={savePlan}
-            onResolutionChange={setGenerationResolution}
-            onGenerateImage={generateCurrentImage}
-            onCheckGeneration={checkCurrentGeneration}
-            onDownloadPreferredZip={downloadPreferredZip}
-          />
-
-          <IdentitySection
-            identity={identity}
-            identityForm={identityForm}
-            savingIdentity={savingIdentity}
-            onChange={setIdentityForm}
-            onSave={saveIdentity}
-          />
-        </section>
-
-        <aside className="border border-zinc-800 bg-zinc-900/45 p-4 xl:sticky xl:top-24 xl:self-start">
-          <CandidateHistory
-            candidateInfo={candidateInfo}
-            onSetPreferredCandidate={setPreferredCandidate}
-            onDeleteCandidate={deleteCandidate}
-            onDownloadCandidate={downloadCandidate}
-            onLoadMoreCandidates={loadMoreCandidates}
-            loadingMoreCandidates={loadingMoreCandidates}
-          />
-          <div className="mt-5 border-t border-zinc-800 pt-4">
-          <h2 className="text-base font-semibold text-white">调用统计</h2>
-          <dl className="mt-4 space-y-3 text-sm">
-            <Info label="识别成功" value={`${successfulRuns.length}`} />
-            <Info label="识别失败" value={`${failedRuns.length}`} />
-            <Info label="策划成功" value={`${planInfo.stats?.successCount || 0}`} />
-            <Info label="策划失败" value={`${planInfo.stats?.failureCount || 0}`} />
-            <Info
-              label="上次策划耗时"
-              value={
-                lastPlanningRun?.durationMs == null
-                  ? "无"
-                  : `${lastPlanningRun.durationMs}ms`
-              }
-            />
-          </dl>
-          <details className="mt-5 border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-400">
-            <summary className="cursor-pointer font-semibold text-zinc-200">高级信息</summary>
-            <dl className="mt-3 space-y-3">
-              <Info label="识别 Provider" value={lastRun?.provider || "无"} />
-              <Info label="识别 Model ID" value={lastRun?.model || "无"} />
-              <Info label="识别 fingerprint" value={lastRun?.inputFingerprint || "无"} />
-              <Info label="策划 Provider" value={lastPlanningRun?.provider || "无"} />
-              <Info label="策划 Model ID" value={lastPlanningRun?.model || "无"} />
-              <Info label="策划 fingerprint" value={lastPlanningRun?.inputFingerprint || "无"} />
-            </dl>
-          </details>
-          <div className="mt-5 space-y-2">
-            <h3 className="text-sm font-semibold text-zinc-400">最近策划记录</h3>
-            {planningRuns.slice(0, 5).map((run) => (
-              <div key={run.id} className="border border-zinc-800 bg-zinc-950 p-2 text-sm">
-                <p className="font-bold text-zinc-200">{run.status}</p>
-                <p className="mt-1 truncate text-zinc-500">
-                  {run.provider || "unknown"} / {run.model || "unknown"}
-                </p>
-                {run.errorCode && <p className="mt-1 text-red-300">{run.errorCode}</p>}
+                );
+              })()}
+              <Field label="项目名称"><input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600" /></Field>
+              <Field label="商品名称"><input value={draft.productName} onChange={(event) => setDraft({ ...draft, productName: event.target.value })} className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600" /></Field>
+              <Field label="平台"><input value={draft.platform} onChange={(event) => setDraft({ ...draft, platform: event.target.value })} className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600" /></Field>
+              <Field label="比例"><input value={draft.aspectRatio} onChange={(event) => setDraft({ ...draft, aspectRatio: event.target.value })} className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600" /></Field>
+              <Field label="备注"><textarea value={draft.notes} onChange={(event) => setDraft({ ...draft, notes: event.target.value })} className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-violet-600" /></Field>
+              <div className="flex items-end">
+                <button disabled={saving} className="flex w-full items-center justify-center gap-2 bg-violet-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-violet-700 disabled:bg-zinc-800">
+                  {saving ? <FaSpinner className="animate-spin" /> : <FaCheck />}
+                  保存项目
+                </button>
               </div>
-            ))}
-          </div>
-          </div>
-        </aside>
+            </form>
+          </details>
+        </div>
+
+        <StageProgress steps={workflowSteps} />
+
+        {(message || error) && (
+          <p className={`mb-5 border px-3 py-2 text-sm ${error ? "border-red-900/60 bg-red-950/40 text-red-200" : "border-emerald-900/60 bg-emerald-950/40 text-emerald-200"}`}>
+            {error || message}
+          </p>
+        )}
+
+        <section className="space-y-4">
+          <StepPanel
+            key={`step-1-${workflowSteps[0].status}`}
+            step={workflowSteps[0]}
+            summary={`${project.referenceImages.length} 张商品图，主图${project.referenceImages.some((image) => image.isPrimary) ? "已设置" : "未设置"}`}
+          >
+            <ReferenceImages
+              fileInputRef={fileInputRef}
+              project={project}
+              uploading={uploading}
+              selectedCount={selectedCount}
+              generationReferenceCount={generationReferenceCount}
+              draggingUpload={draggingUpload}
+              onDragState={setDraggingUpload}
+              onUpload={uploadFiles}
+              onUpdate={updateImage}
+              onDelete={deleteImage}
+            />
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => analyzeProduct({ force: false })}
+                disabled={!visionAssignment?.providerProfile || selectedCount === 0 || analyzing}
+                data-testid="next-analyze-product-button"
+                className="flex items-center justify-center gap-2 bg-zinc-100 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-white disabled:bg-zinc-800 disabled:text-zinc-500"
+              >
+                {analyzing ? <FaSpinner className="animate-spin" /> : <FaEye />}
+                下一步：识别商品
+              </button>
+            </div>
+          </StepPanel>
+
+          <StepPanel
+            key={`step-2-${workflowSteps[1].status}`}
+            step={workflowSteps[1]}
+            summary={identity ? `${identity.productName || "未命名商品"} · ${identity.category || "未填写类目"}` : "还没有识别商品"}
+          >
+            <WorkflowPanel
+              identity={identity}
+              selectedCount={selectedCount}
+              visionAssignment={visionAssignment}
+              analyzing={analyzing}
+              onAnalyze={analyzeProduct}
+            />
+            <IdentitySection
+              identity={identity}
+              identityForm={identityForm}
+              savingIdentity={savingIdentity}
+              onChange={setIdentityForm}
+              onSave={saveIdentity}
+            />
+          </StepPanel>
+
+          <StepPanel
+            key={`step-3-${workflowSteps[2].status}`}
+            step={workflowSteps[2]}
+            summary={`${plans.length}/5 张套图策划`}
+          >
+            <PlanningSection
+              plans={plans}
+              planForm={planForm}
+              activePlanIndex={activePlanIndex}
+              planDirty={planDirty}
+              planning={planning}
+              savingPlan={savingPlan}
+              selectedPlan={selectedPlan}
+              generationSummary={generationSummary}
+              onGenerate={generatePlans}
+              onSelectPlan={selectPlan}
+              onUpdatePlanForm={updatePlanForm}
+              onSavePlan={savePlan}
+            />
+          </StepPanel>
+
+          <StepPanel
+            key={`step-4-${workflowSteps[3].status}`}
+            step={workflowSteps[3]}
+            summary={`${generationSummary?.preferredCount || 0}/5 张首选图`}
+          >
+            <GenerationSummaryBar
+              summary={generationSummary}
+              onDownloadPreferredZip={downloadPreferredZip}
+            />
+            <GenerationPanel
+              identity={identity}
+              project={project}
+              selectedPlan={selectedPlan}
+              generationAssignment={generationAssignment}
+              generationInfo={generationInfo}
+              candidateInfo={candidateInfo}
+              generationReferenceCount={generationReferenceCount}
+              generationResolution={generationResolution}
+              generatingImage={generatingImage}
+              onResolutionChange={setGenerationResolution}
+              onGenerateImage={generateCurrentImage}
+              onCheckGeneration={checkCurrentGeneration}
+            />
+            <details data-testid="generation-history-details" className="border border-zinc-800 bg-zinc-900/35 p-4">
+              <summary className="cursor-pointer text-sm font-semibold text-zinc-200">
+                查看生成历史
+              </summary>
+              <CandidateHistory
+                candidateInfo={candidateInfo}
+                onSetPreferredCandidate={setPreferredCandidate}
+                onDeleteCandidate={deleteCandidate}
+                onDownloadCandidate={downloadCandidate}
+                onLoadMoreCandidates={loadMoreCandidates}
+                loadingMoreCandidates={loadingMoreCandidates}
+              />
+              <div className="mt-5 border-t border-zinc-800 pt-4">
+                <h2 className="text-base font-semibold text-white">调用统计</h2>
+                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                  <Info label="识别成功" value={`${successfulRuns.length}`} />
+                  <Info label="识别失败" value={`${failedRuns.length}`} />
+                  <Info label="策划成功" value={`${planInfo.stats?.successCount || 0}`} />
+                  <Info label="策划失败" value={`${planInfo.stats?.failureCount || 0}`} />
+                </dl>
+              </div>
+            </details>
+          </StepPanel>
+        </section>
       </div>
     </main>
   );
@@ -923,18 +885,10 @@ export default function ProjectStudioClient({ projectId }) {
 function WorkflowPanel({
   identity,
   selectedCount,
-  generationReferenceCount,
   visionAssignment,
-  planningAssignment,
-  generationAssignment,
   analyzing,
-  planning,
-  generatingImage,
-  planInfo,
   onAnalyze,
-  onGenerate,
 }) {
-  const hasPlans = planInfo?.plans?.length === 5;
   const analyzeDisabledReason = analyzing
     ? "正在识别，请稍候"
     : !visionAssignment?.providerProfile
@@ -947,26 +901,10 @@ function WorkflowPanel({
     : !identity
       ? "还没有可重新识别的产品身份证"
       : "";
-  const planningDisabledReason = planning
-    ? "正在生成策划，请稍候"
-    : !planningAssignment?.providerProfile
-      ? "请先到 API 设置绑定策划模型"
-      : !identity
-        ? "请先完成商品识别"
-        : "";
-  const generationReason = !generationAssignment?.providerProfile
-    ? "请先到 API 设置绑定图片生成模型"
-    : generationReferenceCount === 0
-      ? "请先选择参与生成的参考图"
-      : generationReferenceCount > 4
-        ? "参与生成的参考图最多 4 张"
-        : generatingImage
-          ? "图片生成处理中"
-          : "准备就绪";
   return (
-    <div className="mt-5 space-y-5 border-t border-zinc-800 pt-4">
+    <div className="mb-4 border border-zinc-800 bg-zinc-950 p-4">
       <section>
-        <h2 className="text-base font-semibold text-white">商品识别</h2>
+        <h2 className="text-base font-semibold text-white">识别商品</h2>
         <p className="mt-2 text-sm text-zinc-500">
           当前视觉模型：
           {visionAssignment?.providerProfile
@@ -999,52 +937,64 @@ function WorkflowPanel({
           状态：{analysisStatus(identity, visionAssignment, analyzing)}
         </p>
       </section>
-
-      <section>
-        <h2 className="text-base font-semibold text-white">5 张主图策划</h2>
-        <p className="mt-2 text-sm text-zinc-500">
-          当前策划模型：
-          {planningAssignment?.providerProfile
-            ? `${planningAssignment.providerProfile.name} / ${planningAssignment.providerProfile.modelId}`
-            : "未配置"}
-        </p>
-        <p className="mt-2 text-sm text-zinc-500">
-          状态：{planningStatus(identity, planningAssignment, planning, planInfo)}
-        </p>
-        <button
-          onClick={() => onGenerate({ force: hasPlans })}
-          disabled={Boolean(planningDisabledReason)}
-          title={planningDisabledReason || "生成五张主图策划"}
-          data-testid="generate-plans-button"
-          className="mt-3 flex w-full items-center justify-center gap-2 bg-emerald-500 px-3 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-800 disabled:text-zinc-500"
-        >
-          {planning ? <FaSpinner className="animate-spin" /> : <FaLightbulb />}
-          {hasPlans ? "重新生成 5 张策划" : "生成 5 张主图策划"}
-        </button>
-        <DisabledReason reason={planningDisabledReason} />
-      </section>
-
-      <section>
-        <h2 className="text-base font-semibold text-white">单张图片生成</h2>
-        <p className="mt-2 text-sm text-zinc-500">
-          当前图片模型：
-          {generationAssignment?.providerProfile
-            ? `${generationAssignment.providerProfile.name} / ${generationAssignment.providerProfile.modelId}`
-            : "未配置"}
-        </p>
-        <p className="mt-2 text-sm text-zinc-500">
-          状态：{generationReason}
-        </p>
-      </section>
     </div>
+  );
+}
+
+function StepPanel({ step, summary, children }) {
+  const shouldOpen = step.status === "current";
+  const [isOpen, setIsOpen] = useState(shouldOpen);
+  const disabled = step.status === "pending";
+
+  return (
+    <section
+      data-testid={`workflow-step-${step.index}`}
+      data-current={shouldOpen ? "true" : "false"}
+      data-open={isOpen ? "true" : "false"}
+      className={`border p-4 ${
+        shouldOpen
+          ? "border-sky-700 bg-sky-950/20"
+          : step.status === "complete"
+            ? "border-emerald-900 bg-zinc-900/35"
+            : "border-zinc-800 bg-zinc-900/20 opacity-75"
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => !disabled && setIsOpen((value) => !value)}
+        disabled={disabled}
+        data-testid={`workflow-step-${step.index}-toggle`}
+        className="w-full cursor-pointer text-left disabled:cursor-not-allowed"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-white">
+              {step.index} {step.label}
+            </h2>
+            <p className="mt-1 text-sm text-zinc-400">
+              {disabled ? step.reason : summary}
+            </p>
+          </div>
+          <span className="border border-zinc-700 px-2 py-1 text-xs font-semibold text-zinc-300">
+            {formatStepStatus(step.status)}
+          </span>
+        </div>
+      </button>
+      {disabled && isOpen ? (
+        <p className="mt-4 border border-dashed border-zinc-800 bg-zinc-950/50 p-4 text-sm text-zinc-500">
+          先完成前一步：{step.reason}
+        </p>
+      ) : isOpen ? (
+        <div className="mt-4">{children}</div>
+      ) : null}
+    </section>
   );
 }
 
 function StageProgress({ steps }) {
   return (
-    <section className="mt-5 border-t border-zinc-800 pt-4">
-      <h2 className="text-base font-semibold text-white">四步流程</h2>
-      <ol className="mt-3 space-y-2">
+    <section className="mb-5 border border-zinc-800 bg-zinc-900/35 p-4">
+      <ol className="grid gap-2 md:grid-cols-4" data-testid="project-four-step-nav">
         {steps.map((step) => (
           <li
             key={step.index}
@@ -1167,39 +1117,44 @@ function ReferenceImages({
               </div>
               <div className="space-y-3 p-3">
                 <p className="truncate text-sm font-semibold text-zinc-300">{image.fileName}</p>
-                <label className="flex items-center gap-2 text-sm text-zinc-400">
-                  <input
-                    checked={image.includeInAnalysis || image.isPrimary}
-                    disabled={image.isPrimary}
-                    onChange={(event) =>
-                      onUpdate(image.id, { includeInAnalysis: event.target.checked })
-                    }
-                    type="checkbox"
-                  />
-                  参与识别
-                </label>
-                <label className="flex items-center gap-2 text-sm text-zinc-400">
-                  <input
-                    checked={image.includeInGeneration || image.isPrimary}
-                    disabled={image.isPrimary}
-                    onChange={(event) =>
-                      onUpdate(image.id, { includeInGeneration: event.target.checked })
-                    }
-                    type="checkbox"
-                  />
-                  参与生成
-                </label>
-                <select
-                  value={image.imageRole}
-                  onChange={(event) => onUpdate(image.id, { imageRole: event.target.value })}
-                  className="w-full border border-zinc-800 bg-zinc-900 px-2 py-2 text-sm outline-none"
-                >
-                  {ROLES.map((role) => (
-                    <option key={role.value} value={role.value}>
-                      {role.label}
-                    </option>
-                  ))}
-                </select>
+                <details data-testid="reference-advanced-settings" className="border border-zinc-800 bg-zinc-900 p-2 text-sm text-zinc-400">
+                  <summary className="cursor-pointer font-semibold text-zinc-200">图片高级设置</summary>
+                  <div className="mt-3 space-y-3">
+                    <label className="flex items-center gap-2">
+                      <input
+                        checked={image.includeInAnalysis || image.isPrimary}
+                        disabled={image.isPrimary}
+                        onChange={(event) =>
+                          onUpdate(image.id, { includeInAnalysis: event.target.checked })
+                        }
+                        type="checkbox"
+                      />
+                      参与识别
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        checked={image.includeInGeneration || image.isPrimary}
+                        disabled={image.isPrimary}
+                        onChange={(event) =>
+                          onUpdate(image.id, { includeInGeneration: event.target.checked })
+                        }
+                        type="checkbox"
+                      />
+                      参与生成
+                    </label>
+                    <select
+                      value={image.imageRole}
+                      onChange={(event) => onUpdate(image.id, { imageRole: event.target.value })}
+                      className="w-full border border-zinc-800 bg-zinc-950 px-2 py-2 text-sm outline-none"
+                    >
+                      {ROLES.map((role) => (
+                        <option key={role.value} value={role.value}>
+                          {role.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </details>
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     onClick={() => onUpdate(image.id, { isPrimary: true })}
@@ -1210,7 +1165,7 @@ function ReferenceImages({
                     }`}
                   >
                     <FaStar />
-                    主图
+                    设为主图
                   </button>
                   <button
                     onClick={() => onDelete(image.id)}
@@ -1243,23 +1198,11 @@ function PlanningSection({
   planning,
   savingPlan,
   selectedPlan,
-  identity,
-  project,
-  generationAssignment,
-  generationInfo,
-  candidateInfo,
   generationSummary,
-  generationReferenceCount,
-  generationResolution,
-  generatingImage,
   onGenerate,
   onSelectPlan,
   onUpdatePlanForm,
   onSavePlan,
-  onResolutionChange,
-  onGenerateImage,
-  onCheckGeneration,
-  onDownloadPreferredZip,
 }) {
   return (
     <section className="border border-zinc-800 bg-zinc-900/35 p-4">
@@ -1273,17 +1216,13 @@ function PlanningSection({
         <button
           onClick={() => onGenerate({ force: plans.length === 5 })}
           disabled={planning}
+          data-testid="generate-plans-button"
           className="flex items-center gap-2 bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-zinc-950 hover:bg-emerald-400 disabled:bg-zinc-700 disabled:text-zinc-400"
         >
           {planning ? <FaSpinner className="animate-spin" /> : <FaLightbulb />}
-          {plans.length === 5 ? "重新生成" : "生成 5 张"}
+          {plans.length === 5 ? "重新生成策划" : "生成整套策划"}
         </button>
       </div>
-
-      <GenerationSummaryBar
-        summary={generationSummary}
-        onDownloadPreferredZip={onDownloadPreferredZip}
-      />
 
       <div className="mb-4 grid gap-2 md:grid-cols-5">
         {PLAN_TABS.map((tab) => {
@@ -1342,13 +1281,6 @@ function PlanningSection({
               className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
             />
           </Field>
-          <Field label="副标题">
-            <input
-              value={planForm.subTitle}
-              onChange={(event) => onUpdatePlanForm({ subTitle: event.target.value })}
-              className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
-            />
-          </Field>
           <Field label="场景">
             <textarea
               value={planForm.scene}
@@ -1356,41 +1288,29 @@ function PlanningSection({
               className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
             />
           </Field>
-          <Field label="构图">
-            <textarea
-              value={planForm.composition}
-              onChange={(event) => onUpdatePlanForm({ composition: event.target.value })}
-              className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
-            />
-          </Field>
-          <Field label="补充要点（逐行）">
-            <textarea
-              value={planForm.keyNotes}
-              onChange={(event) => onUpdatePlanForm({ keyNotes: event.target.value })}
-              className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
-            />
-          </Field>
-          <Field label="必须保持（逐行）">
-            <textarea
-              value={planForm.mustKeep}
-              onChange={(event) => onUpdatePlanForm({ mustKeep: event.target.value })}
-              className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
-            />
-          </Field>
-          <Field label="禁止改变（逐行）">
-            <textarea
-              value={planForm.avoid}
-              onChange={(event) => onUpdatePlanForm({ avoid: event.target.value })}
-              className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none"
-            />
-          </Field>
-          <Field label="最终提示词">
-            <textarea
-              value={planForm.finalPrompt}
-              onChange={(event) => onUpdatePlanForm({ finalPrompt: event.target.value })}
-              className="h-48 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none lg:col-span-2"
-            />
-          </Field>
+          <details data-testid="planning-advanced-editor" className="border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-400 lg:col-span-2">
+            <summary className="cursor-pointer font-semibold text-zinc-200">编辑高级策划</summary>
+            <div className="mt-3 grid gap-3 lg:grid-cols-2">
+              <Field label="副标题">
+                <input value={planForm.subTitle} onChange={(event) => onUpdatePlanForm({ subTitle: event.target.value })} className="w-full border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none" />
+              </Field>
+              <Field label="构图">
+                <textarea value={planForm.composition} onChange={(event) => onUpdatePlanForm({ composition: event.target.value })} className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none" />
+              </Field>
+              <Field label="补充要点（逐行）">
+                <textarea value={planForm.keyNotes} onChange={(event) => onUpdatePlanForm({ keyNotes: event.target.value })} className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none" />
+              </Field>
+              <Field label="必须保持（逐行）">
+                <textarea value={planForm.mustKeep} onChange={(event) => onUpdatePlanForm({ mustKeep: event.target.value })} className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none" />
+              </Field>
+              <Field label="禁止改变（逐行）">
+                <textarea value={planForm.avoid} onChange={(event) => onUpdatePlanForm({ avoid: event.target.value })} className="h-24 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none" />
+              </Field>
+              <Field label="最终提示词">
+                <textarea value={planForm.finalPrompt} onChange={(event) => onUpdatePlanForm({ finalPrompt: event.target.value })} className="h-48 w-full resize-none border border-zinc-800 bg-zinc-950 px-3 py-2 text-sm outline-none" />
+              </Field>
+            </div>
+          </details>
           <div className="lg:col-span-2">
             {planDirty && <p className="mb-2 text-sm text-amber-300">有未保存修改</p>}
             <button
@@ -1402,20 +1322,6 @@ function PlanningSection({
 	              {savingPlan ? <FaSpinner className="animate-spin" /> : <FaSave />}
 	              保存当前策划
 	            </button>
-	            <GenerationPanel
-	              identity={identity}
-	              project={project}
-	              selectedPlan={selectedPlan}
-	              generationAssignment={generationAssignment}
-	              generationInfo={generationInfo}
-	              candidateInfo={candidateInfo}
-	              generationReferenceCount={generationReferenceCount}
-	              generationResolution={generationResolution}
-	              generatingImage={generatingImage}
-	              onResolutionChange={onResolutionChange}
-	              onGenerateImage={onGenerateImage}
-	              onCheckGeneration={onCheckGeneration}
-	            />
 	          </div>
 	        </form>
       )}
@@ -1725,10 +1631,11 @@ function CandidateHistory({
 }
 
 function IdentitySection({ identity, identityForm, savingIdentity, onChange, onSave }) {
+  const sellingPoints = Array.isArray(identity?.sellingPoints) ? identity.sellingPoints.slice(0, 5) : [];
   return (
     <section className="border border-zinc-800 bg-zinc-900/35 p-4">
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-base font-semibold text-white">产品身份证摘要</h2>
+        <h2 className="text-base font-semibold text-white">商品信息</h2>
         <span
           className={`border px-2 py-1 text-xs font-medium ${
             identity?.isStale
@@ -1743,13 +1650,23 @@ function IdentitySection({ identity, identityForm, savingIdentity, onChange, onS
       </div>
       <div className="grid gap-3 text-sm sm:grid-cols-3">
         <Info label="商品名称" value={identity?.productName || "未填写"} />
-        <Info label="类目" value={identity?.category || "未填写"} />
+        <Info label="商品类别" value={identity?.category || "未填写"} />
         <Info label="颜色" value={identity?.color || "未填写"} />
         <Info label="材质" value={identity?.material || "未填写"} />
-        <Info label="结构" value={identity?.structure || "未填写"} />
-        <Info label="核心卖点" value={`${identity?.sellingPoints?.length || 0} 条`} />
+      </div>
+      <div className="mt-4 border border-zinc-800 bg-zinc-950 p-3">
+        <p className="text-sm font-semibold text-zinc-300">主要卖点</p>
+        {sellingPoints.length ? (
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-zinc-400">
+            {sellingPoints.map((point) => <li key={point}>{point}</li>)}
+          </ul>
+        ) : (
+          <p className="mt-2 text-sm text-zinc-500">识别完成后会显示 3-5 个主要卖点。</p>
+        )}
       </div>
 
+      <details data-testid="identity-full-details" className="mt-4 border border-zinc-800 bg-zinc-950 p-3 text-sm text-zinc-400">
+        <summary className="cursor-pointer font-semibold text-zinc-200">查看完整识别信息</summary>
       <form onSubmit={onSave} className="mt-5 grid gap-3 lg:grid-cols-2">
         {[
           ["productName", "商品名称", "input"],
@@ -1801,6 +1718,7 @@ function IdentitySection({ identity, identityForm, savingIdentity, onChange, onS
           </button>
         </div>
       </form>
+      </details>
     </section>
   );
 }
@@ -1811,16 +1729,6 @@ function analysisStatus(identity, visionAssignment, analyzing) {
   if (!identity) return "未识别";
   if (identity.isStale) return "产品身份证可能过期";
   return "识别成功";
-}
-
-function planningStatus(identity, planningAssignment, planning, planInfo) {
-  if (planning) return "正在生成 5 张策划";
-  if (!identity) return "等待产品身份证";
-  if (identity.isStale) return "产品身份证已过期";
-  if (!planningAssignment?.providerProfile) return "等待配置策划模型";
-  if (planInfo?.plans?.length === 5 && planInfo?.hasStalePlans) return "策划可能已过期";
-  if (planInfo?.plans?.length === 5) return "生成成功";
-  return "未生成";
 }
 
 function generationStatus(identity, selectedPlan, provider, latestRun) {
@@ -1847,25 +1755,25 @@ function buildWorkflowSteps({ project, identity, planInfo, generationSummary }) 
   const base = [
     {
       index: 1,
-      label: "参考图",
+      label: "上传商品图",
       complete: hasReferences && hasPrimary,
       reason: hasReferences ? (hasPrimary ? "" : "需要设置主参考图") : "需要上传商品参考图",
     },
     {
       index: 2,
-      label: "商品识别",
+      label: "确认商品",
       complete: hasIdentity && !identity?.isStale,
       reason: !hasReferences || !hasPrimary ? "先完成参考图" : hasIdentity ? (identity?.isStale ? "需要重新识别" : "") : "需要商品识别",
     },
     {
       index: 3,
-      label: "五图策划",
+      label: "选择套图方案",
       complete: hasPlans && !planInfo?.hasStalePlans,
       reason: !hasIdentity ? "先完成商品识别" : hasPlans ? (planInfo?.hasStalePlans ? "需要重新策划" : "") : "需要生成五张策划",
     },
     {
       index: 4,
-      label: "图片生成与导出",
+      label: "生成与下载",
       complete: zipReady,
       reason: !hasPlans ? "先生成五张策划" : zipReady ? "" : hasGenerated ? "等待五张首选图" : "需要逐张生成图片",
     },

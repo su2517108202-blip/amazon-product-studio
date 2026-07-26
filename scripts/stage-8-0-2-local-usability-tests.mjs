@@ -154,42 +154,46 @@ async function testDraftModels(baseUrl) {
 
 async function testProviderSettings(page, baseUrl) {
   await page.goto(`${baseUrl}/settings/providers`, { waitUntil: "networkidle" });
-  await page.getByText("服务商配置").first().waitFor({ state: "visible" });
+  await page.getByText("AI 服务").first().waitFor({ state: "visible" });
   await page.getByLabel("配置名称").fill("草稿模型配置");
   await page.getByLabel("服务商").selectOption("openai-compatible");
+  await page.getByRole("button", { name: "高级设置" }).click();
   await page.getByLabel("Base URL").fill(fakeProvider.baseUrl);
+  await page.getByRole("button", { name: "AI 服务" }).click();
   await page.getByLabel("API Key").fill(fakeApiKey);
-  await page.getByText("获取模型").click();
+  await page.getByRole("button", { name: "获取模型" }).click();
   await page.getByPlaceholder("搜索模型").fill("planner");
-  await page.getByLabel("模型 ID").selectOption("planner-b");
-  assert.equal(await page.getByLabel("模型 ID").inputValue(), "planner-b");
-  await page.getByRole("button", { name: "手动填写" }).click();
-  await page.getByLabel("模型 ID").fill("manual-model-id");
-  assert.equal(await page.getByLabel("模型 ID").inputValue(), "manual-model-id");
+  await page.getByLabel("选择模型").selectOption("planner-b");
+  assert.equal(await page.getByLabel("选择模型").inputValue(), "planner-b");
+  await page.getByRole("button", { name: "高级：手动填写模型 ID" }).click();
+  await page.getByLabel("选择模型").fill("manual-model-id");
+  assert.equal(await page.getByLabel("选择模型").inputValue(), "manual-model-id");
   await page.screenshot({ path: path.join(screenshotDir, "02-provider-draft-models.png"), fullPage: true });
 
   const profiles = await createThreeProviderProfiles(baseUrl);
   await page.reload({ waitUntil: "networkidle" });
-  await page.getByText("三角色绑定").waitFor({ state: "visible" });
-  await selectRole(page, "商品识图", profiles.vision.id);
-  await selectRole(page, "策划与提示词", profiles.planning.id);
-  await selectRole(page, "图片生成", profiles.generation.id);
+  await page.getByRole("button", { name: "模型分工" }).click();
+  await page.getByText("商品识别用哪个模型").waitFor({ state: "visible" });
+  await selectRole(page, "商品识别用哪个模型", profiles.vision.id);
+  await selectRole(page, "文案策划用哪个模型", profiles.planning.id);
+  await selectRole(page, "图片生成用哪个模型", profiles.generation.id);
 
   let assignments = await getAssignments(baseUrl);
   assert.equal(assignments.product_vision, profiles.vision.id);
   assert.equal(assignments.image_planning, profiles.planning.id);
   assert.equal(assignments.image_generation, profiles.generation.id);
 
-  await selectRole(page, "商品识图", profiles.altVision.id);
+  await selectRole(page, "商品识别用哪个模型", profiles.altVision.id);
   assignments = await getAssignments(baseUrl);
   assert.equal(assignments.product_vision, profiles.altVision.id, "changed role updates");
   assert.equal(assignments.image_planning, profiles.planning.id, "planning role remains unchanged");
   assert.equal(assignments.image_generation, profiles.generation.id, "generation role remains unchanged");
 
   await page.reload({ waitUntil: "networkidle" });
-  await expectRoleText(page, "商品识图", "OpenAI视觉备用");
-  await expectRoleText(page, "策划与提示词", "DeepSeek策划");
-  await expectRoleText(page, "图片生成", "Gemini生图");
+  await page.getByRole("button", { name: "模型分工" }).click();
+  await expectRoleText(page, "商品识别用哪个模型", "OpenAI视觉备用");
+  await expectRoleText(page, "文案策划用哪个模型", "DeepSeek策划");
+  await expectRoleText(page, "图片生成用哪个模型", "Gemini生图");
   await page.screenshot({ path: path.join(screenshotDir, "03-independent-roles.png"), fullPage: true });
 }
 

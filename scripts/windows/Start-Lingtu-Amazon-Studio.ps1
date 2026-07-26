@@ -1,4 +1,4 @@
-$ErrorActionPreference = "Stop"
+﻿$ErrorActionPreference = "Stop"
 
 $Repo = "F:\codex\amazon-product-studio"
 $AppDataDir = Join-Path $env:APPDATA "LingtuAmazonStudio"
@@ -104,10 +104,39 @@ function Test-Web() {
 function Show-Error($Message) {
   try {
     Add-Type -AssemblyName PresentationFramework
-    [System.Windows.MessageBox]::Show($Message, "Lingtu Amazon Studio startup failed", "OK", "Error") | Out-Null
+    [System.Windows.MessageBox]::Show($Message, "灵图电商工作室启动失败", "OK", "Error") | Out-Null
   } catch {
     Write-Host $Message
   }
+}
+
+function Start-HiddenProcess($FilePath, $Arguments, $WorkingDirectory = "", $Wait = $true, $StdOutPath = "", $StdErrPath = "") {
+  $info = [System.Diagnostics.ProcessStartInfo]::new()
+  $info.FileName = $FilePath
+  $info.Arguments = $Arguments
+  if ($WorkingDirectory) { $info.WorkingDirectory = $WorkingDirectory }
+  $info.UseShellExecute = $false
+  $info.CreateNoWindow = $true
+  $info.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+  if ($StdOutPath) { $info.RedirectStandardOutput = $true }
+  if ($StdErrPath) { $info.RedirectStandardError = $true }
+
+  $process = [System.Diagnostics.Process]::new()
+  $process.StartInfo = $info
+  [void]$process.Start()
+
+  if (-not $Wait) {
+    return $process
+  }
+
+  $stdout = ""
+  $stderr = ""
+  if ($info.RedirectStandardOutput) { $stdout = $process.StandardOutput.ReadToEnd() }
+  if ($info.RedirectStandardError) { $stderr = $process.StandardError.ReadToEnd() }
+  $process.WaitForExit()
+  if ($StdOutPath -and $stdout) { Add-Content -LiteralPath $StdOutPath -Value $stdout -Encoding UTF8 }
+  if ($StdErrPath -and $stderr) { Add-Content -LiteralPath $StdErrPath -Value $stderr -Encoding UTF8 }
+  return $process
 }
 
 function Invoke-CmdStep($Command, $FailMessage) {
@@ -115,7 +144,7 @@ function Invoke-CmdStep($Command, $FailMessage) {
   $stepOut = Join-Path $LogDir "step.out.log"
   $stepErr = Join-Path $LogDir "step.err.log"
   Remove-Item -LiteralPath $stepOut, $stepErr -Force -ErrorAction SilentlyContinue
-  $process = Start-Process -FilePath $env:ComSpec -ArgumentList @("/c", $Command) -WorkingDirectory $Repo -RedirectStandardOutput $stepOut -RedirectStandardError $stepErr -Wait -PassThru -WindowStyle Hidden
+  $process = Start-HiddenProcess $env:ComSpec "/c $Command" $Repo $true $stepOut $stepErr
   if (Test-Path $stepOut) { Get-Content -LiteralPath $stepOut -ErrorAction SilentlyContinue | Add-Content -LiteralPath $SetupLog -Encoding UTF8 }
   if (Test-Path $stepErr) { Get-Content -LiteralPath $stepErr -ErrorAction SilentlyContinue | Add-Content -LiteralPath $SetupLog -Encoding UTF8 }
   if ($process.ExitCode -ne 0) { throw $FailMessage }
@@ -207,10 +236,10 @@ try {
     Write-Log "target database port already has a listener; checking project PostgreSQL"
   } else {
     Write-Log "starting postgres"
-    $pgCommandLine = '"' + $PgCtl + '" start -D "' + $PgData + '" -l "' + $PgLog + '" -o "-p ' + $db.Port + '"'
-    $pgStart = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $pgCommandLine }
-    Write-Log "pg_ctl start return=$($pgStart.ReturnValue) pid=$($pgStart.ProcessId)"
-    if ($pgStart.ReturnValue -ne 0) {
+    $pgArgs = 'start -D "' + $PgData + '" -l "' + $PgLog + '" -o "-p ' + $db.Port + '"'
+    $pgProcess = Start-HiddenProcess $PgCtl $pgArgs "" $true
+    Write-Log "pg_ctl start exit=$($pgProcess.ExitCode)"
+    if ($pgProcess.ExitCode -ne 0) {
       $tail = Get-PostgresLogTail
       Write-Log "postgres log tail after pg_ctl failure:`n$tail"
       throw "PostgreSQL failed to start. See log: $PgLog"
@@ -244,7 +273,9 @@ try {
   Invoke-CmdStep "npx prisma migrate deploy --config prisma.config.ts" "Database migration failed."
 
   Write-Log "starting next dev"
-  $process = Start-Process -FilePath "$env:ComSpec" -ArgumentList @("/c", "npm run dev -- -p 3000") -WorkingDirectory $Repo -RedirectStandardOutput $OutLog -RedirectStandardError $ErrLog -PassThru -WindowStyle Hidden
+  Remove-Item -LiteralPath $OutLog, $ErrLog -Force -ErrorAction SilentlyContinue
+  $devCommand = 'npm run dev -- -p 3000 > "' + $OutLog + '" 2> "' + $ErrLog + '"'
+  $process = Start-HiddenProcess $env:ComSpec "/c $devCommand" $Repo $false
   $process.Id | Set-Content -LiteralPath $PidFile -Encoding ascii
 
   for ($i = 1; $i -le 90 -and -not (Test-Web); $i += 1) {
@@ -258,7 +289,7 @@ try {
 } catch {
   $message = $_.Exception.Message
   Set-Content -LiteralPath $FailureLog -Value ($_.Exception.ToString()) -Encoding UTF8
-  Show-Error ($message + "`n`nLogs: " + $LogDir)
+  Show-Error ($message + "`n`n查看日志：" + $LogDir)
   exit 1
 } finally {
   [Environment]::SetEnvironmentVariable("PGPASSWORD", $null, "Process")

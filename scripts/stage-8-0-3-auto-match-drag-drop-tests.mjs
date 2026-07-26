@@ -27,6 +27,7 @@ let prisma;
 let fakeProvider;
 let activeApp;
 let activeBrowser;
+let activePage;
 let browserEvents = [];
 
 process.env.APP_MODE = "local";
@@ -55,6 +56,7 @@ try {
   const browser = await chromium.launch({ headless: true });
   activeBrowser = browser;
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  activePage = page;
   page.on("console", (message) => browserEvents.push(`console:${message.type()}:${message.text()}`));
   page.on("pageerror", (error) => browserEvents.push(`pageerror:${error.message}`));
   page.on("dialog", (dialog) => dialog.accept());
@@ -131,12 +133,15 @@ async function testHomeClickUpload(page, baseUrl) {
   await page.waitForURL(/\/projects\//, { timeout: 15000 });
   const projectId = page.url().split("/projects/")[1]?.split(/[?#]/)[0];
   assert(projectId, "home quick upload navigates to workspace");
+  await waitForWorkflowStep(page, 2);
+  await openPanelIfPresent(page, "workflow-step-1");
   await page.getByTestId("reference-image-card").first().waitFor({ state: "visible" });
   return projectId;
 }
 
 async function testWorkspaceDropAndPaste(page, baseUrl, projectId) {
   await page.goto(`${baseUrl}/projects/${projectId}`, { waitUntil: "networkidle" });
+  await openPanelIfPresent(page, "workflow-step-1");
   await page.getByTestId("reference-drop-zone").waitFor({ state: "visible" });
 
   const before = await countReferences(projectId);
@@ -165,12 +170,13 @@ async function testProviderAutoDetectAndRecommend(page, baseUrl) {
   });
 
   await page.goto(`${baseUrl}/settings/providers`, { waitUntil: "networkidle" });
-  await page.getByText("服务商配置").first().waitFor({ state: "visible" });
-  await page.getByRole("button", { name: "手动填写" }).click();
-  await page.getByLabel("模型 ID").fill("gpt-image-1");
-  await page.locator("summary", { hasText: "高级设置" }).click();
+  await page.getByText("AI 服务").first().waitFor({ state: "visible" });
+  await page.getByRole("button", { name: "高级：手动填写模型 ID" }).click();
+  await page.getByLabel("选择模型").fill("gpt-image-1");
+  await page.getByRole("button", { name: "高级设置" }).click();
   await page.locator('input[value="openai-image-edit"]').waitFor({ state: "visible" });
 
+  await page.getByRole("button", { name: "模型分工" }).click();
   await page.getByTestId("role-lock-image_planning").check();
   const recommendation = page.waitForResponse((response) =>
     response.url().includes("/api/model-role-assignments/") && response.request().method() === "PUT",
@@ -184,6 +190,7 @@ async function testProviderAutoDetectAndRecommend(page, baseUrl) {
   assert.equal(assignments.product_vision, profiles.vision.id, "vision role receives recommended profile");
   assert.equal(assignments.image_generation, profiles.generation.id, "generation role receives recommended profile");
   await page.reload({ waitUntil: "networkidle" });
+  await page.getByRole("button", { name: "模型分工" }).click();
   await page.locator("p", { hasText: "OpenAI Compatible · 视觉模型" }).first().waitFor({ state: "visible" });
   await page.locator("p", { hasText: "Google Gemini · Gemini生图" }).first().waitFor({ state: "visible" });
   await page.screenshot({ path: path.join(screenshotDir, "03-provider-auto-recommend.png"), fullPage: true });
@@ -199,6 +206,7 @@ async function testMobileWorkspace(page, baseUrl, projectId) {
   const projectResponse = await projectResponsePromise;
   assert(projectResponse && projectResponse.status() === 200, "mobile workspace project API must load");
   try {
+    await openPanelIfPresent(page, "workflow-step-1");
     await page.getByTestId("reference-drop-zone").waitFor({ state: "visible", timeout: 60000 });
   } catch (error) {
     await page.screenshot({ path: path.join(diagnosticsDir, "mobile-workspace-missing-drop-zone.png"), fullPage: true }).catch(() => {});
@@ -208,6 +216,36 @@ async function testMobileWorkspace(page, baseUrl, projectId) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 2);
   assert.equal(overflow, false, "workspace must not severely overflow on mobile");
   await page.screenshot({ path: path.join(screenshotDir, "04-workspace-mobile.png"), fullPage: true });
+}
+
+async function openPanelIfPresent(page, testId) {
+  const panel = page.getByTestId(testId);
+  await panel.waitFor({ state: "attached", timeout: 30000 }).catch(() => {});
+  if (await panel.count() === 0) return;
+  const isOpen = await panel.evaluate((element) => element.dataset.open === "true" || element.open === true);
+  if (isOpen) return;
+  const toggle = page.getByTestId(`${testId}-toggle`);
+  if (await toggle.count()) {
+    await page.evaluate((id) => {
+      document.querySelector(`[data-testid="${id}-toggle"]`)?.click();
+    }, testId);
+  }
+  await page.waitForFunction(
+    (id) => {
+      const element = document.querySelector(`[data-testid="${id}"]`);
+      return !element || element.dataset.open === "true" || element.open === true;
+    },
+    testId,
+    { timeout: 30000 },
+  );
+}
+
+async function waitForWorkflowStep(page, index) {
+  await page.waitForFunction(
+    (stepIndex) => document.querySelector(`[data-testid="workflow-step-${stepIndex}"]`)?.dataset.current === "true",
+    index,
+    { timeout: 30000 },
+  );
 }
 
 async function dispatchImageDrop(page, fileName, size) {
@@ -407,6 +445,10 @@ async function fileExists(filePath) {
 
 async function persistDiagnostics(error) {
   await fs.mkdir(diagnosticsDir, { recursive: true }).catch(() => {});
+  if (activePage) {
+    await activePage.screenshot({ path: path.join(diagnosticsDir, "failure-page.png"), fullPage: true }).catch(() => {});
+    await fs.writeFile(path.join(diagnosticsDir, "failure-body.txt"), await activePage.locator("body").innerText().catch(() => ""), "utf8").catch(() => {});
+  }
   await fs.writeFile(path.join(diagnosticsDir, "failure-summary.txt"), String(error?.stack || error), "utf8").catch(() => {});
   await fs.writeFile(path.join(diagnosticsDir, "browser-events.log"), browserEvents.join("\n"), "utf8").catch(() => {});
 }

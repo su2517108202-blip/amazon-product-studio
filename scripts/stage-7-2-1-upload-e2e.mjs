@@ -71,6 +71,7 @@ try {
     (response) => response.url().includes("/api/projects") && response.request().method() === "POST",
     { timeout: 30000 },
   );
+  await openDetailsIfPresent(page, "home-more-settings");
   await page.getByTestId("project-name-input").fill(projectName);
   await page.getByTestId("project-product-name-input").fill("中文便携充电宝");
   const createButton = page.getByTestId("create-project-button");
@@ -105,19 +106,24 @@ try {
     { timeout: 30000 },
   );
   await fileInput.setInputFiles([files.jpg, files.png, files.webp]);
-  await page.getByTestId("reference-upload-button").waitFor({ state: "visible" });
+  await openDetailsIfPresent(page, "workflow-step-1");
+  await page.getByTestId("reference-upload-button").waitFor({ state: "attached" });
   await page.screenshot({ path: path.join(screenshotDir, "02-upload-progress.png"), fullPage: true });
   const uploadResponse = await uploadResponsePromise;
   assert.equal(uploadResponse.status(), 201);
   const uploadBody = await uploadResponse.text();
   assert(!/[A-Z]:\\|\/home\/|\/mnt\/|localPath|Authorization|apiKey|password|base64/i.test(uploadBody));
 
+  await waitForWorkflowStep(page, 2);
+  await openDetailsIfPresent(page, "workflow-step-1");
   await page.getByTestId("reference-image-card").nth(2).waitFor({ state: "visible", timeout: 30000 });
   await page.screenshot({ path: path.join(screenshotDir, "03-upload-thumbnails.png"), fullPage: true });
   assert.equal(await page.getByTestId("reference-image-card").count(), 3);
   assert.equal(await page.getByTestId("reference-image-card").first().getAttribute("data-primary"), "true");
 
   await page.reload({ waitUntil: "networkidle" });
+  await waitForWorkflowStep(page, 2);
+  await openDetailsIfPresent(page, "workflow-step-1");
   assert.equal(await page.getByTestId("reference-image-card").count(), 3);
   assert.equal(await page.getByTestId("reference-image-card").first().getAttribute("data-primary"), "true");
   await page.screenshot({ path: path.join(screenshotDir, "04-readable-candidates.png"), fullPage: true });
@@ -209,7 +215,7 @@ async function resetData() {
 async function startNextApp() {
   const port = await getOpenPort();
   const hasProductionBuild = await fileExists(path.join(root, ".next", "BUILD_ID"));
-  const useProductionBuild = process.env.CI === "true" && hasProductionBuild;
+  const useProductionBuild = hasProductionBuild;
   if (!useProductionBuild) {
     await fs.rm(path.join(root, ".next"), { recursive: true, force: true }).catch(() => {});
   }
@@ -278,6 +284,47 @@ async function expectEnabled(locator, label) {
   await locator.waitFor({ state: "visible", timeout: 30000 });
   const disabled = await locator.evaluate((element) => Boolean(element.disabled));
   assert.equal(disabled, false, `${label} must be enabled`);
+}
+
+async function openDetailsIfPresent(page, testId) {
+  const panel = page.getByTestId(testId);
+  await panel.waitFor({ state: "attached", timeout: 30000 }).catch(() => {});
+  if (await panel.count() === 0) return;
+  const isOpen = await panel.evaluate((element) => {
+    if (element instanceof HTMLDetailsElement) return Boolean(element.open);
+    return element.dataset.open === "true";
+  });
+  if (isOpen) return;
+  const toggle = page.getByTestId(`${testId}-toggle`);
+  if (await toggle.count()) {
+    await page.evaluate((id) => {
+      document.querySelector(`[data-testid="${id}-toggle"]`)?.click();
+    }, testId);
+  } else {
+    await panel.evaluate((element) => {
+      if (!(element instanceof HTMLDetailsElement)) return;
+      element.open = true;
+      element.dispatchEvent(new Event("toggle", { bubbles: true }));
+    });
+  }
+  await page.waitForFunction(
+    (id) => {
+      const element = document.querySelector(`[data-testid="${id}"]`);
+      if (!element) return true;
+      if (element instanceof HTMLDetailsElement) return element.open === true;
+      return element.dataset.open === "true";
+    },
+    testId,
+    { timeout: 30000 },
+  );
+}
+
+async function waitForWorkflowStep(page, index) {
+  await page.waitForFunction(
+    (stepIndex) => document.querySelector(`[data-testid="workflow-step-${stepIndex}"]`)?.dataset.current === "true",
+    index,
+    { timeout: 30000 },
+  );
 }
 
 async function assertResponseStatus(response, expected, label) {

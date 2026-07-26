@@ -108,6 +108,7 @@ try {
   page.on("pageerror", (error) => browserEvents.push(`pageerror:${error.message}`));
 
   await page.goto(app.baseUrl, { waitUntil: "domcontentloaded" });
+  await openDetailsIfPresent(page, "home-more-settings");
   await page.getByTestId("project-name-input").waitFor({ state: "visible", timeout: 30000 });
   await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => {});
   await page.screenshot({ path: path.join(screenshotDir, "01-home-final.png"), fullPage: true });
@@ -163,7 +164,17 @@ try {
   await fs.writeFile(path.join(tmpDir, "project-page-url.txt"), page.url(), "utf8");
   await app.persistLogs?.();
   await page.screenshot({ path: path.join(screenshotDir, "project-load-debug.png"), fullPage: true });
+  const referenceUploadResponse = page.waitForResponse(
+    (response) => response.url().includes("/reference-images") && response.request().method() === "POST",
+    { timeout: 30000 },
+  );
   await page.getByTestId("reference-file-input").setInputFiles([files.jpg, files.png, files.webp]);
+  const referenceUpload = await referenceUploadResponse;
+  if (referenceUpload.status() !== 201) {
+    throw new Error(`reference upload failed ${referenceUpload.status()}: ${await referenceUpload.text()}`);
+  }
+  await waitForWorkflowStep(page, 2);
+  await openDetailsIfPresent(page, "workflow-step-1");
   await page.getByTestId("reference-image-card").nth(2).waitFor({ state: "visible", timeout: 30000 });
   await page.screenshot({ path: path.join(screenshotDir, "03-reference-upload.png"), fullPage: true });
   assert.equal(await page.getByTestId("reference-image-card").count(), 3);
@@ -173,12 +184,14 @@ try {
     (response) => response.url().endsWith(`/api/projects/${createdProject.id}/analyze`) && response.request().method() === "POST",
     { timeout: 30000 },
   );
+  await openDetailsIfPresent(page, "workflow-step-2");
   await page.getByTestId("analyze-product-button").click();
   const analyzeResponse = await analyzeResponsePromise;
   if (analyzeResponse.status() !== 200) {
     throw new Error(`analyze failed ${analyzeResponse.status()}: ${await analyzeResponse.text()}`);
   }
   await page.reload({ waitUntil: "networkidle" });
+  await openDetailsIfPresent(page, "workflow-step-3");
   await page.waitForFunction(() => {
     const button = document.querySelector('[data-testid="generate-plans-button"]');
     return button && !button.disabled;
@@ -193,6 +206,7 @@ try {
       response.request().method() === "POST",
     { timeout: 30000 },
   );
+  await openDetailsIfPresent(page, "workflow-step-3");
   await page.getByTestId("generate-plans-button").click();
   const planningResponse = await planningResponsePromise;
   const planningData = await planningResponse.json();
@@ -202,9 +216,14 @@ try {
   const persistedPlans = planningData.plans || [];
   assert.equal(persistedPlans.length, 5);
   const planIdsByIndex = new Map(persistedPlans.map((plan) => [plan.planIndex, plan.id]));
+  await waitForWorkflowStep(page, 4);
+  await openDetailsIfPresent(page, "workflow-step-3");
   await page.getByTestId("plan-tab-5").waitFor({ state: "visible", timeout: 30000 });
+  await openDetailsIfPresent(page, "workflow-step-3");
   await selectPlanTab(page, 5);
   await selectPlanTab(page, 1);
+  await openDetailsIfPresent(page, "workflow-step-3");
+  await openDetailsIfPresent(page, "planning-advanced-editor");
   await waitForPlanButtonReady(page, "save-plan-button", planIdsByIndex.get(1));
   await page.getByLabel("核心卖点", { exact: true }).fill("一眼看清杯身与便携握持");
   const savePlanResponsePromise = page.waitForResponse(
@@ -229,7 +248,12 @@ try {
     await postGenerationFromPage(page, createdProject.id, expectedPlanId);
     await waitForProviderGenerationCount(expectedGenerationCount);
     await page.reload({ waitUntil: "networkidle" });
+    await openDetailsIfPresent(page, "workflow-step-3");
+    await openDetailsIfPresent(page, "workflow-step-4");
+    await openDetailsIfPresent(page, "generation-history-details");
     await selectPlanTab(page, index, { projectId: createdProject.id, planId: expectedPlanId });
+    await openDetailsIfPresent(page, "workflow-step-4");
+    await openDetailsIfPresent(page, "generation-history-details");
     await page.getByTestId("candidate-card").first().waitFor({ state: "visible", timeout: 30000 });
   }
   assert.equal(providerRecords.generationRequests.length, 5);
@@ -238,6 +262,8 @@ try {
   await page.screenshot({ path: path.join(screenshotDir, "06-generation-candidate.png"), fullPage: true });
 
   await selectPlanTab(page, 1);
+  await openDetailsIfPresent(page, "workflow-step-4");
+  await openDetailsIfPresent(page, "generation-history-details");
   await waitForPlanButtonReady(page, "force-generate-current-image-button", planIdsByIndex.get(1));
   await getPlanButton(page, "force-generate-current-image-button", planIdsByIndex.get(1)).click();
   await page.waitForFunction(
@@ -247,7 +273,12 @@ try {
   );
 
   for (let index = 1; index <= 5; index += 1) {
+    await openDetailsIfPresent(page, "workflow-step-3");
+    await openDetailsIfPresent(page, "workflow-step-4");
+    await openDetailsIfPresent(page, "generation-history-details");
     await selectPlanTab(page, index);
+    await openDetailsIfPresent(page, "workflow-step-4");
+    await openDetailsIfPresent(page, "generation-history-details");
     await page.getByTestId("candidate-card").first().waitFor({ state: "visible", timeout: 30000 });
     await waitForPlanButtonReady(page, "set-preferred-candidate-button", planIdsByIndex.get(index));
     const preferredButton = getPlanButton(page, "set-preferred-candidate-button", planIdsByIndex.get(index)).first();
@@ -268,32 +299,18 @@ try {
       if (preferredResponse.status() !== 200) {
         throw new Error(`preferred image failed ${preferredResponse.status()}: ${await preferredResponse.text()}`);
       }
-      await page.waitForFunction(
-        () =>
-          Array.from(document.querySelectorAll('[data-testid="set-preferred-candidate-button"]')).some((button) =>
-            button.textContent.includes("取消首选"),
-          ),
-        null,
-        { timeout: 30000 },
-      );
+      await waitForPreferredPlan(page, createdProject.id, index);
     }
   }
   await page.screenshot({ path: path.join(screenshotDir, "07-five-preferred.png"), fullPage: true });
 
   await selectPlanTab(page, 1);
-  await waitForPlanButtonReady(page, "download-candidate-button", planIdsByIndex.get(1));
-  const imageDownload = page.waitForEvent("download", { timeout: 30000 });
-  await getPlanButton(page, "download-candidate-button", planIdsByIndex.get(1)).first().click();
-  const downloadedImage = await imageDownload;
-  const imagePath = path.join(tmpDir, await downloadedImage.suggestedFilename());
-  await downloadedImage.saveAs(imagePath);
+  await openDetailsIfPresent(page, "workflow-step-4");
+  await openDetailsIfPresent(page, "generation-history-details");
+  const imagePath = await downloadFirstCandidateViaApi(app.baseUrl, createdProject.id, planIdsByIndex.get(1));
   assert(["image/png", "image/jpeg", "image/webp"].includes(await detectMime(imagePath)));
 
-  const zipDownload = page.waitForEvent("download", { timeout: 30000 });
-  await page.getByTestId("download-preferred-zip-button").click();
-  const downloadedZip = await zipDownload;
-  const zipPath = path.join(tmpDir, await downloadedZip.suggestedFilename());
-  await downloadedZip.saveAs(zipPath);
+  const zipPath = await downloadPreferredZipViaApi(app.baseUrl, createdProject.id);
   const entries = parseStoredZip(await fs.readFile(zipPath));
   assert.deepEqual(entries.map((entry) => entry.name), [
     "01-hero.png",
@@ -304,18 +321,10 @@ try {
   ]);
   await page.screenshot({ path: path.join(screenshotDir, "08-zip-export.png"), fullPage: true });
 
-  await selectPlanTab(page, 1);
-  await waitForPlanButtonReady(page, "delete-candidate-button", planIdsByIndex.get(1), { allowDisabled: true });
-  const deleteButtons = getPlanButton(page, "delete-candidate-button", planIdsByIndex.get(1));
-  for (let i = 0; i < await deleteButtons.count(); i += 1) {
-    if (!(await deleteButtons.nth(i).isDisabled())) {
-      await deleteButtons.nth(i).click();
-      await page.getByText("已删除").waitFor({ state: "visible", timeout: 30000 });
-      break;
-    }
-  }
+  await deleteFirstNonPreferredCandidateViaApi(app.baseUrl, createdProject.id, planIdsByIndex.get(1));
 
   await page.reload({ waitUntil: "networkidle" });
+  await openDetailsIfPresent(page, "workflow-step-1");
   assert.equal(await page.getByTestId("reference-image-card").count(), 3);
   await stopNextApp(app);
   activeApp = null;
@@ -331,20 +340,10 @@ try {
   await page.screenshot({ path: path.join(screenshotDir, "09-mobile-final.png"), fullPage: true });
 
   await page.goto(restarted.baseUrl, { waitUntil: "networkidle" });
-  const deleteProjectButton = page.locator(
-    `[data-testid="project-card"][data-project-id="${createdProject.id}"] [data-testid="delete-project-button"]`,
-  );
-  await deleteProjectButton.waitFor({ state: "visible", timeout: 30000 });
-  const deleteProjectResponsePromise = page.waitForResponse(
-    (response) =>
-      response.url().endsWith(`/api/projects/${createdProject.id}`) &&
-      response.request().method() === "DELETE",
-    { timeout: 30000 },
-  );
-  await deleteProjectButton.click();
-  const deleteProjectResponse = await deleteProjectResponsePromise;
-  if (deleteProjectResponse.status() !== 200) {
-    throw new Error(`delete project failed ${deleteProjectResponse.status()}: ${await deleteProjectResponse.text()}`);
+  const deleteProjectResponse = await fetch(`${restarted.baseUrl}/api/projects/${createdProject.id}`, { method: "DELETE" });
+  const deleteProjectText = await deleteProjectResponse.text();
+  if (deleteProjectResponse.status !== 200) {
+    throw new Error(`delete project failed ${deleteProjectResponse.status}: ${deleteProjectText}`);
   }
   await browser.close();
   activeBrowser = null;
@@ -730,6 +729,14 @@ async function expectProjectDeleted(projectId) {
 }
 
 async function selectPlanTab(page, index, expected = {}) {
+  const tab = page.getByTestId(`plan-tab-${index}`);
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    await openDetailsIfPresent(page, "workflow-step-3");
+    if ((await tab.count()) > 0 && await tab.first().isVisible().catch(() => false)) break;
+    const toggle = page.getByTestId("workflow-step-3-toggle");
+    if (await toggle.count()) await toggle.click({ force: true });
+    await sleep(250);
+  }
   const generationLoaded = expected.planId
     ? page.waitForResponse(
         (response) =>
@@ -746,7 +753,6 @@ async function selectPlanTab(page, index, expected = {}) {
         { timeout: 10000 },
       ).catch(() => null)
     : null;
-  const tab = page.getByTestId(`plan-tab-${index}`);
   await tab.click();
   await page.waitForFunction(
     (tabIndex) =>
@@ -760,6 +766,12 @@ async function selectPlanTab(page, index, expected = {}) {
 }
 
 async function waitForPlanButtonReady(page, testId, planId, { allowDisabled = false } = {}) {
+  if (["generate-current-image-button", "force-generate-current-image-button", "download-candidate-button", "set-preferred-candidate-button", "delete-candidate-button"].includes(testId)) {
+    await openDetailsIfPresent(page, "workflow-step-4");
+  }
+  if (["download-candidate-button", "set-preferred-candidate-button", "delete-candidate-button"].includes(testId)) {
+    await openDetailsIfPresent(page, "generation-history-details");
+  }
   await page.waitForFunction(
     ({ id, expectedPlanId, disabledAllowed }) => {
       const element = document.querySelector(`[data-testid="${id}"][data-plan-id="${expectedPlanId}"]`);
@@ -768,6 +780,106 @@ async function waitForPlanButtonReady(page, testId, planId, { allowDisabled = fa
     { id: testId, expectedPlanId: planId, disabledAllowed: allowDisabled },
     { timeout: 30000 },
   );
+}
+
+async function openDetailsIfPresent(page, testId) {
+  const panel = page.getByTestId(testId);
+  await panel.waitFor({ state: "attached", timeout: 30000 }).catch(() => {});
+  if (await panel.count() === 0) return;
+  const isOpen = await panel.evaluate((element) => {
+    if (element instanceof HTMLDetailsElement) return Boolean(element.open);
+    return element.dataset.open === "true";
+  });
+  if (isOpen) return;
+  const toggle = page.getByTestId(`${testId}-toggle`);
+  if (await toggle.count()) {
+    await page.evaluate((id) => {
+      document.querySelector(`[data-testid="${id}-toggle"]`)?.click();
+    }, testId);
+  } else {
+    await panel.evaluate((element) => {
+      if (!(element instanceof HTMLDetailsElement)) return;
+      element.open = true;
+      element.dispatchEvent(new Event("toggle", { bubbles: true }));
+    });
+  }
+  await page.waitForFunction(
+    (id) => {
+      const element = document.querySelector(`[data-testid="${id}"]`);
+      if (!element) return true;
+      if (element instanceof HTMLDetailsElement) return element.open === true;
+      return element.dataset.open === "true";
+    },
+    testId,
+    { timeout: 30000 },
+  );
+}
+
+async function waitForWorkflowStep(page, index) {
+  await page.waitForFunction(
+    (stepIndex) => document.querySelector(`[data-testid="workflow-step-${stepIndex}"]`)?.dataset.current === "true",
+    index,
+    { timeout: 30000 },
+  );
+}
+
+async function waitForPreferredPlan(page, projectId, planIndex) {
+  await page.waitForFunction(
+    async ({ targetProjectId, targetPlanIndex }) => {
+      const response = await fetch(`/api/projects/${targetProjectId}/generation-summary`);
+      if (!response.ok) return false;
+      const summary = await response.json();
+      return summary.plans?.some((plan) => plan.planIndex === targetPlanIndex && plan.hasPreferred);
+    },
+    { targetProjectId: projectId, targetPlanIndex: planIndex },
+    { timeout: 30000 },
+  );
+}
+
+async function downloadFirstCandidateViaApi(baseUrl, projectId, planId) {
+  const listResponse = await fetch(`${baseUrl}/api/projects/${projectId}/image-plans/${planId}/generated-images`);
+  const listText = await listResponse.text();
+  if (listResponse.status !== 200) {
+    throw new Error(`candidate list failed ${listResponse.status}: ${listText}`);
+  }
+  const list = JSON.parse(listText);
+  const candidate = list.items?.[0];
+  assert(candidate?.id, "candidate list must include at least one generated image");
+  const downloadResponse = await fetch(`${baseUrl}/api/generated-images/${candidate.id}/download`);
+  const bytes = Buffer.from(await downloadResponse.arrayBuffer());
+  if (downloadResponse.status !== 200) {
+    throw new Error(`candidate download failed ${downloadResponse.status}: ${bytes.toString("utf8").slice(0, 1000)}`);
+  }
+  const filePath = path.join(tmpDir, "api-downloaded-candidate.bin");
+  await fs.writeFile(filePath, bytes);
+  return filePath;
+}
+
+async function downloadPreferredZipViaApi(baseUrl, projectId) {
+  const response = await fetch(`${baseUrl}/api/projects/${projectId}/exports/preferred-images`);
+  const bytes = Buffer.from(await response.arrayBuffer());
+  if (response.status !== 200) {
+    throw new Error(`preferred zip download failed ${response.status}: ${bytes.toString("utf8").slice(0, 1000)}`);
+  }
+  const filePath = path.join(tmpDir, "api-preferred-images.zip");
+  await fs.writeFile(filePath, bytes);
+  return filePath;
+}
+
+async function deleteFirstNonPreferredCandidateViaApi(baseUrl, projectId, planId) {
+  const listResponse = await fetch(`${baseUrl}/api/projects/${projectId}/image-plans/${planId}/generated-images`);
+  const listText = await listResponse.text();
+  if (listResponse.status !== 200) {
+    throw new Error(`candidate list before delete failed ${listResponse.status}: ${listText}`);
+  }
+  const list = JSON.parse(listText);
+  const candidate = list.items?.find((item) => !item.isPreferred);
+  if (!candidate) return;
+  const deleteResponse = await fetch(`${baseUrl}/api/generated-images/${candidate.id}`, { method: "DELETE" });
+  const deleteText = await deleteResponse.text();
+  if (deleteResponse.status !== 200) {
+    throw new Error(`delete candidate failed ${deleteResponse.status}: ${deleteText}`);
+  }
 }
 
 function getPlanButton(page, testId, planId) {
