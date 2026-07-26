@@ -207,10 +207,10 @@ try {
     Write-Log "target database port already has a listener; checking project PostgreSQL"
   } else {
     Write-Log "starting postgres"
-    & $PgCtl start -D $PgData -l $PgLog -o "-p $($db.Port)"
-    $pgExit = $LASTEXITCODE
-    Write-Log "pg_ctl start exit=$pgExit"
-    if ($pgExit -ne 0) {
+    $pgCommandLine = '"' + $PgCtl + '" start -D "' + $PgData + '" -l "' + $PgLog + '" -o "-p ' + $db.Port + '"'
+    $pgStart = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = $pgCommandLine }
+    Write-Log "pg_ctl start return=$($pgStart.ReturnValue) pid=$($pgStart.ProcessId)"
+    if ($pgStart.ReturnValue -ne 0) {
       $tail = Get-PostgresLogTail
       Write-Log "postgres log tail after pg_ctl failure:`n$tail"
       throw "PostgreSQL failed to start. See log: $PgLog"
