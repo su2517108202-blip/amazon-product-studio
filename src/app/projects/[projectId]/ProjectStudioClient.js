@@ -94,6 +94,7 @@ export default function ProjectStudioClient({ projectId }) {
   const [draggingUpload, setDraggingUpload] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [analysisMigration, setAnalysisMigration] = useState(null);
   const [nameSuggestions, setNameSuggestions] = useState(null);
   const [userEditedName, setUserEditedName] = useState(false);
   const fileInputRef = useRef(null);
@@ -419,6 +420,7 @@ export default function ProjectStudioClient({ projectId }) {
 
     setAnalyzing(true);
     setError("");
+    setAnalysisMigration(null);
     setMessage(`正在读取 ${selectedCount} 张参考图`);
     try {
       const res = await fetch(`/api/projects/${projectId}/analyze`, {
@@ -428,7 +430,12 @@ export default function ProjectStudioClient({ projectId }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        let errorMsg = `${data.code || "ERROR"}：${data.message || "识别失败"}`;
+        if (data.code === "MODEL_UNAVAILABLE_FOR_ACCOUNT" && data.suggestedMigration) {
+          setAnalysisMigration(data.suggestedMigration);
+        }
+        let errorMsg = data.code === "MODEL_UNAVAILABLE_FOR_ACCOUNT"
+          ? (data.message || "当前账号无法使用 Gemini 2.5 Flash。请切换到 Gemini 3.6 Flash 后重新识别。")
+          : `${data.code || "ERROR"}：${data.message || "识别失败"}`;
         const diag = data.diagnostic;
         if (diag) {
           const parts = [];
@@ -688,6 +695,41 @@ export default function ProjectStudioClient({ projectId }) {
     }
   }
 
+  async function migrateVisionModelAndRetry() {
+    if (!analysisMigration?.providerProfileId || !analysisMigration?.toModelId) return;
+    setAnalyzing(true);
+    setError("");
+    setMessage(`正在切换到 ${analysisMigration.displayName || analysisMigration.toModelId}`);
+    try {
+      const res = await fetch("/api/model-role-assignments/product_vision", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          providerProfileId: analysisMigration.providerProfileId,
+          modelId: analysisMigration.toModelId,
+          isUserForced: true,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "切换商品识别模型失败");
+      setMessage(`已切换到 ${analysisMigration.displayName || analysisMigration.toModelId}，正在重新识别商品`);
+      const retryRes = await fetch(`/api/projects/${projectId}/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ force: true }),
+      });
+      const retryData = await retryRes.json().catch(() => ({}));
+      if (!retryRes.ok) throw new Error(retryData.message || retryData.error || "重新识别失败");
+      await fetchProject();
+      setAnalysisMigration(null);
+      setMessage("模型已切换，商品识别成功");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setAnalyzing(false);
+    }
+  }
+
   async function checkCurrentGeneration() {
     const runId = generationInfo?.latestRun?.id;
     if (!runId) return;
@@ -825,9 +867,29 @@ export default function ProjectStudioClient({ projectId }) {
         </div>
 
         {(message || error) && (
-          <p className={`mb-5 border px-3 py-2 text-sm ${error ? "border-red-900/60 bg-red-950/40 text-red-200" : "border-emerald-900/60 bg-emerald-950/40 text-emerald-200"}`}>
-            {error || message}
-          </p>
+          <div className={`mb-5 border px-3 py-2 text-sm ${error ? "border-red-900/60 bg-red-950/40 text-red-200" : "border-emerald-900/60 bg-emerald-950/40 text-emerald-200"}`}>
+            <p>{error || message}</p>
+            {error && analysisMigration && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Link
+                  href="/settings/providers?section=roles"
+                  data-testid="go-model-roles-button"
+                  className="border border-red-800 px-3 py-2 text-xs font-semibold text-red-100 hover:border-red-500"
+                >
+                  前往模型分工
+                </Link>
+                <button
+                  type="button"
+                  onClick={migrateVisionModelAndRetry}
+                  disabled={analyzing}
+                  data-testid="migrate-vision-model-button"
+                  className="bg-amber-500 px-3 py-2 text-xs font-semibold text-black hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-500"
+                >
+                  切换到 {analysisMigration.displayName || analysisMigration.toModelId} 并重试
+                </button>
+              </div>
+            )}
+          </div>
         )}
 
         <div className="grid items-start gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">

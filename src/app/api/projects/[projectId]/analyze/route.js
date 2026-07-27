@@ -7,6 +7,13 @@ import { identityToDbData, identityToResponse } from "@/lib/product-identity";
 import { buildAnalysisImages, calculateInputFingerprint, pickAnalysisImages, runToResponse } from "@/lib/product-analysis";
 import { sanitizeReferenceImage } from "@/lib/projects";
 import { humanErrorLabel } from "@/lib/providers/errors";
+import {
+  MODEL_UNAVAILABLE_FOR_ACCOUNT,
+  buildGeminiReplacementCandidates,
+  chooseGeminiProductVisionReplacement,
+  isGeminiLegacyProductVisionModel,
+  markModelUnavailableForAccount,
+} from "@/lib/model-availability";
 import { redactSecrets } from "@/lib/security";
 import crypto from "crypto";
 
@@ -96,6 +103,43 @@ export async function POST(req, context) {
     const durationMs = Date.now() - startedAt;
     console.error("[PRODUCT_ANALYSIS_ERROR]", { projectId, profileId: profile?.id || "", provider: profile?.provider || "", model: effectiveModelId || "", errorCode: error.code || "UPSTREAM_ERROR", httpStatus: error.httpStatus || 0, durationMs });
 
+    let suggestedMigration = null;
+    if (
+      error.code === MODEL_UNAVAILABLE_FOR_ACCOUNT &&
+      profile?.provider === "gemini" &&
+      isGeminiLegacyProductVisionModel(effectiveModelId)
+    ) {
+      await markModelUnavailableForAccount({
+        providerProfileId: profile.id,
+        provider: profile.provider,
+        modelId: effectiveModelId,
+        reason: "当前账号无法使用 Gemini 2.5 Flash",
+      });
+      try {
+        const adapter = getProviderAdapter(profile.provider);
+        const list = await adapter.listModels(buildProviderConfig(profile));
+        const candidates = buildGeminiReplacementCandidates({
+          provider: profile.provider,
+          rawModels: list.models || [],
+          profile,
+        }).map((model) => ({
+          ...model,
+          providerProfileId: profile.id,
+          enabled: profile.enabled,
+        }));
+        const replacement = chooseGeminiProductVisionReplacement(candidates);
+        if (replacement) {
+          suggestedMigration = {
+            role: "product_vision",
+            providerProfileId: profile.id,
+            fromModelId: effectiveModelId,
+            toModelId: replacement.modelId,
+            displayName: replacement.displayName || replacement.modelId,
+          };
+        }
+      } catch {}
+    }
+
     if (run) {
       await prisma.productAnalysisRun.update({
         where: { id: run.id }, data: { status: "failed", errorCode: error.code || "UPSTREAM_ERROR", errorMessage: error.message || "商品识别失败", durationMs, completedAt: new Date() },
@@ -107,8 +151,11 @@ export async function POST(req, context) {
     return NextResponse.json(redactSecrets({
       ok: false,
       code: error.code || "UPSTREAM_ERROR",
-      message: error.message || humanErrorLabel(error.code) || "商品识别失败",
+      message: error.code === MODEL_UNAVAILABLE_FOR_ACCOUNT
+        ? "当前账号无法使用 Gemini 2.5 Flash。请切换到 Gemini 3.6 Flash 后重新识别。"
+        : (error.message || humanErrorLabel(error.code) || "商品识别失败"),
       httpStatus: error.httpStatus || 0,
+      suggestedMigration,
       diagnostic: {
         provider: profile?.provider || "",
         model: effectiveModelId || profile?.modelId || "",

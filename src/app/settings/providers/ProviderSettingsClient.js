@@ -51,6 +51,12 @@ const ROLE_LABELS = {
   image_planning: "文案策划用哪个模型",
   image_generation: "图片生成用哪个模型",
 };
+const GEMINI_LEGACY_PRODUCT_VISION_MODELS = new Set(["gemini-2.5-flash"]);
+const GEMINI_PRODUCT_VISION_REPLACEMENTS = [
+  "gemini-3.6-flash",
+  "gemini-3.5-flash",
+  "gemini-3.5-flash-lite",
+];
 
 function normalizeModelDetails(payload) {
   const source = Array.isArray(payload?.modelDetails) && payload.modelDetails.length
@@ -61,6 +67,10 @@ function normalizeModelDetails(payload) {
       ? resolveEffectiveModelCapability({ provider: payload?.provider || "", modelId: item })
       : item))
     .filter((item) => item?.modelId);
+}
+
+function normalizeModelIdForUi(modelId = "") {
+  return String(modelId || "").trim().replace(/^models\//i, "").toLowerCase();
 }
 
 export default function ProviderSettingsClient() {
@@ -107,6 +117,16 @@ export default function ProviderSettingsClient() {
     }, 0);
     return () => clearTimeout(timer);
   }, [loadData]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const section = new URLSearchParams(window.location.search).get("section");
+      if (SECTION_TABS.some((tab) => tab.id === section)) {
+        setActiveSection(section);
+      }
+    }, 0);
+    return () => clearTimeout(timer);
+  }, []);
 
   const assignmentMap = useMemo(
     () => Object.fromEntries(assignments.map((item) => [item.role, item])),
@@ -812,7 +832,18 @@ function RoleCard({
   const profileModels = selectedProfile
     ? buildRoleModelsForProfile(selectedProfile, discoveredModels, assignment, currentModelId, role)
     : [];
-  const sortedModels = sortModelsForRole(role, profileModels, currentModelId);
+  const migration = productVisionMigrationForCurrentBinding({
+    role,
+    assignment,
+    selectedProfile,
+    profileModels,
+    currentModelId,
+  });
+  const sortedModels = sortModelsForRole(
+    role,
+    profileModels.map((model) => applyClientUnavailableState(model, migration, currentModelId)),
+    currentModelId,
+  );
   const suitable = sortedModels.filter((model) => isSuitableForRole(role, model));
   const unsuitable = sortedModels.filter((model) => !isSuitableForRole(role, model));
   const modelSelectValue = assignment?.providerProfileId === selectedProfileId
@@ -828,6 +859,11 @@ function RoleCard({
     onAssignRole(role, profileId, modelId || undefined, true);
   }
 
+  function applyMigration() {
+    if (!migration) return;
+    onAssignRole(role, selectedProfileId, migration.modelId, true);
+  }
+
   return (
     <article className="border border-zinc-800 bg-zinc-950 p-4">
       <div className="flex items-center justify-between gap-3">
@@ -841,6 +877,27 @@ function RoleCard({
           ? `${providerName(assignment.providerProfile.provider)} / ${assignment.providerProfile.name} / ${currentModelId}${assignment.isUserForced ? "（手动选择）" : "（推荐）"}`
           : "未绑定"}
       </p>
+
+      {migration && (
+        <div className="mb-3 border border-amber-900/60 bg-amber-950/30 p-3 text-sm text-amber-100">
+          <p className="font-semibold">当前商品识别模型已不可用</p>
+          <p className="mt-1">推荐切换到：{migration.displayName}</p>
+          {locked && (
+            <p className="mt-1 text-xs text-amber-200">
+              当前角色已锁定，不会后台静默覆盖；点击按钮后只切换商品识别角色。
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={applyMigration}
+            data-testid="product-vision-migrate-model-button"
+            className="mt-3 inline-flex items-center gap-2 bg-amber-500 px-3 py-2 text-sm font-semibold text-black hover:bg-amber-400"
+          >
+            <FaCheck />
+            立即切换
+          </button>
+        </div>
+      )}
 
       <Field label="使用哪个 AI 配置">
         <select
@@ -1027,11 +1084,15 @@ function buildRoleModelsForProfile(profile, discoveredModels, assignment, curren
 }
 
 function isSuitableForRole(role, model) {
+  if (model?.capabilityStatus === "unavailable_for_account" || model?.unavailableForAccount) return false;
   return modelSupportsRole(role, model);
 }
 
 function friendlyRoleReason(role, model) {
   if (!model.enabled) return "配置已停用";
+  if (model.capabilityStatus === "unavailable_for_account" || model.unavailableForAccount) {
+    return model.reason || "当前账号不可用";
+  }
   const capabilities = model.capabilities || [];
   if (role === "product_vision" && model.capabilityStatus === "unverified") return model.reason || "视觉能力未验证";
   if (role === "product_vision" && !capabilities.includes("vision")) return model.reason || "该模型明确不支持图片输入";
@@ -1070,6 +1131,57 @@ function pickRecommendedModel(role, profiles, discoveredModels, current) {
   if (!candidates.length) return null;
   const sorted = sortModelsForRole(role, candidates, current?.modelId || "");
   return sorted[0] || null;
+}
+
+function productVisionMigrationForCurrentBinding({
+  role,
+  assignment,
+  selectedProfile,
+  profileModels,
+  currentModelId,
+}) {
+  if (role !== "product_vision") return null;
+  if (!assignment?.providerProfile || !selectedProfile) return null;
+  if (assignment.providerProfileId !== selectedProfile.id) return null;
+  if (selectedProfile.provider !== "gemini") return null;
+  if (!GEMINI_LEGACY_PRODUCT_VISION_MODELS.has(normalizeModelIdForUi(currentModelId))) return null;
+  const candidates = profileModels.filter((model) =>
+    model.provider === "gemini" &&
+    model.enabled !== false &&
+    isSuitableForRole("product_vision", model) &&
+    !model.capabilities?.includes("image") &&
+    !model.capabilities?.includes("asyncImage") &&
+    !model.unavailableForAccount &&
+    model.capabilityStatus !== "unavailable_for_account",
+  );
+  for (const preferred of GEMINI_PRODUCT_VISION_REPLACEMENTS) {
+    const match = candidates.find((model) => normalizeModelIdForUi(model.modelId) === preferred);
+    if (match) {
+      return {
+        modelId: match.modelId,
+        displayName: match.displayName || match.modelId,
+      };
+    }
+  }
+  return null;
+}
+
+function applyClientUnavailableState(model, migration, currentModelId) {
+  if (model.capabilityStatus === "unavailable_for_account" || model.unavailableForAccount) return model;
+  if (
+    migration &&
+    GEMINI_LEGACY_PRODUCT_VISION_MODELS.has(normalizeModelIdForUi(model.modelId)) &&
+    normalizeModelIdForUi(model.modelId) === normalizeModelIdForUi(currentModelId)
+  ) {
+    return {
+      ...model,
+      capabilityStatus: "unavailable_for_account",
+      unavailableForAccount: true,
+      recommendedFor: [],
+      reason: "当前账号无法使用 Gemini 2.5 Flash，请切换到推荐模型",
+    };
+  }
+  return model;
 }
 
 function formatBytes(bytes) {

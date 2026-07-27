@@ -5,6 +5,7 @@ import { buildProviderConfig } from "@/lib/provider-runtime";
 import { getProviderAdapter } from "@/lib/providers/registry";
 import { validateProviderDraftInput } from "@/lib/provider-profiles";
 import { resolveEffectiveModelCapability } from "@/lib/model-capabilities";
+import { applyModelAvailability } from "@/lib/model-availability";
 import { redactSecrets } from "@/lib/security";
 
 const UNSUPPORTED_MESSAGE = "该服务商不支持自动获取模型列表";
@@ -76,12 +77,12 @@ export async function POST(req) {
         description: "",
         supportedGenerationMethods: [],
       };
-      const resolved = resolveEffectiveModelCapability({
+      const resolved = applyModelAvailability(resolveEffectiveModelCapability({
         provider,
         modelId,
         discoveredModel: { modelId, metadata },
         profile: config,
-      });
+      }), { providerProfileId: input.providerProfileId || "" });
 
       return {
         modelId: resolved.modelId,

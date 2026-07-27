@@ -20,6 +20,7 @@
     "test:stage-8-0-5": "node scripts/stage-8-0-5-beginner-ui-tests.mjs",
     "test:stage-8-0-5-model-capability": "node scripts/stage-8-0-5-model-capability-provider-filter-tests.mjs",
     "test:stage-8-0-6": "node scripts/stage-8-0-6-layout-batch-generation-tests.mjs",
+    "test:stage-8-0-6-gemini-unavailable": "node scripts/stage-8-0-6-gemini-model-unavailable-tests.mjs",
     "test:ui-text": "node scripts/ui-text-tests.mjs",
     "lint": "eslint",
     "generate:credential-key": "node -e \"console.log(require('crypto').randomBytes(32).toString('base64'))\""

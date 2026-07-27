@@ -16,6 +16,10 @@ import {
   parsePlanningJson,
   sanitizeImagePlans,
 } from "@/lib/image-planning";
+import {
+  MODEL_UNAVAILABLE_FOR_ACCOUNT,
+  isGeminiAccountUnavailableError,
+} from "@/lib/model-availability";
 
 function geminiModelPath(modelId) {
   return modelId.startsWith("models/") ? modelId : `models/${modelId}`;
@@ -41,6 +45,15 @@ async function classifyGeminiError(response) {
 
   const status = response.status;
   const lowered = `${errorStatus} ${errorMessage}`.toLowerCase();
+
+  if (isGeminiAccountUnavailableError({
+    provider: "gemini",
+    httpStatus: status,
+    status: errorStatus,
+    message: errorMessage,
+  })) {
+    return MODEL_UNAVAILABLE_FOR_ACCOUNT;
+  }
 
   if (errorStatus === "INVALID_ARGUMENT" || errorStatus === "FAILED_PRECONDITION") {
     if (/image|media|multipart/i.test(lowered)) return "IMAGE_INPUT_UNSUPPORTED";

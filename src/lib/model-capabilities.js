@@ -53,15 +53,51 @@ const MODEL_CATALOG = {
     aliases: ["nano banana", "香蕉", "banana"],
     reason: "仍可使用，但不再作为默认推荐",
   },
-  "gemini-2.5-flash": {
-    displayName: "Gemini 2.5 Flash",
-    badges: ["稳定兼容"],
-    rank: 55,
+  "gemini-3.6-flash": {
+    displayName: "Gemini 3.6 Flash",
+    badges: ["热门首选"],
+    rank: 95,
     lifecycle: "stable",
     capabilities: ["text", "vision"],
     protocol: "gemini",
     supportsReferenceImages: false,
     recommendedFor: ["product_vision", "image_planning"],
+    aliases: ["gemini flash", "gemini 3.6 flash"],
+    reason: "当前账号优先推荐的图片输入、文字输出商品识别模型",
+  },
+  "gemini-3.5-flash": {
+    displayName: "Gemini 3.5 Flash",
+    badges: ["稳定强力"],
+    rank: 90,
+    lifecycle: "stable",
+    capabilities: ["text", "vision"],
+    protocol: "gemini",
+    supportsReferenceImages: false,
+    recommendedFor: ["product_vision", "image_planning"],
+    aliases: ["gemini 3.5 flash"],
+    reason: "支持图片输入和文字输出，可作为商品识别稳定替代",
+  },
+  "gemini-3.5-flash-lite": {
+    displayName: "Gemini 3.5 Flash Lite",
+    badges: ["极速省钱"],
+    rank: 85,
+    lifecycle: "stable",
+    capabilities: ["text", "vision"],
+    protocol: "gemini",
+    supportsReferenceImages: false,
+    recommendedFor: ["product_vision", "image_planning"],
+    aliases: ["gemini 3.5 flash lite"],
+    reason: "支持图片输入和文字输出，可作为轻量商品识别替代",
+  },
+  "gemini-2.5-flash": {
+    displayName: "Gemini 2.5 Flash",
+    badges: ["旧版"],
+    rank: 15,
+    lifecycle: "deprecated",
+    capabilities: ["text", "vision"],
+    protocol: "gemini",
+    supportsReferenceImages: false,
+    recommendedFor: ["image_planning"],
     aliases: ["gemini flash", "gemini 2.5 flash"],
     reason: "支持图片输入和文字输出，可用于商品识别",
   },
@@ -370,6 +406,7 @@ export function resolveEffectiveModelCapability({
 export function modelSupportsRole(role, model) {
   const capabilities = model?.capabilities || [];
   if (model?.enabled === false) return false;
+  if (model?.capabilityStatus === "unavailable_for_account" || model?.unavailableForAccount) return false;
   if (model?.capabilityStatus === "unsupported") return false;
   if (role === "product_vision") return capabilities.includes("vision");
   if (role === "image_planning") return capabilities.includes("text");
@@ -397,8 +434,16 @@ export function scoreModelForRole(role, model) {
   if (model.badges?.includes("极速省钱")) score += 20;
   if (model.capabilityStatus === "official" || model.capabilityStatus === "adapterVerified") score += 20;
   if (model.capabilityStatus === "unverified") score -= 20;
+  if (model.capabilityStatus === "unavailable_for_account" || model.unavailableForAccount) score -= 1000;
   if (role === "product_vision" && (model.capabilities?.includes("image") || model.capabilities?.includes("asyncImage"))) {
     score -= 60;
+  }
+  if (role === "product_vision") {
+    const normalized = normalizeModelId(model.modelId || "");
+    if (normalized === "gemini-3.6-flash") score += 160;
+    if (normalized === "gemini-3.5-flash") score += 140;
+    if (normalized === "gemini-3.5-flash-lite") score += 120;
+    if (normalized === "gemini-2.5-flash" || normalized === "gemini-2.0-flash") score -= 600;
   }
   if (!modelSupportsRole(role, model)) score -= 500;
   return score;
@@ -421,6 +466,7 @@ export function formatModelOptionLabel(model) {
   if (model.badges?.length) parts.push(model.badges.join(" / "));
   if (model.lifecycle === "preview") parts.push("预览版");
   if (model.lifecycle === "shutdown" && model.deprecationDate) parts.push(`即将停用：${model.deprecationDate}`);
+  if (model.capabilityStatus === "unavailable_for_account" || model.unavailableForAccount) parts.push("当前账号不可用");
   return parts.join("｜");
 }
 

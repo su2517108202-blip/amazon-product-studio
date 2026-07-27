@@ -77,6 +77,7 @@ export function humanErrorLabel(code) {
     BILLING_REQUIRED: "需要启用计费（Gemini API 免费配额已用完或未关联结算账号）",
     QUOTA_EXCEEDED: "API 配额已用尽，请稍后重试或检查配额",
     MODEL_NOT_FOUND: "模型不存在或已被移除",
+    MODEL_UNAVAILABLE_FOR_ACCOUNT: "当前账号无法使用该模型",
     MODEL_ACCESS_DENIED: "账号无权使用该模型",
     INSUFFICIENT_QUOTA: "账号额度不足",
     IMAGE_INPUT_UNSUPPORTED: "该模型不支持图片输入",
