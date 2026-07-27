@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireCurrentUser } from "@/lib/app-mode";
 import { prisma } from "@/lib/prisma";
 import { REQUIRED_PLAN_COUNT } from "@/lib/result-management";
+import { imageGenerationRunToResponse } from "@/lib/image-generation";
 
 export async function GET(_req, context) {
   try {
@@ -45,11 +46,30 @@ export async function GET(_req, context) {
         distinct: ["imagePlanId"],
         select: {
           id: true,
+          projectId: true,
           imagePlanId: true,
+          providerProfileId: true,
+          provider: true,
+          model: true,
+          protocol: true,
           status: true,
           mode: true,
+          externalTaskId: true,
+          inputFingerprint: true,
+          aspectRatio: true,
+          resolution: true,
+          requestedCount: true,
+          usedStaleInput: true,
+          isForcedVersion: true,
+          checkAttempts: true,
+          lastCheckedAt: true,
+          expiresAt: true,
           createdAt: true,
+          updatedAt: true,
+          completedAt: true,
           errorCode: true,
+          errorMessage: true,
+          durationMs: true,
         },
       }),
       prisma.imageGenerationRun.findMany({
@@ -58,10 +78,30 @@ export async function GET(_req, context) {
         distinct: ["imagePlanId"],
         select: {
           id: true,
+          projectId: true,
           imagePlanId: true,
+          providerProfileId: true,
+          provider: true,
+          model: true,
+          protocol: true,
           status: true,
           mode: true,
+          externalTaskId: true,
+          inputFingerprint: true,
+          aspectRatio: true,
+          resolution: true,
+          requestedCount: true,
+          usedStaleInput: true,
+          isForcedVersion: true,
+          checkAttempts: true,
+          lastCheckedAt: true,
+          expiresAt: true,
           createdAt: true,
+          updatedAt: true,
+          completedAt: true,
+          errorCode: true,
+          errorMessage: true,
+          durationMs: true,
         },
       }),
     ]);
@@ -91,8 +131,8 @@ export async function GET(_req, context) {
         hasPreferred: Boolean(plan.preferredGeneratedImageId),
         completedRunCount: runCounts.completed || 0,
         failedRunCount: runCounts.failed || 0,
-        processingRun: processingRunByPlan.get(plan.id) || null,
-        latestRun: latestRunByPlan.get(plan.id) || null,
+        processingRun: imageGenerationRunToResponse(processingRunByPlan.get(plan.id)),
+        latestRun: imageGenerationRunToResponse(latestRunByPlan.get(plan.id)),
       };
     });
 

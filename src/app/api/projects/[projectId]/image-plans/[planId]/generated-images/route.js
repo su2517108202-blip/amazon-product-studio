@@ -62,6 +62,7 @@ export async function GET(req, context) {
                 createdAt: true,
                 completedAt: true,
                 errorCode: true,
+                errorMessage: true,
               },
             },
           },

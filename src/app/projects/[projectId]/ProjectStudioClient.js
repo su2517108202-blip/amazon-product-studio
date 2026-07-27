@@ -15,6 +15,9 @@ import {
   FaStar,
   FaTrash,
   FaUpload,
+  FaTimes,
+  FaChevronLeft,
+  FaChevronRight,
 } from "react-icons/fa";
 
 const ROLES = [
@@ -90,6 +93,8 @@ export default function ProjectStudioClient({ projectId }) {
   const [generationMode, setGenerationMode] = useState(1);
   const [batchGeneration, setBatchGeneration] = useState(null);
   const [generationResolution, setGenerationResolution] = useState("1K");
+  const [previewCandidateId, setPreviewCandidateId] = useState("");
+  const [highlightPlanId, setHighlightPlanId] = useState("");
   const [planDirty, setPlanDirty] = useState(false);
   const [draggingUpload, setDraggingUpload] = useState(false);
   const [message, setMessage] = useState("");
@@ -99,6 +104,7 @@ export default function ProjectStudioClient({ projectId }) {
   const [userEditedName, setUserEditedName] = useState(false);
   const fileInputRef = useRef(null);
   const fetchRequestIdRef = useRef(0);
+  const generationRequestKeysRef = useRef(new Set());
 
   const fetchProject = useCallback(async () => {
     const requestId = fetchRequestIdRef.current + 1;
@@ -573,18 +579,33 @@ export default function ProjectStudioClient({ projectId }) {
     }
   }
 
-  async function generateCurrentImage({ force = false } = {}) {
-    const targetPlans = getGenerationTargetPlans({
-      plans,
-      selectedPlan,
-      activePlanIndex,
-      generationMode,
-    });
+  function getFailedGenerationPlans() {
+    const failedPlanIds = new Set(
+      (generationSummary?.plans || [])
+        .filter((item) => item.latestRun?.status === "failed" && Number(item.candidateCount || 0) === 0)
+        .map((item) => item.id),
+    );
+    return [...plans]
+      .sort((a, b) => a.planIndex - b.planIndex)
+      .filter((plan) => failedPlanIds.has(plan.id));
+  }
+
+  function getSummaryPlan(planId) {
+    return (generationSummary?.plans || []).find((item) => item.id === planId) || null;
+  }
+
+  async function generatePlansBatch({
+    targetPlans,
+    force = false,
+    actionLabel = "",
+    confirmText = "",
+    requireFullSet = false,
+  }) {
     if (!targetPlans.length) {
       setError(generationMode === 5 ? "请先生成完整 5 张套图策划" : "请先选择一条主图策划");
       return;
     }
-    if (generationMode === 5 && targetPlans.length < 5) {
+    if (requireFullSet && targetPlans.length < 5) {
       setError("整套生成需要先完成图1至图5的策划");
       return;
     }
@@ -613,8 +634,21 @@ export default function ProjectStudioClient({ projectId }) {
       stale && window.confirm("当前产品身份证或部分策划可能过期，是否仍然生成？");
     if (stale && !allowStaleInput) return;
 
+    const unknownBillingPlans = targetPlans.filter(
+      (plan) => getSummaryPlan(plan.id)?.latestRun?.billingStatus === "unknown",
+    );
+    if (unknownBillingPlans.length) {
+      const confirmedUnknown = window.confirm(
+        "上一次请求因网络中断，是否已经计费无法确认。\n本次重试会再次调用图片生成 API，可能再次产生费用。\n\n是否继续重试？",
+      );
+      if (!confirmedUnknown) return;
+    }
+
     const countText = targetPlans.length === 5 ? "整套 5 张" : `${targetPlans.length} 张`;
-    const confirmed = window.confirm(`本次将调用真实图片生成 API 生成${countText}并可能产生费用，是否继续？`);
+    const confirmed = window.confirm(
+      confirmText ||
+        `本次将调用真实图片生成 API 生成${countText}并可能产生费用，是否继续？`,
+    );
     if (!confirmed) return;
 
     const referenceImageIds = project.referenceImages
@@ -631,7 +665,7 @@ export default function ProjectStudioClient({ projectId }) {
 
     setGeneratingImage(true);
     setError("");
-    setMessage(truncated ? `剩余不足 ${generationMode} 张，将生成剩余 ${targetPlans.length} 张` : `正在生成${countText}`);
+    setMessage(actionLabel || (truncated ? `剩余不足 ${generationMode} 张，将生成剩余 ${targetPlans.length} 张` : `正在生成${countText}`));
     setBatchGeneration({
       total: targetPlans.length,
       current: 0,
@@ -644,12 +678,26 @@ export default function ProjectStudioClient({ projectId }) {
     const failures = [];
     try {
       for (const plan of targetPlans) {
+        const requestKey = buildClientGenerationKey({
+          projectId,
+          plan,
+          generationAssignment,
+          generationResolution,
+          aspectRatio: project.aspectRatio,
+          force,
+        });
+        if (generationRequestKeysRef.current.has(requestKey)) {
+          continue;
+        }
+        generationRequestKeysRef.current.add(requestKey);
+        setHighlightPlanId(plan.id);
         setBatchGeneration((current) => updateBatchItem(current, plan.id, {
           current: successCount + failures.length + 1,
           status: "generating",
           message: "生成中",
         }));
         try {
+          const startedAt = new Date().toISOString();
           const res = await fetch(
             `/api/projects/${projectId}/image-plans/${plan.id}/generations`,
             {
@@ -661,26 +709,44 @@ export default function ProjectStudioClient({ projectId }) {
                 referenceImageIds,
                 resolution: generationResolution,
                 aspectRatio: project.aspectRatio,
+                clientRequestId: createClientRequestId(),
+                clientDiagnostics: {
+                  projectId,
+                  planId: plan.id,
+                  promptFingerprint: plan.updatedAt || plan.id,
+                  referenceFingerprint: referenceImageIds.join(","),
+                  modelId: generationAssignment?.providerProfile?.modelId || "",
+                  startedAt,
+                },
               }),
             },
           );
-          const data = await res.json();
-          if (!res.ok) throw new Error(`${data.code || "ERROR"}: ${data.error || "生成失败"}`);
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) {
+            const requestError = new Error(`${data.code || "ERROR"}: ${data.error || "生成失败"}`);
+            requestError.details = data;
+            throw requestError;
+          }
           successCount += 1;
           setBatchGeneration((current) => updateBatchItem(current, plan.id, {
             status: "success",
             message: data.reused ? "复用旧结果" : "已生成",
+            billingStatus: data.run?.billingStatus || data.billingStatus || "billed_or_usage_recorded",
             successCount,
             failureCount: failures.length,
           }));
         } catch (err) {
-          failures.push({ plan, message: err.message });
+          failures.push({ plan, message: err.message, details: err.details || null });
           setBatchGeneration((current) => updateBatchItem(current, plan.id, {
             status: "failure",
             message: err.message,
+            billingStatus: err.details?.billingStatus || err.details?.run?.billingStatus || "",
+            billingReason: err.details?.billingReason || err.details?.run?.billingReason || "",
             successCount,
             failureCount: failures.length,
           }));
+        } finally {
+          generationRequestKeysRef.current.delete(requestKey);
         }
       }
       await fetchProject();
@@ -693,6 +759,65 @@ export default function ProjectStudioClient({ projectId }) {
     } finally {
       setGeneratingImage(false);
     }
+  }
+
+  async function generateCurrentImage({ force = false } = {}) {
+    const targetPlans = getGenerationTargetPlans({
+      plans,
+      selectedPlan,
+      activePlanIndex,
+      generationMode,
+    });
+    const countText = targetPlans.length === 5 ? "整套 5 张" : `${targetPlans.length || generationMode} 张`;
+    await generatePlansBatch({
+      targetPlans,
+      force,
+      requireFullSet: generationMode === 5,
+      confirmText: force
+        ? `本次会重新生成${countText}，可能重复产生图片生成费用。是否继续？`
+        : "",
+    });
+  }
+
+  async function retryFailedGenerationPlans() {
+    const failedPlans = getFailedGenerationPlans();
+    if (!failedPlans.length) {
+      setMessage("当前没有需要重试的失败图位");
+      return;
+    }
+    await generatePlansBatch({
+      targetPlans: failedPlans,
+      force: true,
+      actionLabel: `正在仅重试失败项（${failedPlans.length}张）`,
+      confirmText: `本次只重试失败图位（${failedPlans.map((plan) => `图${plan.planIndex}`).join("、")}），成功图片不会重新生成。是否继续？`,
+    });
+  }
+
+  async function retrySingleGenerationPlan(plan) {
+    if (!plan) return;
+    await generatePlansBatch({
+      targetPlans: [plan],
+      force: true,
+      actionLabel: `正在重新生成图${plan.planIndex}`,
+      confirmText: `本次只重新生成图${plan.planIndex}，其他成功图不会重复生成。是否继续？`,
+    });
+  }
+
+  async function regenerateFullGenerationSet() {
+    const fullSetPlans = PLAN_TABS
+      .map((tab) => plans.find((plan) => plan.planIndex === tab.index))
+      .filter(Boolean);
+    if (fullSetPlans.length < 5) {
+      setError("整套重新生成需要先完成图1至图5的策划");
+      return;
+    }
+    await generatePlansBatch({
+      targetPlans: fullSetPlans,
+      force: true,
+      requireFullSet: true,
+      actionLabel: "正在重新生成整套5张",
+      confirmText: "本次会重新生成整套5张，包括已经成功的图片，可能重复产生图片生成费用。是否继续？",
+    });
   }
 
   async function migrateVisionModelAndRetry() {
@@ -988,55 +1113,88 @@ export default function ProjectStudioClient({ projectId }) {
             active={activeWorkflowStep === 4}
             summary={`${generationSummary?.preferredCount || 0}/5 张首选图`}
           >
-            <GenerationSummaryBar
-              summary={generationSummary}
-              onDownloadPreferredZip={downloadPreferredZip}
-            />
-            <GenerationPanel
-              identity={identity}
-              project={project}
-              selectedPlan={selectedPlan}
-              generationAssignment={generationAssignment}
-              generationInfo={generationInfo}
-              candidateInfo={candidateInfo}
-              plans={plans}
-              activePlanIndex={activePlanIndex}
-              generationReferenceCount={generationReferenceCount}
-              generationResolution={generationResolution}
-              generationMode={generationMode}
-              batchGeneration={batchGeneration}
-              generatingImage={generatingImage}
-              onResolutionChange={setGenerationResolution}
-              onGenerationModeChange={setGenerationMode}
-              onGenerateImage={generateCurrentImage}
-              onCheckGeneration={checkCurrentGeneration}
-            />
-            <details data-testid="generation-history-details" className="border border-zinc-800 bg-zinc-900/35 p-4">
-              <summary className="cursor-pointer text-sm font-semibold text-zinc-200">
-                查看生成历史（按图位归档）
-              </summary>
-              <GenerationResultsByPlan
+            <div className="grid items-start gap-4 xl:grid-cols-[minmax(520px,1fr)_380px]">
+              <div className="min-w-0">
+                <GenerationSummaryBar
+                  summary={generationSummary}
+                  onDownloadPreferredZip={downloadPreferredZip}
+                />
+                <GenerationPanel
+                  identity={identity}
+                  project={project}
+                  selectedPlan={selectedPlan}
+                  generationAssignment={generationAssignment}
+                  generationInfo={generationInfo}
+                  candidateInfo={candidateInfo}
+                  plans={plans}
+                  activePlanIndex={activePlanIndex}
+                  generationReferenceCount={generationReferenceCount}
+                  generationResolution={generationResolution}
+                  generationMode={generationMode}
+                  batchGeneration={batchGeneration}
+                  generationSummary={generationSummary}
+                  failedRetryCount={getFailedGenerationPlans().length}
+                  generatingImage={generatingImage}
+                  onResolutionChange={setGenerationResolution}
+                  onGenerationModeChange={setGenerationMode}
+                  onGenerateImage={generateCurrentImage}
+                  onRetryFailed={retryFailedGenerationPlans}
+                  onRegenerateFullSet={regenerateFullGenerationSet}
+                  onCheckGeneration={checkCurrentGeneration}
+                  onHighlightPlan={(plan) => {
+                    setHighlightPlanId(plan.id);
+                    selectPlan(plan.planIndex);
+                  }}
+                />
+                <details data-testid="generation-history-details" className="mt-4 border border-zinc-800 bg-zinc-900/35 p-4">
+                  <summary className="cursor-pointer text-sm font-semibold text-zinc-200">
+                    查看历史候选（查看生成历史）
+                  </summary>
+                  <GenerationResultsByPlan
+                    plans={plans}
+                    candidateMap={candidateMap}
+                    selectedPlanId={selectedPlan?.id || ""}
+                    selectedCandidateInfo={candidateInfo}
+                    loadingMoreCandidates={loadingMoreCandidates}
+                    onSelectPlan={selectPlan}
+                    onSetPreferredCandidate={setPreferredCandidate}
+                    onDeleteCandidate={deleteCandidate}
+                    onDownloadCandidate={downloadCandidate}
+                    onLoadMoreCandidates={loadMoreCandidates}
+                  />
+                  <div className="mt-5 border-t border-zinc-800 pt-4">
+                    <h2 className="text-base font-semibold text-white">调用统计</h2>
+                    <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
+                      <Info label="识别成功" value={`${successfulRuns.length}`} />
+                      <Info label="识别失败" value={`${failedRuns.length}`} />
+                      <Info label="策划成功" value={`${planInfo.stats?.successCount || 0}`} />
+                      <Info label="策划失败" value={`${planInfo.stats?.failureCount || 0}`} />
+                    </dl>
+                  </div>
+                </details>
+              </div>
+              <GenerationPreviewRail
                 plans={plans}
                 candidateMap={candidateMap}
+                generationSummary={generationSummary}
                 selectedPlanId={selectedPlan?.id || ""}
-                selectedCandidateInfo={candidateInfo}
-                loadingMoreCandidates={loadingMoreCandidates}
+                highlightedPlanId={highlightPlanId}
+                generatingImage={generatingImage}
                 onSelectPlan={selectPlan}
-                onSetPreferredCandidate={setPreferredCandidate}
-                onDeleteCandidate={deleteCandidate}
+                onPreviewCandidate={setPreviewCandidateId}
                 onDownloadCandidate={downloadCandidate}
-                onLoadMoreCandidates={loadMoreCandidates}
+                onSetPreferredCandidate={setPreferredCandidate}
+                onRetryPlan={retrySingleGenerationPlan}
               />
-              <div className="mt-5 border-t border-zinc-800 pt-4">
-                <h2 className="text-base font-semibold text-white">调用统计</h2>
-                <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-                  <Info label="识别成功" value={`${successfulRuns.length}`} />
-                  <Info label="识别失败" value={`${failedRuns.length}`} />
-                  <Info label="策划成功" value={`${planInfo.stats?.successCount || 0}`} />
-                  <Info label="策划失败" value={`${planInfo.stats?.failureCount || 0}`} />
-                </dl>
-              </div>
-            </details>
+            </div>
+            <PreviewLightbox
+              previewCandidateId={previewCandidateId}
+              plans={plans}
+              candidateMap={candidateMap}
+              onClose={() => setPreviewCandidateId("")}
+              onSelectCandidate={setPreviewCandidateId}
+              onDownloadCandidate={downloadCandidate}
+            />
           </StepPanel>
         </section>
         </div>
@@ -1539,15 +1697,19 @@ function GenerationPanel({
   generationResolution,
   generationMode,
   batchGeneration,
+  generationSummary,
+  failedRetryCount,
   generatingImage,
   onResolutionChange,
   onGenerationModeChange,
   onGenerateImage,
+  onRetryFailed,
+  onRegenerateFullSet,
   onCheckGeneration,
+  onHighlightPlan,
 }) {
   const provider = generationAssignment?.providerProfile;
   const latestRun = generationInfo?.latestRun;
-  const latestImage = generationInfo?.latestImage;
   const generateDisabledReason = generatingImage
     ? "图片生成处理中"
     : !provider
@@ -1670,19 +1832,49 @@ function GenerationPanel({
         </button>
         <button
           type="button"
+          onClick={onRetryFailed}
+          disabled={!canGenerate || failedRetryCount < 1}
+          data-testid="retry-failed-only-button"
+          className="flex items-center justify-center gap-2 border border-amber-700 bg-amber-950/30 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:border-amber-500 disabled:border-zinc-800 disabled:bg-transparent disabled:text-zinc-600"
+        >
+          仅重试失败项（{failedRetryCount}张）
+        </button>
+      </div>
+
+      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr]">
+        <button
+          type="button"
           onClick={() => onGenerateImage({ force: true })}
-          disabled={!canGenerate || !latestImage}
-          title={!latestImage ? "当前策划还没有旧候选图" : generateDisabledReason || "强制重新生成当前图片"}
+          disabled={!canGenerate}
+          title={generateDisabledReason || "强制重新生成当前选择的图位，可能重复产生费用"}
           data-testid="force-generate-current-image-button"
           data-plan-id={selectedPlan?.id || ""}
           className="border border-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600"
         >
-          强制重新生成
+          强制重新生成当前图位（可能重复计费）
+        </button>
+        <button
+          type="button"
+          onClick={onRegenerateFullSet}
+          disabled={!canGenerate}
+          title={generateDisabledReason || "重新生成整套会再次调用成功图位，可能重复产生费用"}
+          data-testid="regenerate-full-set-button"
+          className="border border-zinc-800 px-4 py-2.5 text-sm font-semibold text-zinc-300 hover:text-white disabled:text-zinc-600"
+        >
+          重新生成整套5张（可能重复计费）
         </button>
       </div>
-      <DisabledReason reason={generateDisabledReason || (!latestImage ? "" : "")} />
+      <DisabledReason reason={generateDisabledReason} />
 
       <BatchGenerationStatus batch={batchGeneration} />
+      <GenerationSlotBriefs
+        plans={plans}
+        generationSummary={generationSummary}
+        onSelectPlan={(plan) => {
+          onHighlightPlan(plan);
+          onGenerationModeChange(1);
+        }}
+      />
 
       {latestRun?.status === "processing" && latestRun.mode === "async" && (
         <button
@@ -1693,33 +1885,6 @@ function GenerationPanel({
         >
           检查异步生成状态
         </button>
-      )}
-
-      {latestImage ? (
-        <div className="mt-4 border border-zinc-800 bg-zinc-950 p-3">
-          <div className="relative aspect-square bg-black">
-            <Image
-              src={latestImage.url}
-              alt="生成的电商图片"
-              fill
-              sizes="(max-width: 1024px) 100vw, 640px"
-              className="object-contain"
-              unoptimized
-            />
-          </div>
-          <div className="mt-3 grid gap-2 text-sm sm:grid-cols-3">
-            <Info label="状态" value={formatRunStatus(latestRun?.status || "completed")} />
-            <Info label="模型" value={latestRun?.model || "未知"} />
-            <Info label="生成时间" value={formatDate(latestImage.createdAt)} />
-            <Info label="尺寸" value={latestImage.width ? `${latestImage.width}x${latestImage.height}` : "未知"} />
-            <Info label="大小" value={`${Math.round((latestImage.byteSize || 0) / 1024)} KB`} />
-            <Info label="来源" value={latestImage.sourceType || "provider"} />
-          </div>
-        </div>
-      ) : (
-        <div className="mt-4 border border-dashed border-zinc-800 bg-zinc-950/50 p-6 text-center text-xs text-zinc-500">
-          当前策划尚未生成图片
-        </div>
       )}
 
     </div>
@@ -1745,9 +1910,311 @@ function BatchGenerationStatus({ batch }) {
             <span className={batchStatusClass(item.status)}>
               {formatBatchStatus(item.status)}
               {item.message ? ` · ${item.message}` : ""}
+              {item.billingStatus ? ` · 计费状态：${formatBillingStatus(item.billingStatus)}` : ""}
             </span>
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function GenerationSlotBriefs({ plans, generationSummary, onSelectPlan }) {
+  const summaryByPlan = new Map((generationSummary?.plans || []).map((item) => [item.id, item]));
+  return (
+    <div className="mt-4 border border-zinc-800 bg-zinc-950 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-semibold text-zinc-200">图位简报</p>
+        <span className="text-xs text-zinc-500">
+          成功 {generationSummary?.generatedPlanCount || 0} · 失败 {(generationSummary?.plans || []).filter((item) => item.latestRun?.status === "failed" && !item.candidateCount).length}
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2 md:grid-cols-2">
+        {[...plans].sort((a, b) => a.planIndex - b.planIndex).map((plan) => {
+          const summaryPlan = summaryByPlan.get(plan.id);
+          const latestRun = summaryPlan?.latestRun || null;
+          const hasImage = Number(summaryPlan?.candidateCount || 0) > 0;
+          const statusText = hasImage
+            ? "成功"
+            : latestRun?.status === "failed"
+              ? `失败：${latestRun.errorMessage || latestRun.errorCode || "生成失败"}`
+              : latestRun?.status === "processing"
+                ? "生成中"
+                : "等待生成";
+          return (
+            <button
+              key={plan.id}
+              type="button"
+              onClick={() => onSelectPlan(plan)}
+              data-testid="generation-slot-brief"
+              data-plan-id={plan.id}
+              className="flex items-center justify-between gap-3 border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-left text-sm hover:border-zinc-600"
+            >
+              <span className="font-semibold text-zinc-100">{planLabel(plan.planIndex, plan.taskType)}</span>
+              <span className={hasImage ? "text-emerald-300" : latestRun?.status === "failed" ? "text-red-300" : "text-zinc-500"}>
+                {statusText}
+              </span>
+            </button>
+          );
+        })}
+        {!plans.length && (
+          <p className="text-sm text-zinc-500">生成五图策划后会显示图位状态。</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function GenerationPreviewRail({
+  plans,
+  candidateMap,
+  generationSummary,
+  selectedPlanId,
+  highlightedPlanId,
+  generatingImage,
+  onSelectPlan,
+  onPreviewCandidate,
+  onDownloadCandidate,
+  onSetPreferredCandidate,
+  onRetryPlan,
+}) {
+  const summaryByPlan = new Map((generationSummary?.plans || []).map((item) => [item.id, item]));
+  const orderedPlans = [...plans].sort((a, b) => a.planIndex - b.planIndex);
+  const successCount = orderedPlans.filter((plan) => getPreviewCandidateForPlan(plan, candidateMap)).length;
+
+  return (
+    <aside
+      data-testid="generation-preview-rail"
+      className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto border border-zinc-800 bg-zinc-950 p-3"
+    >
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-300">
+          生成结果 {successCount}/5
+        </h3>
+        <span className="text-xs text-zinc-500">右侧预览栏</span>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+        {orderedPlans.map((plan) => {
+          const summaryPlan = summaryByPlan.get(plan.id);
+          const latestRun = summaryPlan?.latestRun || null;
+          const candidate = getPreviewCandidateForPlan(plan, candidateMap);
+          const selected = plan.id === selectedPlanId || plan.id === highlightedPlanId;
+          return (
+            <section
+              key={plan.id}
+              data-testid="generation-preview-slot"
+              data-plan-id={plan.id}
+              className={`border p-2 ${selected ? "border-sky-600 bg-sky-950/20" : "border-zinc-800 bg-zinc-900/45"}`}
+            >
+              <button
+                type="button"
+                onClick={() => onSelectPlan(plan.planIndex)}
+                className="mb-2 flex w-full items-center justify-between gap-2 text-left"
+              >
+                <span className="text-xs font-semibold text-zinc-100">{planLabel(plan.planIndex, plan.taskType)}</span>
+                <span className={`text-[11px] ${candidate ? "text-emerald-300" : latestRun?.status === "failed" ? "text-red-300" : "text-zinc-500"}`}>
+                  {candidate ? "成功" : latestRun?.status === "failed" ? "失败" : latestRun?.status === "processing" ? "处理中" : "待生成"}
+                </span>
+              </button>
+
+              {candidate ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => onPreviewCandidate(candidate.id)}
+                    data-testid="generation-preview-thumbnail"
+                    data-plan-id={plan.id}
+                    className="relative block aspect-square w-full overflow-hidden bg-black"
+                  >
+                    <Image
+                      src={candidate.url}
+                      alt={`图${plan.planIndex}缩略图`}
+                      fill
+                      sizes="180px"
+                      className="object-contain"
+                      unoptimized
+                    />
+                  </button>
+                  <div className="mt-2 grid gap-2">
+                    <button
+                      type="button"
+                      onClick={() => onPreviewCandidate(candidate.id)}
+                      data-testid="preview-candidate-button"
+                      data-plan-id={plan.id}
+                      className="flex items-center justify-center gap-2 border border-zinc-700 px-2 py-1.5 text-xs font-semibold text-zinc-200 hover:text-white"
+                    >
+                      <FaEye />
+                      预览
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDownloadCandidate(candidate)}
+                      data-testid="download-preview-image-button"
+                      data-plan-id={plan.id}
+                      className="flex items-center justify-center gap-2 border border-emerald-800 px-2 py-1.5 text-xs font-semibold text-emerald-200 hover:border-emerald-500"
+                    >
+                      <FaDownload />
+                      下载图片
+                    </button>
+                    {!candidate.isPreferred && (
+                      <button
+                        type="button"
+                        onClick={() => onSetPreferredCandidate(candidate)}
+                        className="flex items-center justify-center gap-2 border border-zinc-700 px-2 py-1.5 text-xs font-semibold text-zinc-300 hover:text-white"
+                      >
+                        <FaStar />
+                        设为首选
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : latestRun?.status === "failed" ? (
+                <FailurePreviewSlot
+                  plan={plan}
+                  run={latestRun}
+                  generatingImage={generatingImage}
+                  onRetryPlan={onRetryPlan}
+                />
+              ) : (
+                <div className="flex aspect-square items-center justify-center border border-dashed border-zinc-800 bg-zinc-950 text-xs text-zinc-500">
+                  暂无结果
+                </div>
+              )}
+            </section>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+function FailurePreviewSlot({ plan, run, generatingImage, onRetryPlan }) {
+  const retryable = isRetryableGenerationFailure(run);
+  return (
+    <div className="space-y-2">
+      <div className="flex aspect-square flex-col items-center justify-center border border-dashed border-red-900/70 bg-red-950/20 p-3 text-center">
+        <p className="text-sm font-semibold text-red-200">生成失败</p>
+        <p className="mt-2 line-clamp-4 text-xs text-red-100">
+          {run.errorCode ? `${run.errorCode}: ` : ""}{run.errorMessage || "生成失败"}
+        </p>
+      </div>
+      <BillingStatus run={run} />
+      {retryable ? (
+        <button
+          type="button"
+          onClick={() => onRetryPlan(plan)}
+          disabled={generatingImage}
+          data-testid="retry-plan-button"
+          data-plan-id={plan.id}
+          className="w-full border border-amber-700 bg-amber-950/30 px-2 py-2 text-xs font-semibold text-amber-100 hover:border-amber-500 disabled:border-zinc-800 disabled:text-zinc-600"
+        >
+          重新生成此图
+        </button>
+      ) : (
+        <Link
+          href="/settings/providers?section=roles"
+          className="block border border-zinc-700 px-2 py-2 text-center text-xs font-semibold text-zinc-200 hover:text-white"
+        >
+          {failureActionLabel(run)}
+        </Link>
+      )}
+    </div>
+  );
+}
+
+function BillingStatus({ run }) {
+  const status = run?.billingStatus || "unknown";
+  return (
+    <div className={`border px-2 py-2 text-xs ${billingStatusClass(status)}`}>
+      <p className="font-semibold">计费状态：{formatBillingStatus(status)}</p>
+      <p className="mt-1 opacity-80">{billingStatusNote(status, run?.billingReason)}</p>
+    </div>
+  );
+}
+
+function PreviewLightbox({
+  previewCandidateId,
+  plans,
+  candidateMap,
+  onClose,
+  onSelectCandidate,
+  onDownloadCandidate,
+}) {
+  const previewItems = buildPreviewItems(plans, candidateMap);
+  const currentIndex = previewItems.findIndex((item) => item.candidate.id === previewCandidateId);
+  if (!previewCandidateId || currentIndex < 0) return null;
+  const current = previewItems[currentIndex];
+  const previous = previewItems[(currentIndex - 1 + previewItems.length) % previewItems.length];
+  const next = previewItems[(currentIndex + 1) % previewItems.length];
+
+  return (
+    <div
+      data-testid="lightbox-modal"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <div className="max-h-[92vh] w-full max-w-5xl border border-zinc-700 bg-zinc-950 p-4 shadow-2xl">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-base font-semibold text-white">
+              {planLabel(current.plan.planIndex, current.plan.taskType)}
+            </h3>
+            <p className="mt-1 text-xs text-zinc-500">
+              {current.candidate.run?.model || "未知模型"} · {current.candidate.width ? `${current.candidate.width}x${current.candidate.height}` : "未知尺寸"} · {formatDate(current.candidate.createdAt)}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="border border-zinc-700 p-2 text-zinc-300 hover:text-white"
+            aria-label="关闭预览"
+          >
+            <FaTimes />
+          </button>
+        </div>
+        <div className="relative h-[62vh] bg-black">
+          <Image
+            src={current.candidate.url}
+            alt={planLabel(current.plan.planIndex, current.plan.taskType)}
+            fill
+            sizes="90vw"
+            className="object-contain"
+            unoptimized
+          />
+        </div>
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => onSelectCandidate(previous.candidate.id)}
+              disabled={previewItems.length < 2}
+              data-testid="lightbox-prev"
+              className="flex items-center gap-2 border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:text-white disabled:text-zinc-600"
+            >
+              <FaChevronLeft />
+              上一张
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectCandidate(next.candidate.id)}
+              disabled={previewItems.length < 2}
+              data-testid="lightbox-next"
+              className="flex items-center gap-2 border border-zinc-700 px-3 py-2 text-sm font-semibold text-zinc-200 hover:text-white disabled:text-zinc-600"
+            >
+              下一张
+              <FaChevronRight />
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={() => onDownloadCandidate(current.candidate)}
+            className="flex items-center gap-2 border border-emerald-800 px-3 py-2 text-sm font-semibold text-emerald-200 hover:border-emerald-500"
+          >
+            <FaDownload />
+            下载图片
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -2062,10 +2529,107 @@ function updateBatchItem(current, planId, patch) {
     failureCount: patch.failureCount ?? current.failureCount,
     items: current.items.map((item) =>
       item.planId === planId
-        ? { ...item, status: patch.status ?? item.status, message: patch.message ?? item.message }
+        ? {
+            ...item,
+            status: patch.status ?? item.status,
+            message: patch.message ?? item.message,
+            billingStatus: patch.billingStatus ?? item.billingStatus,
+            billingReason: patch.billingReason ?? item.billingReason,
+          }
         : item,
     ),
   };
+}
+
+function buildClientGenerationKey({
+  projectId,
+  plan,
+  generationAssignment,
+  generationResolution,
+  aspectRatio,
+  force,
+}) {
+  const profile = generationAssignment?.providerProfile || {};
+  return [
+    projectId,
+    plan?.id || "",
+    plan?.updatedAt || "",
+    profile.id || "",
+    profile.modelId || "",
+    generationResolution,
+    aspectRatio || "",
+    force ? "force" : "reuse",
+  ].join(":");
+}
+
+function createClientRequestId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getPreviewCandidateForPlan(plan, candidateMap) {
+  const candidates = candidateMap?.[plan.id]?.items || [];
+  return candidates.find((candidate) => candidate.isPreferred) || candidates[0] || null;
+}
+
+function buildPreviewItems(plans, candidateMap) {
+  return [...plans]
+    .sort((a, b) => a.planIndex - b.planIndex)
+    .map((plan) => ({ plan, candidate: getPreviewCandidateForPlan(plan, candidateMap) }))
+    .filter((item) => item.candidate);
+}
+
+function isRetryableGenerationFailure(run) {
+  const code = String(run?.errorCode || "").toUpperCase();
+  const message = String(run?.errorMessage || "").toLowerCase();
+  if (
+    code === "NETWORK_ERROR" ||
+    code === "TIMEOUT" ||
+    code === "PROVIDER_TIMEOUT" ||
+    code === "PROVIDER_NETWORK_ERROR" ||
+    code === "UPSTREAM_SERVER_ERROR" ||
+    code === "UPSTREAM_UNAVAILABLE" ||
+    code.includes("500") ||
+    code.includes("503") ||
+    code.includes("504") ||
+    message.includes("terminated") ||
+    message.includes("socket hang up") ||
+    message.includes("socket closed") ||
+    message.includes("timeout") ||
+    message.includes("网络连接失败")
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function failureActionLabel(run) {
+  const code = String(run?.errorCode || "").toUpperCase();
+  if (code.includes("SAFETY") || code.includes("CONTENT")) return "调整策划后重试";
+  if (code === "CAPABILITY_MISMATCH" || code === "MODEL_NOT_FOUND" || code === "MODEL_UNAVAILABLE_FOR_ACCOUNT") {
+    return "更换模型";
+  }
+  if (code === "INVALID_REQUEST" || code === "INVALID_ARGUMENT") return "检查参数";
+  return "前往 API 设置";
+}
+
+function formatBillingStatus(status) {
+  if (status === "not_billed") return "未计费";
+  if (status === "billed_or_usage_recorded") return "已产生用量";
+  return "无法确认";
+}
+
+function billingStatusNote(status, reason) {
+  if (status === "not_billed") return "请求仍可能计入接口配额";
+  if (status === "billed_or_usage_recorded") return "已收到服务商成功结果或用量记录";
+  if (status === "unknown") return "请求可能已到达服务商，重新生成可能再次产生费用";
+  return reason || "计费状态待确认";
+}
+
+function billingStatusClass(status) {
+  if (status === "not_billed") return "border-zinc-700 bg-zinc-900 text-zinc-300";
+  if (status === "billed_or_usage_recorded") return "border-emerald-800 bg-emerald-950/30 text-emerald-200";
+  return "border-amber-700 bg-amber-950/30 text-amber-100";
 }
 
 function planLabel(planIndex, taskType) {

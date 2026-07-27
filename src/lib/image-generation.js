@@ -205,6 +205,13 @@ export async function loadGenerationReferences(referenceImages) {
 export function imageGenerationRunToResponse(run) {
   if (!run) return null;
   const images = run.generatedImages || [];
+  const generatedImages = images.filter((image) => !image.deletedAt).map(generatedImageToResponse);
+  const billing = classifyGenerationBilling({
+    status: run.status,
+    errorCode: run.errorCode || "",
+    errorMessage: run.errorMessage || "",
+    imageReceived: generatedImages.length > 0 || run.status === "completed",
+  });
   return {
     id: run.id,
     projectId: run.projectId,
@@ -231,7 +238,112 @@ export function imageGenerationRunToResponse(run) {
     createdAt: run.createdAt,
     updatedAt: run.updatedAt,
     completedAt: run.completedAt,
-    generatedImages: images.filter((image) => !image.deletedAt).map(generatedImageToResponse),
+    requestStartedAt: run.createdAt,
+    requestCompletedAt: run.completedAt,
+    requestSentToProvider: true,
+    upstreamHttpStatus: billing.upstreamHttpStatus,
+    responseReceived: billing.responseReceived,
+    imageReceived: billing.imageReceived,
+    usageMetadata: null,
+    billingStatus: billing.billingStatus,
+    billingReason: billing.billingReason,
+    generatedImages,
+  };
+}
+
+const UNKNOWN_BILLING_ERROR_CODES = new Set([
+  "NETWORK_ERROR",
+  "TIMEOUT",
+  "PROVIDER_TIMEOUT",
+  "PROVIDER_NETWORK_ERROR",
+]);
+
+const NOT_BILLED_ERROR_CODES = new Set([
+  "INVALID_API_KEY",
+  "MISSING_API_KEY",
+  "MODEL_NOT_FOUND",
+  "MODEL_UNAVAILABLE_FOR_ACCOUNT",
+  "MODEL_ACCESS_DENIED",
+  "CAPABILITY_MISMATCH",
+  "INVALID_REQUEST",
+  "INVALID_PROMPT",
+  "INVALID_REFERENCE_IMAGE",
+  "MISSING_PRIMARY_REFERENCE",
+  "MISSING_PRODUCT_IDENTITY",
+  "MISSING_IMAGE_PLAN",
+  "MISSING_IMAGE_GENERATION_PROVIDER",
+  "PROJECT_NOT_FOUND",
+  "REFERENCE_IMAGES_UNSUPPORTED",
+  "UNSUPPORTED_PROTOCOL",
+  "IMAGE_INPUT_UNSUPPORTED",
+  "TOO_MANY_REFERENCE_IMAGES",
+  "REFERENCE_FILE_NOT_FOUND",
+  "UPSTREAM_SERVER_ERROR",
+  "UPSTREAM_UNAVAILABLE",
+]);
+
+export function classifyGenerationBilling({
+  status = "",
+  errorCode = "",
+  errorMessage = "",
+  httpStatus = 0,
+  imageReceived = false,
+  usageMetadata = null,
+} = {}) {
+  const code = String(errorCode || "").toUpperCase();
+  const message = String(errorMessage || "").toLowerCase();
+  const networkInterrupted =
+    UNKNOWN_BILLING_ERROR_CODES.has(code) ||
+    message.includes("terminated") ||
+    message.includes("socket hang up") ||
+    message.includes("socket closed") ||
+    message.includes("timeout") ||
+    message.includes("连接中断") ||
+    message.includes("网络连接失败") ||
+    message.includes("响应接收中断");
+
+  if (status === "completed" || imageReceived || usageMetadata) {
+    return {
+      billingStatus: "billed_or_usage_recorded",
+      billingReason: "服务商已返回成功结果或图片内容",
+      upstreamHttpStatus: httpStatus || 0,
+      responseReceived: true,
+      imageReceived: true,
+    };
+  }
+
+  if (networkInterrupted) {
+    return {
+      billingStatus: "unknown",
+      billingReason: "请求可能已到达服务商，但响应在网络层中断",
+      upstreamHttpStatus: httpStatus || 0,
+      responseReceived: false,
+      imageReceived: false,
+    };
+  }
+
+  if (
+    status === "failed" ||
+    NOT_BILLED_ERROR_CODES.has(code) ||
+    (httpStatus >= 400 && httpStatus < 600)
+  ) {
+    return {
+      billingStatus: "not_billed",
+      billingReason: httpStatus >= 400
+        ? "服务商明确返回失败状态"
+        : "请求在本地校验或明确错误阶段失败",
+      upstreamHttpStatus: httpStatus || 0,
+      responseReceived: httpStatus >= 400,
+      imageReceived: false,
+    };
+  }
+
+  return {
+    billingStatus: "unknown",
+    billingReason: "生成请求尚未完成，计费状态待确认",
+    upstreamHttpStatus: httpStatus || 0,
+    responseReceived: false,
+    imageReceived: false,
   };
 }
 

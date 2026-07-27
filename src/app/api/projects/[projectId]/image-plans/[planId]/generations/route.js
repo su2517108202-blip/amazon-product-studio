@@ -9,6 +9,7 @@ import { ProviderError } from "@/lib/providers/errors";
 import {
   buildPromptSnapshot,
   calculateGenerationFingerprint,
+  classifyGenerationBilling,
   generatedImageToResponse,
   getAsyncGenerationExpiresAt,
   imageGenerationRunToResponse,
@@ -270,8 +271,9 @@ export async function POST(req, context) {
     });
   } catch (error) {
     const normalized = normalizedGenerationError(error);
+    let failedRun = null;
     if (run) {
-      await prisma.imageGenerationRun.update({
+      failedRun = await prisma.imageGenerationRun.update({
         where: { id: run.id },
         data: {
           status: "failed",
@@ -280,10 +282,42 @@ export async function POST(req, context) {
           durationMs: Date.now() - startedAt,
           completedAt: new Date(),
         },
+        include: { generatedImages: { where: { deletedAt: null }, orderBy: { createdAt: "desc" } } },
       });
     }
+    const billing = failedRun
+      ? {
+          ...imageGenerationRunToResponse(failedRun),
+          ...classifyGenerationBilling({
+            status: "failed",
+            errorCode: normalized.code,
+            errorMessage: normalized.message,
+            httpStatus: normalized.httpStatus || error.httpStatus || 0,
+          }),
+        }
+      : classifyGenerationBilling({
+          status: "failed",
+          errorCode: normalized.code,
+          errorMessage: normalized.message,
+          httpStatus: normalized.httpStatus || error.httpStatus || 0,
+        });
     return NextResponse.json(
-      { ok: false, code: normalized.code, error: normalized.message, diagnostic: error?.cause?.diagnostic || null },
+      {
+        ok: false,
+        code: normalized.code,
+        error: normalized.message,
+        diagnostic: error?.cause?.diagnostic || null,
+        ...(failedRun ? { run: billing } : {}),
+        billingStatus: billing.billingStatus,
+        billingReason: billing.billingReason,
+        requestStartedAt: run?.createdAt || new Date(startedAt),
+        requestCompletedAt: failedRun?.completedAt || new Date(),
+        requestSentToProvider: Boolean(run),
+        upstreamHttpStatus: billing.upstreamHttpStatus,
+        responseReceived: billing.responseReceived,
+        imageReceived: billing.imageReceived,
+        usageMetadata: null,
+      },
       { status: error.httpStatus || normalized.httpStatus || 400 },
     );
   }

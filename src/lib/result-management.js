@@ -1,4 +1,5 @@
 import { getPublicStorageUrl, readStoredFile } from "@/lib/storage";
+import { classifyGenerationBilling } from "@/lib/image-generation";
 
 export const REQUIRED_PLAN_COUNT = 5;
 export const MAX_ZIP_IMAGE_COUNT = 5;
@@ -14,6 +15,14 @@ const ZIP_PLAN_NAMES = {
 
 export function generatedCandidateToResponse(image, { candidateNumber, preferredGeneratedImageId } = {}) {
   const run = image?.generationRun || null;
+  const billing = run
+    ? classifyGenerationBilling({
+        status: run.status,
+        errorCode: run.errorCode || "",
+        errorMessage: run.errorMessage || "",
+        imageReceived: true,
+      })
+    : null;
   return {
     id: image.id,
     imagePlanId: image.imagePlanId,
@@ -46,6 +55,16 @@ export function generatedCandidateToResponse(image, { candidateNumber, preferred
           createdAt: run.createdAt,
           completedAt: run.completedAt,
           errorCode: run.errorCode || "",
+          errorMessage: run.errorMessage || "",
+          requestStartedAt: run.createdAt,
+          requestCompletedAt: run.completedAt,
+          requestSentToProvider: true,
+          upstreamHttpStatus: billing?.upstreamHttpStatus || 0,
+          responseReceived: billing?.responseReceived || true,
+          imageReceived: true,
+          usageMetadata: null,
+          billingStatus: billing?.billingStatus || "billed_or_usage_recorded",
+          billingReason: billing?.billingReason || "服务商已返回成功结果或图片内容",
         }
       : null,
   };
