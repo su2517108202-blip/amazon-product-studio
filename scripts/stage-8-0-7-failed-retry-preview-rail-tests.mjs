@@ -66,10 +66,21 @@ check("generation APIs return diagnostic billing fields without migrations", [
 check("right preview rail replaces large middle result preview", [
   { file: "project", match: /function GenerationPreviewRail\(/ },
   { file: "project", match: /data-testid="generation-preview-rail"/ },
-  { file: "project", match: /sticky top-4/ },
+  { file: "project", match: /sticky top-5/ },
   { file: "project", match: /生成结果 \{successCount\}\/5/ },
   { file: "project", match: /data-testid="generation-preview-thumbnail"/ },
   { file: "project", match: /data-testid="download-preview-image-button"/ },
+]);
+
+check("full width hotfix keeps the project workspace out of a centered max width shell", [
+  { file: "project", match: /data-testid="project-workbench-shell"/ },
+  { file: "project", match: /w-full max-w-none px-5 py-5/ },
+  { file: "project", match: /min-\[1100px\]:grid-cols-\[250px_minmax\(0,1fr\)\]/ },
+  { file: "project", match: /min-\[1440px\]:grid-cols-\[280px_minmax\(0,1fr\)\]/ },
+  { file: "project", match: /data-testid="generation-step-layout"/ },
+  { file: "project", match: /min-\[1100px\]:grid-cols-\[minmax\(520px,1fr\)_380px\]/ },
+  { file: "project", match: /min-\[1440px\]:grid-cols-\[minmax\(620px,1fr\)_460px\]/ },
+  { file: "project", match: /grid grid-cols-2 gap-3/ },
 ]);
 
 check("thumbnail lightbox supports preview navigation and download", [
@@ -88,6 +99,8 @@ check("history remains folded below the generation controls", [
 
 assert(!fs.existsSync(path.join(root, "prisma/migrations/stage-8-0-7")), "Stage 8.0.7 must not add a migration");
 assert(source.packageJson.includes('"test:stage-8-0-7"'));
-assertionCount += 2;
+assert(!/mx-auto max-w-7xl px-4 py-5/.test(source.project), "project workbench must not use the old centered max-width shell");
+assert(!/container/.test(source.project), "project workbench must not use container layout");
+assertionCount += 4;
 
 console.log(`stage-8-0-7 failed retry and preview rail checks passed (${assertionCount} assertions)`);

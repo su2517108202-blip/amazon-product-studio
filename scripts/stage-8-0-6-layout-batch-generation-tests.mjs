@@ -11,8 +11,9 @@ const checks = [
   [
     "left step navigation is a sticky side rail",
     /function StageProgress\(\{ steps, activeStepIndex, summaries, onSelectStep \}\)/,
-    /lg:grid-cols-\[300px_minmax\(0,1fr\)\]/,
-    /lg:sticky lg:top-4/,
+    /min-\[1100px\]:grid-cols-\[250px_minmax\(0,1fr\)\]/,
+    /min-\[1440px\]:grid-cols-\[280px_minmax\(0,1fr\)\]/,
+    /min-\[1100px\]:sticky min-\[1100px\]:top-5/,
     /data-testid=\{`workflow-step-\$\{step\.index\}-toggle`\}/,
   ],
   [

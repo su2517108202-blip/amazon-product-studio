@@ -1,0 +1,41 @@
+[
+  {
+    "viewport": "1440x900",
+    "documentScrollWidth": 1440,
+    "documentClientWidth": 1440,
+    "hasHorizontalOverflow": false,
+    "shellLeft": 0,
+    "shellRight": 0,
+    "navLeft": 19,
+    "navWidth": 280,
+    "layoutWidth": 1076,
+    "railRight": 15,
+    "railWidth": 460
+  },
+  {
+    "viewport": "1750x820",
+    "documentScrollWidth": 1750,
+    "documentClientWidth": 1750,
+    "hasHorizontalOverflow": false,
+    "shellLeft": 0,
+    "shellRight": 0,
+    "navLeft": 19,
+    "navWidth": 280,
+    "layoutWidth": 1386,
+    "railRight": 35,
+    "railWidth": 460
+  },
+  {
+    "viewport": "1920x1080",
+    "documentScrollWidth": 1920,
+    "documentClientWidth": 1920,
+    "hasHorizontalOverflow": false,
+    "shellLeft": 0,
+    "shellRight": 0,
+    "navLeft": 19,
+    "navWidth": 280,
+    "layoutWidth": 1556,
+    "railRight": 35,
+    "railWidth": 460
+  }
+]

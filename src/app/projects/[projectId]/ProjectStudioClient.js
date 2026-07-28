@@ -939,7 +939,7 @@ export default function ProjectStudioClient({ projectId }) {
 
   return (
     <main className="flex-1 overflow-y-auto bg-zinc-950 text-zinc-100">
-      <div className="mx-auto max-w-7xl px-4 py-5">
+      <div data-testid="project-workbench-shell" className="w-full max-w-none px-5 py-5">
         <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
           <Link
             href="/"
@@ -1017,7 +1017,7 @@ export default function ProjectStudioClient({ projectId }) {
           </div>
         )}
 
-        <div className="grid items-start gap-5 lg:grid-cols-[300px_minmax(0,1fr)]">
+        <div className="grid w-full items-start gap-4 min-[1100px]:grid-cols-[250px_minmax(0,1fr)] min-[1440px]:grid-cols-[280px_minmax(0,1fr)]">
           <StageProgress
             steps={workflowSteps}
             activeStepIndex={activeWorkflowStep}
@@ -1113,7 +1113,10 @@ export default function ProjectStudioClient({ projectId }) {
             active={activeWorkflowStep === 4}
             summary={`${generationSummary?.preferredCount || 0}/5 张首选图`}
           >
-            <div className="grid items-start gap-4 xl:grid-cols-[minmax(520px,1fr)_380px]">
+            <div
+              data-testid="generation-step-layout"
+              className="grid w-full min-w-0 items-start gap-4 min-[1100px]:grid-cols-[minmax(520px,1fr)_380px] min-[1440px]:grid-cols-[minmax(620px,1fr)_460px]"
+            >
               <div className="min-w-0">
                 <GenerationSummaryBar
                   summary={generationSummary}
@@ -1305,7 +1308,7 @@ function StepPanel({ step, active, summary, children }) {
 
 function StageProgress({ steps, activeStepIndex, summaries, onSelectStep }) {
   return (
-    <aside className="border border-zinc-800 bg-zinc-900/35 p-4 lg:sticky lg:top-4">
+    <aside className="w-full shrink-0 self-start border border-zinc-800 bg-zinc-900/35 p-4 min-[1100px]:sticky min-[1100px]:top-5">
       <p className="mb-3 text-xs font-semibold uppercase tracking-widest text-zinc-500">
         制作步骤
       </p>
@@ -1985,7 +1988,7 @@ function GenerationPreviewRail({
   return (
     <aside
       data-testid="generation-preview-rail"
-      className="sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto border border-zinc-800 bg-zinc-950 p-3"
+      className="sticky top-5 w-full max-h-[calc(100vh-2.5rem)] overflow-y-auto border border-zinc-800 bg-zinc-950 p-3"
     >
       <div className="mb-3 flex items-center justify-between gap-3">
         <h3 className="text-sm font-semibold uppercase tracking-widest text-zinc-300">
@@ -1993,7 +1996,7 @@ function GenerationPreviewRail({
         </h3>
         <span className="text-xs text-zinc-500">右侧预览栏</span>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+      <div className="grid grid-cols-2 gap-3">
         {orderedPlans.map((plan) => {
           const summaryPlan = summaryByPlan.get(plan.id);
           const latestRun = summaryPlan?.latestRun || null;
